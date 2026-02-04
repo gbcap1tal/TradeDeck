@@ -5,41 +5,41 @@
 @tailwind utilities;
 
 :root {
-  --background: 40 10% 98%;
-  --foreground: 0 0% 10%;
+  --background: 220 10% 10%;
+  --foreground: 0 0% 98%;
 
-  --card: 0 0% 100%;
-  --card-foreground: 0 0% 10%;
+  --card: 220 10% 12%;
+  --card-foreground: 0 0% 98%;
 
-  --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 10%;
+  --popover: 220 10% 12%;
+  --popover-foreground: 0 0% 98%;
 
-  --primary: 45 90% 45%;
-  --primary-foreground: 0 0% 100%;
+  --primary: 45 90% 55%;
+  --primary-foreground: 220 10% 10%;
 
-  --secondary: 40 10% 94%;
-  --secondary-foreground: 0 0% 20%;
+  --secondary: 220 10% 18%;
+  --secondary-foreground: 0 0% 98%;
 
-  --muted: 40 5% 90%;
-  --muted-foreground: 0 0% 40%;
+  --muted: 220 10% 15%;
+  --muted-foreground: 220 5% 65%;
 
-  --accent: 45 90% 96%;
-  --accent-foreground: 45 90% 20%;
+  --accent: 220 10% 20%;
+  --accent-foreground: 0 0% 98%;
 
   --destructive: 0 84% 60%;
   --destructive-foreground: 0 0% 98%;
 
-  --border: 0 0% 90%;
-  --input: 0 0% 80%;
-  --ring: 45 90% 50%;
+  --border: 220 10% 18%;
+  --input: 220 10% 20%;
+  --ring: 45 90% 55%;
 
-  --radius: 0.5rem;
+  --radius: 1rem;
 
   /* Custom Status Colors */
-  --up: 142 76% 36%;
+  --up: 142 76% 45%;
   --down: 0 84% 60%;
   
-  --font-sans: 'Plus Jakarta Sans', sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
 

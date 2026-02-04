@@ -38,8 +38,8 @@ export default function Dashboard() {
                 Live Market Data
               </div>
               
-              <h1 className="text-5xl md:text-6xl font-serif font-bold tracking-tight leading-tight">
-                Master the Markets with <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-primary/60">Precision</span>
+              <h1 className="text-6xl md:text-7xl font-bold tracking-tight leading-[1.1]">
+                Master the Markets with <span className="text-white">Precision</span>
               </h1>
               
               <p className="text-xl text-muted-foreground leading-relaxed max-w-lg">
@@ -62,27 +62,27 @@ export default function Dashboard() {
             </motion.div>
 
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
+              initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.8, delay: 0.2 }}
               className="relative"
             >
-              <div className="glass-card rounded-2xl p-6 border border-border shadow-2xl relative z-10 bg-card/60">
+              <div className="rounded-3xl p-8 border border-white/5 shadow-2xl relative z-10 bg-white/[0.03] backdrop-blur-2xl">
                 <MarketIndices />
-                <div className="mt-6 flex gap-4">
-                  <div className="flex-1 bg-background/50 rounded-xl p-4 border border-border/50">
-                     <div className="flex items-center gap-3 mb-2">
-                       <div className="p-2 bg-primary/10 rounded-lg text-primary"><BarChart2 className="w-5 h-5"/></div>
-                       <div className="font-semibold">Advanced Charting</div>
+                <div className="mt-8 grid grid-cols-2 gap-6">
+                  <div className="bg-white/[0.03] rounded-2xl p-5 border border-white/5 transition-all hover:bg-white/[0.05]">
+                     <div className="flex items-center gap-3 mb-3">
+                       <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><BarChart2 className="w-5 h-5"/></div>
+                       <div className="font-medium tracking-tight">Analytics</div>
                      </div>
-                     <p className="text-sm text-muted-foreground">Interactive charts with technical indicators.</p>
+                     <p className="text-sm text-muted-foreground leading-relaxed">Precision charts and indicators.</p>
                   </div>
-                  <div className="flex-1 bg-background/50 rounded-xl p-4 border border-border/50">
-                     <div className="flex items-center gap-3 mb-2">
-                       <div className="p-2 bg-blue-500/10 rounded-lg text-blue-500"><Zap className="w-5 h-5"/></div>
-                       <div className="font-semibold">Real-time Data</div>
+                  <div className="bg-white/[0.03] rounded-2xl p-5 border border-white/5 transition-all hover:bg-white/[0.05]">
+                     <div className="flex items-center gap-3 mb-3">
+                       <div className="p-2.5 bg-blue-500/10 rounded-xl text-blue-400"><Zap className="w-5 h-5"/></div>
+                       <div className="font-medium tracking-tight">Real-time</div>
                      </div>
-                     <p className="text-sm text-muted-foreground">Live updates on price action and news.</p>
+                     <p className="text-sm text-muted-foreground leading-relaxed">Instant market execution.</p>
                   </div>
                 </div>
               </div>
