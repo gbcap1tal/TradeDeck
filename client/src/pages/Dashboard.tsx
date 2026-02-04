@@ -38,8 +38,8 @@ export default function Dashboard() {
                 Live Market Data
               </div>
               
-              <h1 className="text-5xl md:text-6xl font-bold tracking-tight leading-tight">
-                Master the Markets with <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-green-300">Precision</span>
+              <h1 className="text-5xl md:text-6xl font-serif font-bold tracking-tight leading-tight">
+                Master the Markets with <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-primary/60">Precision</span>
               </h1>
               
               <p className="text-xl text-muted-foreground leading-relaxed max-w-lg">
