@@ -1,0 +1,97 @@
+rading Cockpit - Full-Stack Financial Markets Dashboard
+
+Build a responsive web application (desktop & mobile) for financial market analysis with the following features:
+
+HOMEPAGE - Market Overview
+
+Major Indices Panel
+Display: SPY, QQQ, QQQE, MDY, IWM, VIX, TLT
+Show for each: Current price, Daily % change, YTD % change, 1-week relative strength, 1-month relative strength
+Color-coded performance (green/red)
+Real-time or delayed quotes via API
+Sectors Heatmap/List
+All market sectors ranked from best to worst performers
+Display: Sector name, % change, relative strength
+Toggle view: Daily / Weekly / Monthly / Quarterly statistics
+Click on sector → drills down to industries view
+SECTOR DRILL-DOWN PAGE
+
+Industries Within Sector
+Same layout as sectors page
+Show all industries within selected sector
+Same metrics: % change, relative strength
+Time period toggle (D/W/M/Q)
+Click on industry → opens stock list + chart
+INDUSTRY DETAIL PAGE
+
+Stock List + Chart View
+Left panel: Scrollable list of all stocks in the industry
+Right panel: Interactive price chart for selected stock
+Chart should show: candlesticks, volume, moving averages
+Stock Fundamental Data (for each stock)
+Market Cap
+Float
+Institutional Ownership %
+Daily $ Volume
+Next Earnings Date
+Sales Growth: QoQ % and YoY %
+EPS Growth: QoQ % and YoY %
+Price/Sales ratio
+Price/Earnings ratio
+52-week high/low
+Average volume (30-day)
+Short interest %
+Dividend yield (if applicable)
+Company Description
+3-4 line business description
+Popup/modal with detailed explanation of what the company does
+Key products/services
+ADDITIONAL FEATURES
+
+Search Functionality
+Global search bar to quickly find any stock/sector/industry
+Autocomplete suggestions
+Watchlist
+User can save favorite stocks
+Quick access panel
+Comparison Tool
+Compare multiple stocks side-by-side
+Overlay charts
+Screener
+Filter stocks by: market cap, volume, growth rates, valuation metrics
+Save custom screens
+Market Breadth Indicators
+Advance/Decline line
+New highs/lows
+Stocks above 50/200 MA
+News Feed
+Latest market news
+Stock-specific news when viewing individual stocks
+TECHNICAL REQUIREMENTS
+
+Frontend: React or Next.js for responsive UI
+Backend: Node.js/Express or Python/Flask
+Database: PostgreSQL or MongoDB for storing user data, watchlists
+APIs:
+Financial data: Alpha Vantage, Finnhub, Polygon.io, or Yahoo Finance API
+News: NewsAPI or similar
+Charts: TradingView widgets, Chart.js, or Recharts
+Styling: Tailwind CSS or Material-UI for clean, professional look
+Mobile: Fully responsive design, touch-friendly navigation
+Performance: Lazy loading, caching, efficient data fetching
+UI/UX PRIORITIES
+
+Clean, professional trader-focused design
+Dark mode option
+Fast loading times
+Intuitive navigation (breadcrumbs for sector→industry→stock)
+Data tables with sorting/filtering
+Color-coded performance metrics
+Tooltips explaining each metric
+Keyboard shortcuts for power users
+DATA REFRESH
+
+Real-time or 15-min delayed quotes
+Fundamental data updated daily
+User can manually refresh
+Build this as a production-ready application with proper error handling, loading states, and a scalable architecture. Focus on creating a comprehensive "single-pane-of-glass" experience where traders can analyze markets from macro (indices) to micro (individual stocks) without leaving the app.
