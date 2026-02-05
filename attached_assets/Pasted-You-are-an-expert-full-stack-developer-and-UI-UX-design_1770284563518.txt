@@ -1,0 +1,646 @@
+You are an expert full-stack developer and UI/UX designer specializing in financial applications with Apple-level design excellence. I need you to enhance my existing "TradingCockpit" investment app with advanced sector analysis features while elevating the design to a hyper-minimal, Apple-inspired aesthetic.
+
+CURRENT STATE:
+- Dark-themed trading dashboard showing major indices (SPY, QQQ, IWM, VIX, TLT)
+- Market breadth indicators (A/D ratio, New H/L, MA percentages)
+- Sector performance tables (Top/Worst sectors and industries)
+- Functional but needs refinement toward Apple's design philosophy
+
+DESIGN PHILOSOPHY - APPLE HYPER-MINIMAL:
+- Extreme focus on whitespace and breathing room
+- Subtle, elegant animations (ease-in-out, spring physics)
+- SF Pro or Inter font family (clean, modern typography)
+- Frosted glass effects (backdrop-blur) for depth
+- Minimal borders - use subtle shadows and elevation instead
+- Monochromatic base with strategic color accents
+- Perfect alignment and mathematical spacing (8px grid system)
+- Haptic-like micro-interactions
+- "Less is more" - remove visual noise, keep only essential elements
+- Smooth gradients over harsh color blocks
+- Rounded corners (12-16px radius) for cards
+- Hover states that feel premium and responsive
+
+COLOR PALETTE:
+- Background: Deep space gray (#0a0a0a to #1a1a1a gradients)
+- Cards: Semi-transparent with blur (rgba(255,255,255,0.05))
+- Text primary: #ffffff (high contrast)
+- Text secondary: #8e8e93 (Apple gray)
+- Accent positive: #30d158 (Apple green) - use sparingly
+- Accent negative: #ff453a (Apple red) - use sparingly
+- Accent neutral: #0a84ff (Apple blue) for interactive elements
+
+NEW FEATURES TO IMPLEMENT:
+
+1. RELATIVE STRENGTH ANALYSIS
+   - Calculate and display sector/industry relative strength vs SPY benchmark
+   - Formula: RS = (Sector_Price / SPY_Price) * 100
+   - Show RS momentum (rate of change over 20, 50, 200 days)
+   - Visual design: elegant progress bars with subtle glow effects
+   - Smooth number transitions (animated counters)
+   - Add a dedicated "Relative Strength" card with frosted glass effect
+
+2. SECTOR ROTATION TRACKER
+   - Implement 4-quadrant rotation chart (Leading/Weakening/Lagging/Improving)
+   - X-axis: Relative Strength
+   - Y-axis: RS Rate of Change (momentum)
+   - Plot sector ETFs as smooth, animated bubbles with subtle shadows
+   - Minimal grid lines (barely visible, #ffffff at 5% opacity)
+   - Show rotation with elegant motion trails
+   - Quadrant labels in subtle, small caps typography
+   - Interactive tooltips with frosted glass background
+   - Add rotation alerts as subtle notification badges
+
+3. DATA INTEGRATION
+   - Use Alpaca Markets API (free tier) for real-time data
+   - Fetch data for sector ETFs: XLK, XLF, XLE, XLV, XLY, XLP, XLI, XLB, XLRE, XLU, XLC
+   - Implement efficient caching to respect API rate limits
+   - Add fallback to Alpha Vantage if needed
+   - Smooth loading states (skeleton screens with shimmer effect)
+
+TECHNICAL REQUIREMENTS:
+- React/Next.js with TypeScript
+- Tailwind CSS + custom CSS for advanced effects
+- Framer Motion for animations (spring physics, stagger effects)
+- Recharts or D3.js for minimal, custom visualizations
+- SWR or React Query for data fetching
+- Fully responsive (mobile-first approach)
+
+UI/UX COMPONENTS STYLE:
+
+Cards:
+```css
+background: rgba(255, 255, 255, 0.05);
+backdrop-filter: blur(20px);
+border: 1px solid rgba(255, 255, 255, 0.1);
+border-radius: 16px;
+box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+Typography:
+
+Headers: 600 weight, letter-spacing: -0.02em (tight)
+Body: 400 weight, line-height: 1.5
+Numbers: Tabular nums, monospace for alignment
+Labels: 500 weight, uppercase, letter-spacing: 0.05em, opacity: 0.6
+Animations:
+
+Page transitions: 300ms ease-out
+Hover effects: 200ms ease-in-out with scale(1.02)
+Number changes: Spring animation (stiffness: 300, damping: 30)
+Loading: Subtle pulse or shimmer (never spinners)
+Interactive Elements:
+
+Buttons: Minimal, text-based with subtle background on hover
+No heavy borders - use background opacity changes
+Cursor: pointer with smooth transitions
+Focus states: Subtle glow (box-shadow with accent color)
+CODE STRUCTURE:
+
+Modular components (atomic design principles)
+Custom hooks for data fetching and calculations
+Separate animation variants file for Framer Motion
+Type-safe API integration layer
+Design tokens file (colors, spacing, typography)
+Clean, self-documenting code with JSDoc comments
+Performance optimized (React.memo, useMemo, lazy loading)
+LAYOUT IMPROVEMENTS:
+
+Increase spacing between sections (24-32px minimum)
+Use CSS Grid for perfect alignment
+Sticky header with blur effect on scroll
+Smooth scroll behavior
+Asymmetric layouts for visual interest (avoid rigid symmetry)
+Progressive disclosure (show details on interaction)
+DELIVERABLES:
+
+Complete React components with Apple-inspired design
+API integration layer with Alpaca (clean, typed)
+Utility functions for RS calculations
+Framer Motion animation variants
+Tailwind config with custom design tokens
+Sample .env.example for API keys
+README with design system documentation
+INSPIRATION REFERENCES:
+
+Apple.com product pages (spacing, typography)
+iOS/macOS design language (frosted glass, subtle shadows)
+Linear.app (minimal, elegant data visualization)
+Stripe Dashboard (clean financial data presentation)
+Please provide production-ready code that feels like an Apple product - refined, minimal, and delightful to use. Every pixel should be intentional. Every animation should have purpose. The design should whisper, not shout.
+
+
+---
+
+## 🎨 Visual Design Enhancements Specifiche
+
+**Invece di:**
+- Bordi pesanti → Usa `box-shadow` sottili e `backdrop-blur`
+- Colori saturi → Usa colori desaturati con accenti strategici
+- Tabelle rigide → Usa card fluide con spaziatura generosa
+- Icone colorate → Usa icone monocromatiche con opacity
+- Grafici complessi → Usa visualizzazioni minimali e chiare
+
+**Aggiungi:**
+- Micro-interazioni (hover scale, smooth color transitions)
+- Skeleton loaders invece di spinners
+- Empty states eleganti con illustrazioni minimal
+- Smooth scroll e scroll snap per sezioni
+- Dark mode nativo (non forzato, ma naturale)
+
+Questo prompt dovrebbe darti un'app che sembra uscita direttamente da Cupertino! 🍎✨
+
+
+Screenshot 2026-02-05 alle 10.17.22.png
+
+
+
+Screenshot 2026-02-05 alle 10.17.59.png
+
+
+
+Screenshot 2026-02-05 alle 10.18.31.png
+
+
+attualmente puoi anche creare nuove pagine o spostare le varie parti per rendere luser experience migliore, magari usando una hetmap o altre metodfologie viswive. la cosa che vorrei è avere sotto controllo in una unica page la "salute del mercato", ma nulla vieta di aggiungere pagine, io per esempio se clicchi su technology apre le insdustries (anche qui va rivisto affinchè sia tutto coerente)
+se clicchi sulle industries hai la lista delle stock relative. se clicchi dentro la stock specifica hai news e dati fondamentali, quio c'è ancora da lavorare, vorrei inserire tutti i valori specifici CANSLIM, ed un chiaro grafico relativo alle sales and earnings e le percentuale di crescita sul grafico, un po' come fa marketsurge
+
+Claude Sonnet 4.5
+Perfetto! Ora ho una visione completa della tua app. Vedo la struttura di navigazione e capisco esattamente cosa vuoi. Ti preparo un prompt completo che include tutto: UX migliorata, CANSLIM metrics, heatmap, sector rotation, e relative strength.
+
+📝 Prompt Completo per Claude/base44 - TradingCockpit Evolution
+You are an expert full-stack developer and UI/UX designer specializing in financial applications with Apple-level design excellence. I need you to completely redesign and enhance my "TradingCockpit" investment app with advanced features, improved navigation architecture, and hyper-minimal Apple-inspired aesthetics.
+
+═══════════════════════════════════════════════════════════════════
+CURRENT APP STRUCTURE & ISSUES
+═══════════════════════════════════════════════════════════════════
+
+EXISTING NAVIGATION HIERARCHY:
+1. Markets Overview (Home) → Shows indices, market breadth, sector/industry performance
+2. Sector Page (e.g., Technology) → Shows industries within sector as cards
+3. Industry Page (e.g., Software-Infrastructure) → Shows stock list with mini chart
+4. Stock Detail Page (e.g., MSFT) → Shows price chart, basic fundamentals, news
+
+CURRENT PROBLEMS TO SOLVE:
+- Navigation flow works but needs visual coherence across all levels
+- Stock detail page lacks CANSLIM-specific metrics
+- No visual representation of market health in one glance
+- Missing sector rotation analysis
+- Missing relative strength indicators
+- Growth metrics (Sales/Earnings) not prominently displayed
+- No heatmap or advanced visualizations
+
+═══════════════════════════════════════════════════════════════════
+DESIGN PHILOSOPHY - APPLE HYPER-MINIMAL
+═══════════════════════════════════════════════════════════════════
+
+CORE PRINCIPLES:
+- Extreme focus on whitespace and breathing room (minimum 24-32px between sections)
+- Subtle, elegant animations with spring physics (Framer Motion)
+- SF Pro Display or Inter font family
+- Frosted glass effects (backdrop-blur) for depth and layering
+- Minimal borders - use subtle shadows and elevation
+- Monochromatic base with strategic color accents
+- Perfect alignment on 8px grid system
+- Haptic-like micro-interactions
+- "Less is more" - remove visual noise
+- Smooth gradients over harsh blocks
+- Rounded corners (12-16px) for all cards
+- Premium hover states (scale, glow, blur)
+
+COLOR PALETTE:
+- Background: Deep space gray (#0a0a0a to #1a1a1a gradients)
+- Cards: rgba(255,255,255,0.05) with backdrop-blur(20px)
+- Borders: rgba(255,255,255,0.1) - barely visible
+- Text primary: #ffffff
+- Text secondary: #8e8e93 (Apple gray)
+- Text tertiary: #636366 (labels, metadata)
+- Accent positive: #30d158 (Apple green) - use sparingly
+- Accent negative: #ff453a (Apple red) - use sparingly  
+- Accent neutral: #0a84ff (Apple blue) - interactive elements
+- Warning: #ffd60a (Apple yellow)
+
+TYPOGRAPHY:
+- Hero numbers: 48-64px, weight 700, letter-spacing -0.03em
+- Section headers: 24-32px, weight 600, letter-spacing -0.02em
+- Card titles: 18-20px, weight 600
+- Body text: 14-16px, weight 400, line-height 1.5
+- Labels: 12px, weight 500, uppercase, letter-spacing 0.05em, opacity 0.6
+- Numbers: Tabular nums, monospace for perfect alignment
+
+CARD DESIGN TEMPLATE:
+```css
+background: rgba(255, 255, 255, 0.05);
+backdrop-filter: blur(20px) saturate(180%);
+border: 1px solid rgba(255, 255, 255, 0.1);
+border-radius: 16px;
+box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 
+            0 1px 0 rgba(255, 255, 255, 0.1) inset;
+transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+&:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+ANIMATION GUIDELINES:
+
+Page transitions: 300ms ease-out
+Hover effects: 200ms ease-in-out
+Number changes: Spring animation (stiffness: 300, damping: 30)
+Loading: Shimmer effect (no spinners)
+Scroll: Smooth with parallax on hero elements
+Stagger children: 50ms delay between items
+═══════════════════════════════════════════════════════════════════
+NEW FEATURES & ENHANCEMENTS
+═══════════════════════════════════════════════════════════════════
+
+MARKETS OVERVIEW PAGE (REDESIGNED) Goal: One-page "market health dashboard" LAYOUT STRUCTURE: A. Hero Section (Top)
+Major indices in horizontal scroll cards (SPY, QQQ, IWM, VIX, TLT)
+Each card: Large price, % change, mini sparkline
+Smooth horizontal scroll with snap points
+Subtle gradient fade on edges
+B. Market Health Heatmap (NEW - Prominent)
+Interactive treemap showing all sectors sized by market cap
+Color intensity = performance (deep red to deep green)
+Hover shows: Sector name, %, RS score
+Click navigates to sector detail
+Smooth color transitions
+Inspiration: Finviz heatmap but more minimal
+C. Market Breadth Indicators (Refined)
+4 cards in grid: A/D Ratio, New H/L, >50 MA, >200 MA
+Each card: Large number, progress bar, trend arrow
+Subtle glow effect on positive metrics
+D. Relative Strength Leaders (NEW)
+Horizontal scrollable cards showing top 5 sectors by RS
+Each card shows:
+Sector name + icon
+RS score (large, prominent)
+RS momentum indicator (↑↗→↘↓)
+Mini chart of RS trend (20 days)
+Sector ETF ticker (XLK, XLF, etc.)
+Click to navigate to sector detail
+E. Sector Rotation Quadrant (NEW - Key Feature)
+Beautiful 4-quadrant scatter plot
+X-axis: Relative Strength vs SPY
+Y-axis: RS Rate of Change (momentum)
+Quadrants labeled:
+Top-right: "Leading" (green glow)
+Top-left: "Improving" (blue glow)
+Bottom-left: "Lagging" (red glow)
+Bottom-right: "Weakening" (yellow glow)
+Plot sector ETFs as bubbles (size = market cap)
+Show rotation trails (last 5 positions, fading opacity)
+Smooth animations when sectors move
+Minimal grid lines (barely visible)
+Interactive tooltips on hover
+F. Top/Worst Performers (Refined)
+Two columns: Top Industries | Worst Industries
+Compact list (top 5 each)
+Show: Rank, Name, %, RS indicator
+Click navigates to industry page
+SECTOR PAGE (REFINED) Current: Shows industry cards in grid ENHANCEMENTS:
+Add sector-level metrics at top:
+Sector ETF price/chart (XLK for Technology)
+Sector RS vs SPY (prominent)
+Sector momentum indicator
+Total market cap
+Number of stocks
+Industry cards improvements:
+Add RS score badge on each card
+Add mini RS trend sparkline
+Show top 3 stocks in industry (small text)
+Smooth hover effects with glow
+Add filter/sort options:
+By performance
+By RS
+By momentum
+By market cap
+INDUSTRY PAGE (REFINED) Current: Stock list with mini chart on right ENHANCEMENTS:
+Add industry-level header:
+Industry name + breadcrumb
+Industry performance vs sector
+Industry RS score
+Total stocks count
+Stock list improvements:
+Add RS column (sortable)
+Add CANSLIM rating badge (A+ to F)
+Add volume indicator (above/below average)
+Improve mini chart (show 50/200 MA lines)
+Add quick-view tooltip on hover (key metrics)
+Add filters:
+RS > 80
+Volume > 50% above average
+Price > 50 MA
+CANSLIM rating A or B
+STOCK DETAIL PAGE (MAJOR OVERHAUL) Current: Basic chart, fundamentals, news NEW LAYOUT: A. Hero Section
+Stock ticker + name
+Large price display
+% change (prominent)
+Sector/Industry breadcrumb
+Quick actions: Watchlist, Share, Alert
+B. Price Chart (Enhanced)
+Larger, more prominent
+Show 50 MA and 200 MA lines
+Volume bars below
+Timeframe selector: 1D, 1W, 1M, 3M, 1Y
+Annotations for earnings dates
+Clean, minimal design (no clutter)
+C. CANSLIM Scorecard (NEW - Critical Feature)
+Prominent card showing all CANSLIM metrics
+Visual rating system (A+ to F for each letter)
+METRICS TO DISPLAY: C - Current Quarterly Earnings
+* EPS growth % (QoQ)
+* Target: >25%
+* Visual: Progress bar + grade A - Annual Earnings Growth
+* EPS growth % (YoY)
+* Last 3 years trend
+* Target: >25% each year
+* Visual: Mini bar chart + grade N - New Product/Service/Management/High
+* 52-week high proximity %
+* Days from high
+* Visual: Gauge + grade S - Supply & Demand (Shares Outstanding)
+* Float size
+* Institutional ownership %
+* Insider ownership %
+* Recent insider buying/selling
+* Visual: Pie chart + grade L - Leader or Laggard (Relative Strength)
+* RS Rating (0-99)
+* RS vs sector
+* RS vs SPY
+* RS trend (20/50 day)
+* Visual: Large number + trend line + grade I - Institutional Sponsorship
+* Number of institutions
+* % ownership
+* Recent changes (Q/Q)
+* Top 5 holders
+* Visual: List + trend + grade M - Market Direction
+* SPY trend
+* Sector trend
+* Market breadth
+* Visual: Indicator + grade OVERALL CANSLIM SCORE:
+* Aggregate grade (A+ to F)
+* Large, prominent display
+* Color-coded (green = A/B, yellow = C, red = D/F) D. Sales & Earnings Growth Chart (NEW - MarketSurge Style)
+Dual-axis chart:
+Bars: Quarterly sales (blue)
+Bars: Quarterly earnings (green)
+Show % growth labels on each bar
+Highlight bars with >25% growth (brighter color)
+Show trend line
+Last 8 quarters minimum
+Clean, minimal design
+Inspiration: MarketSurge earnings chart
+E. Key Fundamentals (Refined)
+Grid layout (2-3 columns)
+Show:
+Market Cap
+P/E Ratio (with sector average comparison)
+P/S Ratio
+PEG Ratio
+Profit Margin %
+ROE %
+Debt/Equity
+Current Ratio
+Free Cash Flow
+Dividend Yield (if applicable)
+Each metric: Label, value, trend indicator
+Color-code vs sector average (green/red)
+F. Technical Indicators (NEW)
+RSI (14)
+MACD
+Volume (20-day average comparison)
+Support/Resistance levels
+Minimal, clean display
+G. Latest News (Refined)
+Cleaner card design
+Source logo/icon
+Timestamp
+Sentiment indicator (positive/neutral/negative)
+Click to read full article
+═══════════════════════════════════════════════════════════════════
+DATA INTEGRATION & API
+═══════════════════════════════════════════════════════════════════
+
+PRIMARY API: Alpaca Markets (Free Tier)
+
+Real-time stock prices
+Historical data for charts
+Sector ETF data (XLK, XLF, XLE, XLV, XLY, XLP, XLI, XLB, XLRE, XLU, XLC)
+SECONDARY API: Alpha Vantage (Fallback)
+
+Fundamental data
+Earnings data
+Technical indicators
+DATA REQUIREMENTS:
+
+Fetch sector ETF prices for RS calculations
+Fetch individual stock fundamentals for CANSLIM
+Fetch earnings history (8 quarters minimum)
+Fetch institutional ownership data
+Cache aggressively (respect rate limits)
+Implement SWR or React Query for efficient fetching
+Show loading states (skeleton screens with shimmer)
+Handle errors gracefully (fallback UI)
+CALCULATIONS NEEDED:
+
+Relative Strength (RS):
+
+typescript
+Copy
+const calculateRS = (stockPrice: number, spyPrice: number) => {
+  return (stockPrice / spyPrice) * 100;
+};
+
+const calculateRSRating = (currentRS: number, historicalRS: number[]) => {
+  // Percentile rank (0-99)
+  // Compare current RS to all stocks in database
+  return percentileRank;
+};
+
+const calculateRSMomentum = (currentRS: number, pastRS: number) => {
+  return ((currentRS - pastRS) / pastRS) * 100;
+};
+CANSLIM Grading Logic:
+
+typescript
+Copy
+// C - Current Earnings
+const gradeCurrentEarnings = (epsGrowth: number) => {
+  if (epsGrowth >= 40) return 'A+';
+  if (epsGrowth >= 25) return 'A';
+  if (epsGrowth >= 15) return 'B';
+  if (epsGrowth >= 5) return 'C';
+  return 'F';
+};
+
+// Similar logic for each CANSLIM component
+// Aggregate into overall score
+═══════════════════════════════════════════════════════════════════
+TECHNICAL REQUIREMENTS
+═══════════════════════════════════════════════════════════════════
+
+STACK:
+
+React 18+ with TypeScript
+Next.js 14+ (App Router)
+Tailwind CSS + custom CSS for advanced effects
+Framer Motion for animations
+Recharts or Lightweight Charts for visualizations
+D3.js for heatmap and rotation quadrant
+SWR or TanStack Query for data fetching
+Zustand or Jotai for state management (lightweight)
+date-fns for date formatting
+COMPONENT STRUCTURE:
+
+/components
+  /layout
+    - Header.tsx
+    - Navigation.tsx
+    - Breadcrumb.tsx
+  /markets
+    - HeroIndices.tsx
+    - MarketHeatmap.tsx
+    - MarketBreadth.tsx
+    - RelativeStrengthLeaders.tsx
+    - SectorRotationQuadrant.tsx
+    - TopPerformers.tsx
+  /sector
+    - SectorHeader.tsx
+    - IndustryCard.tsx
+    - IndustryGrid.tsx
+  /industry
+    - IndustryHeader.tsx
+    - StockList.tsx
+    - StockRow.tsx
+  /stock
+    - StockHero.tsx
+    - PriceChart.tsx
+    - CanslimScorecard.tsx
+    - EarningsChart.tsx
+    - Fundamentals.tsx
+    - TechnicalIndicators.tsx
+    - NewsSection.tsx
+  /ui
+    - Card.tsx
+    - Button.tsx
+    - Badge.tsx
+    - Tooltip.tsx
+    - Skeleton.tsx
+    - GradeIndicator.tsx
+
+/hooks
+  - useMarketData.ts
+  - useStockData.ts
+  - useRelativeStrength.ts
+  - useCanslimScore.ts
+
+/lib
+  - api/
+    - alpaca.ts
+    - alphaVantage.ts
+  - calculations/
+    - relativeStrength.ts
+    - canslim.ts
+  - utils/
+    - formatters.ts
+    - colors.ts
+
+/types
+  - market.ts
+  - stock.ts
+  - canslim.ts
+PERFORMANCE OPTIMIZATIONS:
+
+React.memo for expensive components
+useMemo for calculations
+useCallback for event handlers
+Lazy loading for charts
+Virtual scrolling for long lists
+Image optimization (Next.js Image)
+Code splitting by route
+Prefetch on hover for navigation
+RESPONSIVE DESIGN:
+
+Mobile-first approach
+Breakpoints: 640px, 768px, 1024px, 1280px, 1536px
+Stack cards vertically on mobile
+Horizontal scroll for tables on mobile
+Touch-friendly hit areas (min 44px)
+Swipe gestures for navigation
+═══════════════════════════════════════════════════════════════════
+UX ENHANCEMENTS
+═══════════════════════════════════════════════════════════════════
+
+NAVIGATION:
+
+Sticky header with blur on scroll
+Breadcrumb navigation (always visible)
+Back button (browser-like)
+Keyboard shortcuts (/, Esc, Arrow keys)
+Search functionality (Cmd+K to open)
+INTERACTIONS:
+
+Smooth page transitions
+Optimistic UI updates
+Skeleton loaders (no spinners)
+Toast notifications for actions
+Contextual tooltips
+Hover previews
+Click-to-copy for tickers
+Share functionality
+ACCESSIBILITY:
+
+Semantic HTML
+ARIA labels
+Keyboard navigation
+Focus indicators
+Color contrast (WCAG AA)
+Screen reader support
+═══════════════════════════════════════════════════════════════════
+DELIVERABLES
+═══════════════════════════════════════════════════════════════════
+
+Complete Next.js application with all pages
+All React components (production-ready)
+API integration layer (Alpaca + Alpha Vantage)
+Utility functions for calculations (RS, CANSLIM)
+Framer Motion animation variants
+Tailwind config with design tokens
+TypeScript types for all data structures
+Sample .env.example with API keys
+README with:
+Setup instructions
+Design system documentation
+API usage guide
+Component documentation
+Deployment-ready code (Vercel-optimized)
+═══════════════════════════════════════════════════════════════════
+INSPIRATION & REFERENCES
+═══════════════════════════════════════════════════════════════════
+
+DESIGN:
+
+Apple.com (spacing, typography, animations)
+Linear.app (minimal, elegant)
+Stripe Dashboard (clean data presentation)
+Vercel Dashboard (modern, fast)
+FUNCTIONALITY:
+
+MarketSurge (CANSLIM metrics, earnings charts)
+Finviz (heatmap visualization)
+TradingView (sector rotation concepts)
+IBD (relative strength methodology)
+═══════════════════════════════════════════════════════════════════
+FINAL NOTES
+═══════════════════════════════════════════════════════════════════
+
+This app should feel like an Apple product - refined, minimal, and delightful to use. Every pixel should be intentional. Every animation should have purpose. The design should whisper, not shout.
+
+Focus on:
+
+Information hierarchy (most important data first)
+Progressive disclosure (show details on interaction)
+Consistency across all pages
+Performance (fast, responsive, smooth)
+Clarity (easy to understand complex data)
+The goal is to create the best CANSLIM-focused investment app with Apple-level design quality. Make it a tool that professional investors would love to use daily.
+
+Please provide production-ready, well-documented code that I can deploy immediately.
