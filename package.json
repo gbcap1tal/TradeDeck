@@ -58,6 +58,7 @@
     "memoizee": "^0.4.17",
     "memorystore": "^1.6.7",
     "next-themes": "^0.4.6",
+    "node-cache": "^5.1.2",
     "openid-client": "^6.8.1",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
@@ -75,6 +76,7 @@
     "vaul": "^1.1.2",
     "wouter": "^3.3.5",
     "ws": "^8.18.0",
+    "yahoo-finance2": "^3.13.0",
     "zod": "^3.24.2",
     "zod-validation-error": "^3.4.0"
   },
