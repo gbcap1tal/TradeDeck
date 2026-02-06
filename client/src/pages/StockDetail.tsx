@@ -7,7 +7,7 @@ import { ChevronRight, Plus, TrendingDown, TrendingUp, Check, X, AlertTriangle, 
 import { useAddToWatchlist, useWatchlists } from "@/hooks/use-watchlists";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { format } from "date-fns";
 import {
   DropdownMenu,
@@ -181,16 +181,36 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
 function EarningsSalesChart({ symbol }: { symbol: string }) {
   const { data: earnings, isLoading } = useStockEarnings(symbol);
   const [hovered, setHovered] = useState<number | null>(null);
+  const [dims, setDims] = useState({ w: 0, h: 0 });
+  const svgRef = useRef<SVGSVGElement | null>(null);
+
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect;
+      if (r) setDims({ w: r.width, h: r.height });
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [!!earnings]);
 
   if (isLoading) return <div className="glass-card rounded-xl shimmer h-full" />;
   if (!earnings) return null;
 
-  const maxSales = Math.max(...earnings.sales);
-  const maxEps = Math.max(...earnings.earnings.map(Math.abs));
+  const allValues = [...earnings.sales, ...earnings.earnings.map(Math.abs)];
+  const maxVal = Math.max(...allValues);
+  const labelH = 28;
+  const barAreaH = Math.max(dims.h - labelH, 0);
+  const n = earnings.quarters.length;
+  const groupGap = dims.w > 0 ? Math.max(dims.w * 0.03, 6) : 8;
+  const groupW = n > 0 ? (dims.w - groupGap * (n - 1)) / n : 0;
+  const barGap = 2;
+  const barW = (groupW - barGap) / 2;
 
   return (
     <div className="glass-card rounded-xl p-4 h-full flex flex-col" data-testid="card-earnings-sales">
-      <div className="flex items-center justify-between mb-3 flex-shrink-0">
+      <div className="flex items-center justify-between mb-2 flex-shrink-0">
         <h2 className="text-[13px] font-semibold text-white/90 tracking-wide">Earnings & Sales</h2>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
@@ -204,7 +224,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 relative" style={{ minHeight: '100px' }}>
+      <div className="flex-1 min-h-0 relative">
         {hovered !== null && (
           <div
             className="absolute top-0 left-1/2 -translate-x-1/2 z-10 rounded-xl border border-white/10 px-5 py-3 pointer-events-none"
@@ -236,54 +256,73 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
           </div>
         )}
 
-        <div className="flex items-end gap-2 h-full px-1">
-          {earnings.quarters.map((q: string, i: number) => {
-            const sH = maxSales > 0 ? (earnings.sales[i] / maxSales) * 100 : 0;
-            const eH = maxEps > 0 ? (Math.abs(earnings.earnings[i]) / maxEps) * 100 : 0;
+        <svg
+          ref={svgRef}
+          width="100%"
+          height="100%"
+          style={{ overflow: 'visible' }}
+        >
+          {dims.w > 0 && dims.h > 0 && earnings.quarters.map((q: string, i: number) => {
+            const salesPct = maxVal > 0 ? earnings.sales[i] / maxVal : 0;
+            const epsPct = maxVal > 0 ? Math.abs(earnings.earnings[i]) / maxVal : 0;
+            const sBarH = Math.max(salesPct * barAreaH, 4);
+            const eBarH = Math.max(epsPct * barAreaH, 4);
+            const x = i * (groupW + groupGap);
+            const isHov = hovered === i;
             const eGrowth = earnings.earningsGrowth[i];
-            const isHovered = hovered === i;
 
             return (
-              <div
+              <g
                 key={q}
-                className="flex-1 flex flex-col items-center cursor-pointer group"
                 onMouseEnter={() => setHovered(i)}
                 onMouseLeave={() => setHovered(null)}
+                style={{ cursor: 'pointer' }}
                 data-testid={`earnings-bar-${i}`}
               >
-                <div
-                  className="w-full flex items-end gap-[2px]"
-                  style={{ height: 'calc(100% - 32px)' }}
+                <rect x={x} y={0} width={groupW} height={dims.h} fill="transparent" />
+                <rect
+                  x={x}
+                  y={barAreaH - sBarH}
+                  width={barW}
+                  height={sBarH}
+                  rx={2}
+                  fill={isHov ? 'rgba(255,255,255,0.50)' : 'rgba(255,255,255,0.30)'}
+                />
+                <rect
+                  x={x + barW + barGap}
+                  y={barAreaH - eBarH}
+                  width={barW}
+                  height={eBarH}
+                  rx={2}
+                  fill={isHov ? '#FBBB04' : 'rgba(251,187,4,0.75)'}
+                />
+                <text
+                  x={x + groupW / 2}
+                  y={barAreaH + 14}
+                  textAnchor="middle"
+                  fill="rgba(255,255,255,0.35)"
+                  fontSize="9"
+                  fontFamily="monospace"
                 >
-                  <div
-                    className="flex-1 rounded-t transition-all"
-                    style={{
-                      height: `${Math.max(sH, 10)}%`,
-                      backgroundColor: isHovered ? 'rgba(255,255,255,0.50)' : 'rgba(255,255,255,0.30)',
-                      minHeight: '8px',
-                    }}
-                  />
-                  <div
-                    className="flex-1 rounded-t transition-all"
-                    style={{
-                      height: `${Math.max(eH, 10)}%`,
-                      backgroundColor: isHovered ? '#FBBB04' : 'rgba(251,187,4,0.65)',
-                      minHeight: '8px',
-                    }}
-                  />
-                </div>
-                <div className="flex flex-col items-center mt-1.5 gap-0">
-                  <span className="text-[9px] text-white/35 font-mono">{q}</span>
-                  {i > 0 && (
-                    <span className={cn("text-[9px] font-mono-nums font-semibold", eGrowth >= 0 ? "text-[#30d158]/80" : "text-[#ff453a]/70")}>
-                      {eGrowth > 0 ? '+' : ''}{eGrowth.toFixed(0)}%
-                    </span>
-                  )}
-                </div>
-              </div>
+                  {q}
+                </text>
+                {i > 0 && (
+                  <text
+                    x={x + groupW / 2}
+                    y={barAreaH + 24}
+                    textAnchor="middle"
+                    fill={eGrowth >= 0 ? 'rgba(48,209,88,0.8)' : 'rgba(255,69,58,0.7)'}
+                    fontSize="9"
+                    fontWeight="600"
+                    fontFamily="monospace"
+                  >
+                    {eGrowth > 0 ? '+' : ''}{eGrowth.toFixed(0)}%
+                  </text>
+                )}
+              </g>
             );
           })}
-        </div>
+        </svg>
       </div>
     </div>
   );
