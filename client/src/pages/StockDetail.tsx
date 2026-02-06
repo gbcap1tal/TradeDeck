@@ -200,8 +200,8 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
 
   const allValues = [...earnings.sales, ...earnings.earnings.map(Math.abs)];
   const maxVal = Math.max(...allValues);
-  const topPad = 16;
-  const labelH = 28;
+  const topPad = 24;
+  const labelH = 36;
   const barAreaH = Math.max(dims.h - labelH - topPad, 0);
   const n = earnings.quarters.length;
   const groupGap = dims.w > 0 ? Math.max(dims.w * 0.03, 6) : 8;
@@ -299,10 +299,10 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                 />
                 <text
                   x={x + groupW / 2}
-                  y={topPad + barAreaH + 14}
+                  y={topPad + barAreaH + 16}
                   textAnchor="middle"
-                  fill="rgba(255,255,255,0.35)"
-                  fontSize="9"
+                  fill="rgba(255,255,255,0.40)"
+                  fontSize="10"
                   fontFamily="monospace"
                 >
                   {q}
@@ -310,10 +310,10 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                 {i > 0 && (
                   <text
                     x={x + groupW / 2}
-                    y={topPad + barAreaH + 24}
+                    y={topPad + barAreaH + 30}
                     textAnchor="middle"
-                    fill={eGrowth >= 0 ? 'rgba(48,209,88,0.8)' : 'rgba(255,69,58,0.7)'}
-                    fontSize="9"
+                    fill={eGrowth >= 0 ? 'rgba(48,209,88,0.85)' : 'rgba(255,69,58,0.75)'}
+                    fontSize="10"
                     fontWeight="600"
                     fontFamily="monospace"
                   >
