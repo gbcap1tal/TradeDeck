@@ -227,6 +227,100 @@ function getStockHistory(symbol: string, range: string = '1M') {
   return data;
 }
 
+function getStockQuality(symbol: string, rsTimeframe: string = 'current') {
+  const s = (suffix: string) => seededRandom(symbol + suffix);
+
+  const basePrice = 100 + s('bp') * 400;
+  const marketCap = Math.floor(s('mc') * 2000) * 1e9;
+  const floatShares = Math.floor(50 + s('float') * 450) * 1e6;
+
+  const rsMap: Record<string, number> = {
+    current: Math.round((40 + s('rs_cur') * 59) * 10) / 10,
+    '1M': Math.round((35 + s('rs_1m') * 60) * 10) / 10,
+    '3M': Math.round((30 + s('rs_3m') * 65) * 10) / 10,
+    '6M': Math.round((25 + s('rs_6m') * 70) * 10) / 10,
+    '12M': Math.round((20 + s('rs_12m') * 75) * 10) / 10,
+  };
+  const rsVsSpy = rsMap[rsTimeframe] ?? rsMap['current'];
+
+  const adr = Math.round((1.5 + s('adr') * 6.5) * 100) / 100;
+  const instOwnership = Math.round((30 + s('inst') * 55) * 10) / 10;
+  const numInstitutions = Math.floor(200 + s('numinst') * 2800);
+  const avgVolume50d = Math.floor(500000 + s('avgvol') * 15000000);
+
+  const now = new Date();
+  const daysToEarnings = Math.floor(5 + s('dte') * 80);
+  const nextEarningsDate = new Date(now.getTime() + daysToEarnings * 86400000).toISOString().split('T')[0];
+
+  const epsQoQ = Math.round((-15 + s('epsqoq') * 80) * 10) / 10;
+  const salesQoQ = Math.round((-10 + s('salesqoq') * 60) * 10) / 10;
+  const epsYoY = Math.round((-10 + s('epsyoy') * 90) * 10) / 10;
+  const salesYoY = Math.round((-5 + s('salesyoy') * 70) * 10) / 10;
+  const earningsAcceleration = s('eacc') > 0.45;
+  const salesGrowth1Y = Math.round((-5 + s('sg1y') * 60) * 10) / 10;
+
+  const epsTTM = Math.round((-2 + s('epsttm') * 15) * 100) / 100;
+  const fcfTTM = Math.round((-500 + s('fcfttm') * 3000) * 1e6);
+
+  const weinsteinStage = Math.min(4, Math.max(1, Math.floor(1 + s('wein') * 4)));
+  const price = basePrice * (1 + (s('curprice') - 0.5) * 0.1);
+  const ema10 = price * (1 + (s('ema10') - 0.55) * 0.04);
+  const ema20 = price * (1 + (s('ema20') - 0.5) * 0.06);
+  const sma50 = price * (1 + (s('sma50') - 0.45) * 0.1);
+  const sma200 = price * (1 + (s('sma200') - 0.4) * 0.15);
+
+  const aboveEma10 = price > ema10;
+  const aboveEma20 = price > ema20;
+  const aboveSma50 = price > sma50;
+  const aboveSma200 = price > sma200;
+  const maAlignment = ema10 > ema20 && ema20 > sma50 && sma50 > sma200;
+  const distFromSma50 = Math.round(((price - sma50) / sma50) * 100 * 100) / 100;
+
+  const atrMultiple = Math.round((1 + s('atr') * 8) * 10) / 10;
+  let overextensionFlag: string;
+  if (atrMultiple < 4) overextensionFlag = '<4';
+  else if (atrMultiple <= 6) overextensionFlag = '4-6';
+  else overextensionFlag = '>=7';
+
+  return {
+    details: {
+      marketCap,
+      floatShares,
+      rsVsSpy,
+      rsTimeframe,
+      adr,
+      instOwnership,
+      numInstitutions,
+      avgVolume50d,
+      nextEarningsDate,
+      daysToEarnings,
+    },
+    fundamentals: {
+      epsQoQ,
+      salesQoQ,
+      epsYoY,
+      salesYoY,
+      earningsAcceleration,
+      salesGrowth1Y,
+    },
+    profitability: {
+      epsTTM,
+      fcfTTM,
+    },
+    trend: {
+      weinsteinStage,
+      aboveEma10,
+      aboveEma20,
+      aboveSma50,
+      aboveSma200,
+      maAlignment,
+      distFromSma50,
+      overextensionFlag,
+      atrMultiple,
+    },
+  };
+}
+
 function getCANSLIM(symbol: string) {
   const s = (suffix: string) => seededRandom(symbol + suffix);
   
@@ -381,6 +475,12 @@ export async function registerRoutes(
   app.get('/api/stocks/:symbol/canslim', (req, res) => {
     const { symbol } = req.params;
     res.json(getCANSLIM(symbol));
+  });
+
+  app.get('/api/stocks/:symbol/quality', (req, res) => {
+    const { symbol } = req.params;
+    const rsTimeframe = (req.query.rsTimeframe as string) || 'current';
+    res.json(getStockQuality(symbol, rsTimeframe));
   });
 
   app.get('/api/stocks/:symbol/earnings', (req, res) => {

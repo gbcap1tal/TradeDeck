@@ -52,6 +52,18 @@ export function useStockEarnings(symbol: string) {
   });
 }
 
+export function useStockQuality(symbol: string, rsTimeframe: string = 'current') {
+  return useQuery({
+    queryKey: ['/api/stocks', symbol, 'quality', rsTimeframe],
+    queryFn: async () => {
+      const res = await fetch(`/api/stocks/${symbol}/quality?rsTimeframe=${rsTimeframe}`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!symbol,
+  });
+}
+
 export function useStockNews(symbol: string) {
   return useQuery({
     queryKey: ['/api/stocks', symbol, 'news'],
