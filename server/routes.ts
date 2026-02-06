@@ -1038,7 +1038,7 @@ export async function registerRoutes(
 
       const allTickers = ['SPY', ...SECTOR_ETFS.map(s => s.ticker)];
       const historyResults = await Promise.allSettled(
-        allTickers.map(t => yahoo.getHistory(t, '3M'))
+        allTickers.map(t => yahoo.getHistory(t, '1Y'))
       );
 
       const historyMap = new Map<string, Array<{ time: string; close: number }>>();
@@ -1050,7 +1050,7 @@ export async function registerRoutes(
       });
 
       const spyHist = historyMap.get('SPY');
-      if (!spyHist || spyHist.length < 20) {
+      if (!spyHist || spyHist.length < 30) {
         return res.json({ sectors: [] });
       }
 
@@ -1058,8 +1058,8 @@ export async function registerRoutes(
       spyHist.forEach(d => spyByDate.set(d.time, d.close));
 
       const RS_PERIOD = 10;
-      const MOM_PERIOD = 10;
-      const TAIL_LENGTH = 5;
+      const MOM_PERIOD = 5;
+      const TAIL_LENGTH = 10;
 
       const calcSMA = (arr: number[], period: number): number[] => {
         const result: number[] = [];
@@ -1073,11 +1073,11 @@ export async function registerRoutes(
           }
         }
         return result;
-      }
+      };
 
       const sectors = SECTOR_ETFS.map(sector => {
         const sectorHist = historyMap.get(sector.ticker);
-        if (!sectorHist || sectorHist.length < 25) {
+        if (!sectorHist || sectorHist.length < 30) {
           return null;
         }
 
@@ -1092,38 +1092,28 @@ export async function registerRoutes(
           }
         }
 
-        if (ratios.length < 25) return null;
+        if (ratios.length < 30) return null;
 
         const ratioSMA = calcSMA(ratios, RS_PERIOD);
         const rsRatio: number[] = ratios.map((r, i) =>
           isNaN(ratioSMA[i]) ? NaN : (r / ratioSMA[i]) * 100
         );
 
-        const rsRatioSMA = calcSMA(
-          rsRatio.filter(v => !isNaN(v)),
-          MOM_PERIOD
-        );
-
-        const validRS = rsRatio.filter(v => !isNaN(v));
-        const rsMomentum: number[] = validRS.map((r, i) =>
-          i < rsRatioSMA.length && !isNaN(rsRatioSMA[i]) && rsRatioSMA[i] > 0
-            ? (r / rsRatioSMA[i]) * 100
-            : NaN
-        );
+        const rsMomentum: number[] = rsRatio.map((r, i) => {
+          if (isNaN(r) || i < MOM_PERIOD) return NaN;
+          const prev = rsRatio[i - MOM_PERIOD];
+          if (isNaN(prev) || prev === 0) return NaN;
+          return ((r - prev) / prev) * 100;
+        });
 
         const validPairs: Array<{ date: string; rsRatio: number; rsMomentum: number }> = [];
-        let validIdx = 0;
         for (let i = 0; i < rsRatio.length; i++) {
-          if (!isNaN(rsRatio[i])) {
-            if (validIdx < rsMomentum.length && !isNaN(rsMomentum[validIdx])) {
-              const dateIdx = i;
-              validPairs.push({
-                date: alignedDates[dateIdx],
-                rsRatio: Math.round(rsRatio[i] * 100) / 100,
-                rsMomentum: Math.round(rsMomentum[validIdx] * 100) / 100,
-              });
-            }
-            validIdx++;
+          if (!isNaN(rsRatio[i]) && !isNaN(rsMomentum[i])) {
+            validPairs.push({
+              date: alignedDates[i],
+              rsRatio: Math.round(rsRatio[i] * 100) / 100,
+              rsMomentum: Math.round(rsMomentum[i] * 100) / 100,
+            });
           }
         }
 
@@ -1141,16 +1131,17 @@ export async function registerRoutes(
         const current = validPairs[validPairs.length - 1];
 
         let quadrant: string;
-        if (current.rsRatio >= 100 && current.rsMomentum >= 100) quadrant = 'leading';
-        else if (current.rsRatio >= 100 && current.rsMomentum < 100) quadrant = 'weakening';
-        else if (current.rsRatio < 100 && current.rsMomentum >= 100) quadrant = 'improving';
+        if (current.rsRatio >= 100 && current.rsMomentum >= 0) quadrant = 'leading';
+        else if (current.rsRatio >= 100 && current.rsMomentum < 0) quadrant = 'weakening';
+        else if (current.rsRatio < 100 && current.rsMomentum >= 0) quadrant = 'improving';
         else quadrant = 'lagging';
 
         const prev = validPairs.length > 1 ? validPairs[validPairs.length - 2] : current;
-        const heading = Math.atan2(
+        let heading = Math.atan2(
           current.rsMomentum - prev.rsMomentum,
           current.rsRatio - prev.rsRatio
         ) * (180 / Math.PI);
+        if (heading < 0) heading += 360;
 
         return {
           name: sector.name,

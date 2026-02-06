@@ -1,0 +1,447 @@
+Codice RRG per Replit - Swing Trading
+python
+Copy
+import yfinance as yf
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+# 11 Settori S&P 500 (SPDR ETFs)
+SECTORS = {
+    'Technology': 'XLK',
+    'Healthcare': 'XLV',
+    'Financials': 'XLF',
+    'Consumer Discretionary': 'XLY',
+    'Industrials': 'XLI',
+    'Consumer Staples': 'XLP',
+    'Energy': 'XLE',
+    'Utilities': 'XLU',
+    'Real Estate': 'XLRE',
+    'Materials': 'XLB',
+    'Communication Services': 'XLC'
+}
+
+BENCHMARK = 'SPY'
+
+class RRGCalculator:
+    """
+    Calcola metriche RRG secondo metodologia Julius de Kempenaer
+    Ottimizzato per swing trading (weekly timeframe)
+    """
+    
+    def __init__(self, period='2y', rs_period=10, momentum_period=5, 
+                 interval='1wk', tail_length=10):
+        """
+        Parametri ottimali per swing trading:
+        - period: '2y' (2 anni di dati)
+        - rs_period: 10 (settimane per media mobile RS)
+        - momentum_period: 5 (settimane per ROC)
+        - interval: '1wk' (dati settimanali)
+        - tail_length: 10 (settimane di tail)
+        """
+        self.period = period
+        self.rs_period = rs_period
+        self.momentum_period = momentum_period
+        self.interval = interval
+        self.tail_length = tail_length
+    
+    def download_data(self, ticker):
+        """Scarica dati storici"""
+        try:
+            data = yf.download(ticker, period=self.period, 
+                             interval=self.interval, progress=False)
+            return data['Close']
+        except Exception as e:
+            print(f"Errore download {ticker}: {e}")
+            return None
+    
+    def calculate_rs_ratio(self, sector_prices, benchmark_prices):
+        """
+        Calcola RS-Ratio normalizzato
+        Formula: (Settore/Benchmark) / MA(Settore/Benchmark) * 100
+        """
+        # Relative Strength grezzo
+        rs = (sector_prices / benchmark_prices) * 100
+        
+        # Media mobile del RS
+        rs_ma = rs.rolling(window=self.rs_period).mean()
+        
+        # RS-Ratio normalizzato
+        rs_ratio = (rs / rs_ma) * 100
+        
+        return rs_ratio
+    
+    def calculate_rs_momentum(self, rs_ratio):
+        """
+        Calcola RS-Momentum (ROC del RS-Ratio)
+        Formula: ((RS_Ratio_oggi - RS_Ratio_N_periodi_fa) / RS_Ratio_N_periodi_fa) * 100
+        """
+        rs_momentum = ((rs_ratio - rs_ratio.shift(self.momentum_period)) / 
+                       rs_ratio.shift(self.momentum_period)) * 100
+        return rs_momentum
+    
+    def calculate_heading(self, rs_ratio, rs_momentum):
+        """
+        Calcola RRG-Heading in gradi (0-360°)
+        Usa ultimi 2 punti per determinare direzione
+        """
+        if len(rs_ratio) < 2 or len(rs_momentum) < 2:
+            return None
+        
+        # Delta tra ultimo e penultimo punto
+        dx = rs_ratio.iloc[-1] - rs_ratio.iloc[-2]
+        dy = rs_momentum.iloc[-1] - rs_momentum.iloc[-2]
+        
+        # Calcola angolo in gradi
+        heading = np.degrees(np.arctan2(dy, dx))
+        
+        # Converti in range 0-360°
+        if heading < 0:
+            heading += 360
+        
+        return heading
+    
+    def get_tail(self, rs_ratio, rs_momentum):
+        """Estrae ultimi N punti per la tail"""
+        tail_rs = rs_ratio.tail(self.tail_length).values
+        tail_momentum = rs_momentum.tail(self.tail_length).values
+        return tail_rs, tail_momentum
+    
+    def calculate_metrics(self, sector_ticker, benchmark_ticker):
+        """
+        Calcola tutte le metriche RRG per un settore
+        Returns: dict con rs_ratio, rs_momentum, heading, tail
+        """
+        # Download dati
+        sector_prices = self.download_data(sector_ticker)
+        benchmark_prices = self.download_data(benchmark_ticker)
+        
+        if sector_prices is None or benchmark_prices is None:
+            return None
+        
+        # Allinea date
+        df = pd.DataFrame({
+            'sector': sector_prices,
+            'benchmark': benchmark_prices
+        }).dropna()
+        
+        # Calcola RS-Ratio
+        rs_ratio = self.calculate_rs_ratio(df['sector'], df['benchmark'])
+        
+        # Calcola RS-Momentum
+        rs_momentum = self.calculate_rs_momentum(rs_ratio)
+        
+        # Rimuovi NaN
+        rs_ratio = rs_ratio.dropna()
+        rs_momentum = rs_momentum.dropna()
+        
+        if len(rs_ratio) == 0 or len(rs_momentum) == 0:
+            return None
+        
+        # Calcola heading
+        heading = self.calculate_heading(rs_ratio, rs_momentum)
+        
+        # Estrai tail
+        tail_rs, tail_momentum = self.get_tail(rs_ratio, rs_momentum)
+        
+        return {
+            'rs_ratio': rs_ratio.iloc[-1],
+            'rs_momentum': rs_momentum.iloc[-1],
+            'heading': heading,
+            'tail_rs': tail_rs.tolist(),
+            'tail_momentum': tail_momentum.tolist(),
+            'rs_ratio_series': rs_ratio,
+            'rs_momentum_series': rs_momentum
+        }
+
+
+class RRGClassifier:
+    """
+    Classifica settori in quadranti e determina azioni di trading
+    """
+    
+    @staticmethod
+    def get_quadrant(rs_ratio, rs_momentum):
+        """
+        Determina quadrante basato su RS-Ratio e RS-Momentum
+        """
+        if rs_ratio >= 100 and rs_momentum >= 0:
+            return 'LEADING'
+        elif rs_ratio >= 100 and rs_momentum < 0:
+            return 'WEAKENING'
+        elif rs_ratio < 100 and rs_momentum < 0:
+            return 'LAGGING'
+        else:  # rs_ratio < 100 and rs_momentum >= 0
+            return 'IMPROVING'
+    
+    @staticmethod
+    def get_trading_action(quadrant, heading):
+        """
+        Determina azione di trading basata su quadrante e heading
+        
+        Heading ranges:
+        - 0-90°: Movimento verso Leading (positivo)
+        - 90-180°: Movimento verso Weakening
+        - 180-270°: Movimento verso Lagging (negativo)
+        - 270-360°: Movimento verso Improving
+        """
+        if heading is None:
+            return 'HOLD', 'NEUTRAL'
+        
+        # IMPROVING quadrant
+        if quadrant == 'IMPROVING':
+            if (315 <= heading <= 360) or (0 <= heading <= 45):
+                return 'BUY', 'STRONG_BUY'
+            elif 45 < heading <= 90:
+                return 'BUY', 'MODERATE_BUY'
+            else:
+                return 'WATCH', 'NEUTRAL'
+        
+        # LEADING quadrant
+        elif quadrant == 'LEADING':
+            if 0 <= heading <= 90:
+                return 'HOLD', 'STRONG_HOLD'
+            elif 90 < heading <= 135:
+                return 'HOLD', 'MODERATE_HOLD'
+            elif 135 < heading <= 180:
+                return 'REDUCE', 'WEAK'
+            else:
+                return 'REDUCE', 'WEAK'
+        
+        # WEAKENING quadrant
+        elif quadrant == 'WEAKENING':
+            if 90 <= heading <= 180:
+                return 'REDUCE', 'MODERATE_SELL'
+            elif 180 <= heading <= 270:
+                return 'SELL', 'STRONG_SELL'
+            else:
+                return 'REDUCE', 'WEAK'
+        
+        # LAGGING quadrant
+        elif quadrant == 'LAGGING':
+            if 180 <= heading <= 270:
+                return 'AVOID', 'STRONG_AVOID'
+            elif 270 <= heading <= 315:
+                return 'WATCH', 'TURNING'
+            else:
+                return 'AVOID', 'WEAK'
+        
+        return 'HOLD', 'NEUTRAL'
+    
+    @staticmethod
+    def calculate_tail_velocity(tail_rs, tail_momentum):
+        """
+        Calcola velocità di movimento (lunghezza tail)
+        Tail più lunga = movimento più veloce
+        """
+        if len(tail_rs) < 2 or len(tail_momentum) < 2:
+            return 0
+        
+        distances = []
+        for i in range(1, len(tail_rs)):
+            dx = tail_rs[i] - tail_rs[i-1]
+            dy = tail_momentum[i] - tail_momentum[i-1]
+            distance = np.sqrt(dx**2 + dy**2)
+            distances.append(distance)
+        
+        return np.mean(distances) if distances else 0
+
+
+class RRGAnalyzer:
+    """
+    Analizza tutti i settori e genera report
+    """
+    
+    def __init__(self, calculator=None):
+        self.calculator = calculator or RRGCalculator()
+        self.classifier = RRGClassifier()
+    
+    def analyze_all_sectors(self, sectors=SECTORS, benchmark=BENCHMARK):
+        """
+        Analizza tutti i settori e ritorna DataFrame con risultati
+        """
+        results = []
+        
+        for sector_name, ticker in sectors.items():
+            print(f"Analyzing {sector_name} ({ticker})...")
+            
+            metrics = self.calculator.calculate_metrics(ticker, benchmark)
+            
+            if metrics is None:
+                print(f"  ⚠️ Skipped {sector_name}")
+                continue
+            
+            # Classifica
+            quadrant = self.classifier.get_quadrant(
+                metrics['rs_ratio'], 
+                metrics['rs_momentum']
+            )
+            
+            action, strength = self.classifier.get_trading_action(
+                quadrant, 
+                metrics['heading']
+            )
+            
+            velocity = self.classifier.calculate_tail_velocity(
+                metrics['tail_rs'],
+                metrics['tail_momentum']
+            )
+            
+            results.append({
+                'sector': sector_name,
+                'ticker': ticker,
+                'rs_ratio': round(metrics['rs_ratio'], 2),
+                'rs_momentum': round(metrics['rs_momentum'], 2),
+                'heading': round(metrics['heading'], 1) if metrics['heading'] else None,
+                'quadrant': quadrant,
+                'action': action,
+                'strength': strength,
+                'velocity': round(velocity, 2),
+                'tail_rs': metrics['tail_rs'],
+                'tail_momentum': metrics['tail_momentum']
+            })
+            
+            print(f"  ✓ {quadrant} | {action} | RS:{metrics['rs_ratio']:.2f} | Mom:{metrics['rs_momentum']:.2f}")
+        
+        df = pd.DataFrame(results)
+        return self._sort_by_priority(df)
+    
+    def _sort_by_priority(self, df):
+        """Ordina per priorità di trading"""
+        priority_map = {
+            'BUY': 1,
+            'HOLD': 2,
+            'REDUCE': 3,
+            'WATCH': 4,
+            'SELL': 5,
+            'AVOID': 6
+        }
+        df['priority'] = df['action'].map(priority_map)
+        return df.sort_values('priority').reset_index(drop=True)
+    
+    def get_top_picks(self, df, actions=['BUY', 'HOLD']):
+        """Filtra top picks per trading"""
+        return df[df['action'].isin(actions)]
+    
+    def get_sectors_by_quadrant(self, df, quadrant):
+        """Filtra settori per quadrante"""
+        return df[df['quadrant'] == quadrant]
+    
+    def export_to_json(self, df, filename='rrg_analysis.json'):
+        """Esporta risultati in JSON"""
+        df_export = df.copy()
+        # Converti liste in stringhe per JSON
+        df_export['tail_rs'] = df_export['tail_rs'].apply(lambda x: ','.join(map(str, x)))
+        df_export['tail_momentum'] = df_export['tail_momentum'].apply(lambda x: ','.join(map(str, x)))
+        df_export.to_json(filename, orient='records', indent=2)
+        print(f"✓ Exported to {filename}")
+
+
+# ============= MAIN EXECUTION =============
+
+if __name__ == "__main__":
+    print("=" * 80)
+    print("RRG SECTOR ROTATION ANALYSIS - SWING TRADING")
+    print("=" * 80)
+    print()
+    
+    # Inizializza analyzer
+    analyzer = RRGAnalyzer()
+    
+    # Analizza tutti i settori
+    df_results = analyzer.analyze_all_sectors()
+    
+    print("\n" + "=" * 80)
+    print("SUMMARY")
+    print("=" * 80)
+    print(df_results[['sector', 'quadrant', 'action', 'strength', 
+                      'rs_ratio', 'rs_momentum', 'heading']].to_string(index=False))
+    
+    # Top picks
+    print("\n" + "=" * 80)
+    print("TOP PICKS FOR SWING TRADING")
+    print("=" * 80)
+    top_picks = analyzer.get_top_picks(df_results)
+    print(top_picks[['sector', 'ticker', 'action', 'strength', 'heading']].to_string(index=False))
+    
+    # Export
+    analyzer.export_to_json(df_results)
+    
+    print("\n✓ Analysis complete!")
+📦 Struttura per Replit
+project/
+├── main.py                 # Codice principale sopra
+├── requirements.txt        # yfinance, pandas, numpy
+├── config.py              # Configurazioni (opzionale)
+└── rrg_analysis.json      # Output generato
+🔧 requirements.txt
+txt
+Copy
+yfinance>=0.2.28
+pandas>=2.0.0
+numpy>=1.24.0
+⚙️ Parametri Configurabili
+python
+Copy
+# Per daily trading (più reattivo)
+calculator_daily = RRGCalculator(
+    period='6mo',
+    rs_period=20,
+    momentum_period=10,
+    interval='1d',
+    tail_length=15
+)
+
+# Per weekly swing trading (default)
+calculator_weekly = RRGCalculator(
+    period='2y',
+    rs_period=10,
+    momentum_period=5,
+    interval='1wk',
+    tail_length=10
+)
+
+# Per monthly position trading
+calculator_monthly = RRGCalculator(
+    period='5y',
+    rs_period=12,
+    momentum_period=6,
+    interval='1mo',
+    tail_length=12
+)
+📊 Output JSON Structure
+json
+Copy
+[
+  {
+    "sector": "Technology",
+    "ticker": "XLK",
+    "rs_ratio": 102.5,
+    "rs_momentum": 3.2,
+    "heading": 45.5,
+    "quadrant": "LEADING",
+    "action": "HOLD",
+    "strength": "STRONG_HOLD",
+    "velocity": 1.25,
+    "tail_rs": "98.5,99.2,100.1,...",
+    "tail_momentum": "1.2,1.8,2.5,..."
+  }
+]
+🎯 API per Integrazioni
+python
+Copy
+# Usa come modulo
+from main import RRGAnalyzer
+
+analyzer = RRGAnalyzer()
+df = analyzer.analyze_all_sectors()
+
+# Filtra per azione specifica
+buy_signals = df[df['action'] == 'BUY']
+
+# Filtra per quadrante
+leading_sectors = analyzer.get_sectors_by_quadrant(df, 'LEADING')
+
+# Accedi a metriche singolo settore
+tech_sector = df[df['ticker'] == 'XLK'].iloc[0]
+print(f"Tech RS: {tech_sector['rs_ratio']}")

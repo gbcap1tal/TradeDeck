@@ -11,11 +11,14 @@ const QUADRANT_COLORS: Record<QuadrantKey, string> = {
 };
 
 const QUADRANT_BG: Record<QuadrantKey, string> = {
-  leading: 'rgba(48,209,88,0.04)',
-  improving: 'rgba(10,132,255,0.04)',
-  lagging: 'rgba(255,69,58,0.04)',
-  weakening: 'rgba(255,159,10,0.04)',
+  leading: 'rgba(48,209,88,0.03)',
+  improving: 'rgba(10,132,255,0.03)',
+  lagging: 'rgba(255,69,58,0.03)',
+  weakening: 'rgba(255,159,10,0.03)',
 };
+
+const NEUTRAL_COLOR = 'rgba(255,255,255,0.25)';
+const NEUTRAL_COLOR_FAINT = 'rgba(255,255,255,0.12)';
 
 interface RRGSector {
   name: string;
@@ -49,15 +52,16 @@ export function SectorRotation() {
     const allMom = typedSectors.flatMap(s => [s.rsMomentum, ...s.tail.map(t => t.rsMomentum)]);
 
     const rsSpread = Math.max(Math.max(...allRS) - 100, 100 - Math.min(...allRS), 1.5);
-    const momSpread = Math.max(Math.max(...allMom) - 100, 100 - Math.min(...allMom), 1.5);
-    const spread = Math.max(rsSpread, momSpread) * 1.15;
+    const momAbsMax = Math.max(Math.abs(Math.max(...allMom)), Math.abs(Math.min(...allMom)), 1);
+
+    const spread = Math.max(rsSpread, momAbsMax) * 1.2;
 
     const rsMin = 100 - spread;
     const rsMax = 100 + spread;
-    const momMin = 100 - spread;
-    const momMax = 100 + spread;
+    const momMin = -spread;
+    const momMax = spread;
 
-    return { typedSectors, rsMin, rsMax, momMin, momMax, spread };
+    return { typedSectors, rsMin, rsMax, momMin, momMax };
   }, [sectors]);
 
   if (isLoading) {
@@ -83,24 +87,30 @@ export function SectorRotation() {
   const scaleY = (val: number) => PAD.top + ((momMax - val) / (momMax - momMin)) * plotH;
 
   const centerX = scaleX(100);
-  const centerY = scaleY(100);
+  const centerY = scaleY(0);
+
+  const getQuadrant = (rs: number, mom: number): QuadrantKey => {
+    if (rs >= 100 && mom >= 0) return 'leading';
+    if (rs >= 100 && mom < 0) return 'weakening';
+    if (rs < 100 && mom >= 0) return 'improving';
+    return 'lagging';
+  };
+
+  const getQuadrantColor = (s: RRGSector): string => {
+    return QUADRANT_COLORS[getQuadrant(s.rsRatio, s.rsMomentum)];
+  };
 
   const tickStep = (rsMax - rsMin) > 8 ? 2 : 1;
   const rsTicks: number[] = [];
-  const momTicks: number[] = [];
   for (let v = Math.ceil(rsMin); v <= Math.floor(rsMax); v += tickStep) {
     rsTicks.push(v);
   }
-  for (let v = Math.ceil(momMin); v <= Math.floor(momMax); v += tickStep) {
+  const momTicks: number[] = [];
+  const momRange = momMax - momMin;
+  const momTickStep = momRange > 8 ? 2 : 1;
+  for (let v = Math.ceil(momMin); v <= Math.floor(momMax); v += momTickStep) {
     momTicks.push(v);
   }
-
-  const getQuadrantColor = (s: RRGSector): string => {
-    if (s.rsRatio >= 100 && s.rsMomentum >= 100) return QUADRANT_COLORS.leading;
-    if (s.rsRatio >= 100 && s.rsMomentum < 100) return QUADRANT_COLORS.weakening;
-    if (s.rsRatio < 100 && s.rsMomentum >= 100) return QUADRANT_COLORS.improving;
-    return QUADRANT_COLORS.lagging;
-  };
 
   const hoveredData = hoveredSector
     ? typedSectors.find(s => s.ticker === hoveredSector)
@@ -113,7 +123,7 @@ export function SectorRotation() {
       <div className="glass-card rounded-xl p-5 relative flex flex-col" ref={containerRef} onMouseMove={handleMouseMove}>
         <div className="flex items-center gap-2 mb-3">
           <span className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">RRG vs SPY</span>
-          <span className="text-[9px] text-white/20 ml-auto">10-day RS-Ratio / Momentum</span>
+          <span className="text-[9px] text-white/20 ml-auto">Weekly · 10-wk tails</span>
         </div>
 
         <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="block flex-1" data-testid="rrg-chart">
@@ -125,25 +135,25 @@ export function SectorRotation() {
           {rsTicks.filter(v => v !== 100).map(v => (
             <line key={`gx-${v}`} x1={scaleX(v)} y1={PAD.top} x2={scaleX(v)} y2={PAD.top + plotH} stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
           ))}
-          {momTicks.filter(v => v !== 100).map(v => (
+          {momTicks.filter(v => v !== 0).map(v => (
             <line key={`gy-${v}`} x1={PAD.left} y1={scaleY(v)} x2={PAD.left + plotW} y2={scaleY(v)} stroke="rgba(255,255,255,0.03)" strokeWidth="1" />
           ))}
 
-          <line x1={centerX} y1={PAD.top} x2={centerX} y2={PAD.top + plotH} stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="4 3" />
-          <line x1={PAD.left} y1={centerY} x2={PAD.left + plotW} y2={centerY} stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="4 3" />
+          <line x1={centerX} y1={PAD.top} x2={centerX} y2={PAD.top + plotH} stroke="rgba(255,255,255,0.12)" strokeWidth="1" strokeDasharray="4 3" />
+          <line x1={PAD.left} y1={centerY} x2={PAD.left + plotW} y2={centerY} stroke="rgba(255,255,255,0.12)" strokeWidth="1" strokeDasharray="4 3" />
 
-          <text x={PAD.left + plotW - 4} y={PAD.top + 14} fill={QUADRANT_COLORS.leading} fontSize="8" textAnchor="end" fontWeight="700" opacity="0.5">LEADING</text>
-          <text x={PAD.left + 4} y={PAD.top + 14} fill={QUADRANT_COLORS.improving} fontSize="8" textAnchor="start" fontWeight="700" opacity="0.5">IMPROVING</text>
-          <text x={PAD.left + 4} y={PAD.top + plotH - 6} fill={QUADRANT_COLORS.lagging} fontSize="8" textAnchor="start" fontWeight="700" opacity="0.5">LAGGING</text>
-          <text x={PAD.left + plotW - 4} y={PAD.top + plotH - 6} fill={QUADRANT_COLORS.weakening} fontSize="8" textAnchor="end" fontWeight="700" opacity="0.5">WEAKENING</text>
+          <text x={PAD.left + plotW - 4} y={PAD.top + 14} fill={QUADRANT_COLORS.leading} fontSize="8" textAnchor="end" fontWeight="700" opacity="0.4">LEADING</text>
+          <text x={PAD.left + 4} y={PAD.top + 14} fill={QUADRANT_COLORS.improving} fontSize="8" textAnchor="start" fontWeight="700" opacity="0.4">IMPROVING</text>
+          <text x={PAD.left + 4} y={PAD.top + plotH - 6} fill={QUADRANT_COLORS.lagging} fontSize="8" textAnchor="start" fontWeight="700" opacity="0.4">LAGGING</text>
+          <text x={PAD.left + plotW - 4} y={PAD.top + plotH - 6} fill={QUADRANT_COLORS.weakening} fontSize="8" textAnchor="end" fontWeight="700" opacity="0.4">WEAKENING</text>
 
           {rsTicks.map(v => (
-            <text key={`lx-${v}`} x={scaleX(v)} y={PAD.top + plotH + 18} fill={v === 100 ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.25)'} fontSize="9" textAnchor="middle" fontFamily="var(--font-mono)" fontWeight={v === 100 ? '600' : '400'}>
+            <text key={`lx-${v}`} x={scaleX(v)} y={PAD.top + plotH + 18} fill={v === 100 ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)'} fontSize="9" textAnchor="middle" fontFamily="var(--font-mono)" fontWeight={v === 100 ? '600' : '400'}>
               {v.toFixed(0)}
             </text>
           ))}
           {momTicks.map(v => (
-            <text key={`ly-${v}`} x={PAD.left - 10} y={scaleY(v) + 3} fill={v === 100 ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.25)'} fontSize="9" textAnchor="end" fontFamily="var(--font-mono)" fontWeight={v === 100 ? '600' : '400'}>
+            <text key={`ly-${v}`} x={PAD.left - 10} y={scaleY(v) + 3} fill={v === 0 ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)'} fontSize="9" textAnchor="end" fontFamily="var(--font-mono)" fontWeight={v === 0 ? '600' : '400'}>
               {v.toFixed(0)}
             </text>
           ))}
@@ -158,7 +168,7 @@ export function SectorRotation() {
           {typedSectors.map((sector) => {
             const isHovered = hoveredSector === sector.ticker;
             const qColor = getQuadrantColor(sector);
-            const tailOpacity = isHovered ? 0.8 : 0.3;
+            const strokeColor = isHovered ? qColor : NEUTRAL_COLOR_FAINT;
 
             if (sector.tail.length < 2) return null;
 
@@ -171,24 +181,28 @@ export function SectorRotation() {
                 <polyline
                   points={tailPoints}
                   fill="none"
-                  stroke={qColor}
-                  strokeWidth={isHovered ? 2 : 1.2}
-                  opacity={tailOpacity}
+                  stroke={strokeColor}
+                  strokeWidth={isHovered ? 2.5 : 1}
+                  opacity={isHovered ? 0.9 : 0.5}
                   strokeLinejoin="round"
                   strokeLinecap="round"
-                  style={{ transition: 'opacity 0.2s ease' }}
+                  style={{ transition: 'stroke 0.25s ease, opacity 0.25s ease, stroke-width 0.25s ease' }}
                 />
-                {sector.tail.slice(0, -1).map((t, i) => (
-                  <circle
-                    key={`td-${sector.ticker}-${i}`}
-                    cx={scaleX(t.rsRatio)}
-                    cy={scaleY(t.rsMomentum)}
-                    r={isHovered ? 2.5 : 1.5}
-                    fill={qColor}
-                    opacity={tailOpacity * (0.3 + (i / sector.tail.length) * 0.7)}
-                    style={{ transition: 'opacity 0.2s ease, r 0.15s ease' }}
-                  />
-                ))}
+                {sector.tail.slice(0, -1).map((t, i) => {
+                  const dotColor = isHovered ? qColor : NEUTRAL_COLOR_FAINT;
+                  const progress = (i + 1) / sector.tail.length;
+                  return (
+                    <circle
+                      key={`td-${sector.ticker}-${i}`}
+                      cx={scaleX(t.rsRatio)}
+                      cy={scaleY(t.rsMomentum)}
+                      r={isHovered ? 2.5 : 1.5}
+                      fill={dotColor}
+                      opacity={isHovered ? 0.3 + progress * 0.7 : 0.3 + progress * 0.4}
+                      style={{ transition: 'fill 0.25s ease, opacity 0.25s ease' }}
+                    />
+                  );
+                })}
               </g>
             );
           })}
@@ -198,6 +212,10 @@ export function SectorRotation() {
             const qColor = getQuadrantColor(sector);
             const cx = scaleX(sector.rsRatio);
             const cy = scaleY(sector.rsMomentum);
+
+            const circleStroke = isHovered ? qColor : NEUTRAL_COLOR;
+            const circleFill = isHovered ? `${qColor}20` : 'rgba(255,255,255,0.03)';
+            const textFill = isHovered ? '#fff' : NEUTRAL_COLOR;
 
             return (
               <g
@@ -211,20 +229,20 @@ export function SectorRotation() {
                   cx={cx}
                   cy={cy}
                   r={isHovered ? 22 : 18}
-                  fill={`${qColor}18`}
-                  stroke={qColor}
-                  strokeWidth={isHovered ? 2.5 : 1.5}
-                  style={{ transition: 'all 0.15s ease' }}
+                  fill={circleFill}
+                  stroke={circleStroke}
+                  strokeWidth={isHovered ? 2.5 : 1}
+                  style={{ transition: 'all 0.2s ease' }}
                 />
                 <text
                   x={cx}
                   y={cy + 3.5}
-                  fill={isHovered ? '#fff' : qColor}
+                  fill={textFill}
                   fontSize="8.5"
                   fontWeight="700"
                   textAnchor="middle"
                   fontFamily="var(--font-mono)"
-                  style={{ pointerEvents: 'none', letterSpacing: '0.02em', transition: 'fill 0.15s ease' }}
+                  style={{ pointerEvents: 'none', letterSpacing: '0.02em', transition: 'fill 0.2s ease' }}
                 >
                   {sector.ticker}
                 </text>
@@ -240,7 +258,7 @@ export function SectorRotation() {
               left: tooltipPos.x < (containerRef.current?.clientWidth || 0) / 2
                 ? tooltipPos.x + 16
                 : tooltipPos.x - 220,
-              top: Math.max(8, Math.min(tooltipPos.y - 40, (containerRef.current?.clientHeight || 400) - 130)),
+              top: Math.max(8, Math.min(tooltipPos.y - 40, (containerRef.current?.clientHeight || 400) - 150)),
             }}
           >
             <div className="rounded-lg border border-white/10 p-3 min-w-[200px]" style={{ background: 'rgba(20,20,20,0.96)', backdropFilter: 'blur(12px)' }}>
@@ -258,8 +276,8 @@ export function SectorRotation() {
                 </div>
                 <div>
                   <div className="text-[9px] text-white/35 uppercase tracking-wider">RS-Momentum</div>
-                  <div className="text-[13px] font-mono-nums font-semibold" style={{ color: hoveredData.rsMomentum >= 100 ? '#30d158' : '#ff453a' }}>
-                    {hoveredData.rsMomentum.toFixed(2)}
+                  <div className="text-[13px] font-mono-nums font-semibold" style={{ color: hoveredData.rsMomentum >= 0 ? '#30d158' : '#ff453a' }}>
+                    {hoveredData.rsMomentum >= 0 ? '+' : ''}{hoveredData.rsMomentum.toFixed(2)}%
                   </div>
                 </div>
               </div>
@@ -268,7 +286,7 @@ export function SectorRotation() {
                   {hoveredData.quadrant}
                 </span>
                 <span className="text-[10px] text-white/30">
-                  Heading: {hoveredData.heading > 0 ? '+' : ''}{hoveredData.heading.toFixed(0)}&deg;
+                  Heading: {hoveredData.heading.toFixed(0)}&deg;
                 </span>
               </div>
             </div>
