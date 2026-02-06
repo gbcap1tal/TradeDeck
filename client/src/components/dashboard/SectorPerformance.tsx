@@ -1,4 +1,4 @@
-import { useSectorPerformance } from "@/hooks/use-market";
+import { useIndustryPerformance } from "@/hooks/use-market";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { ChevronRight } from "lucide-react";
@@ -29,7 +29,7 @@ function TimeframeSwitch({ value, onChange, testId }: { value: Timeframe; onChan
 }
 
 export function SectorPerformance() {
-  const { data: sectors, isLoading } = useSectorPerformance();
+  const { data, isLoading } = useIndustryPerformance();
   const [, setLocation] = useLocation();
   const [topTf, setTopTf] = useState<Timeframe>('D');
   const [bottomTf, setBottomTf] = useState<Timeframe>('D');
@@ -40,7 +40,7 @@ export function SectorPerformance() {
         <div className="grid md:grid-cols-2 gap-4">
           {[1, 2].map(i => (
             <div key={i} className="glass-card rounded-xl p-5 space-y-3">
-              {[1, 2, 3, 4, 5].map(j => <div key={j} className="shimmer h-8 rounded-md" />)}
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(j => <div key={j} className="shimmer h-7 rounded-md" />)}
             </div>
           ))}
         </div>
@@ -48,17 +48,19 @@ export function SectorPerformance() {
     );
   }
 
-  const getChange = (sector: any, tf: Timeframe) => {
-    if (tf === 'W') return sector.changePercent * 2.3 + (sector.rs % 3 - 1);
-    if (tf === 'M') return sector.changePercent * 4.5 + (sector.rs % 5 - 2);
-    return sector.changePercent;
+  const industries = data?.industries || [];
+
+  const getChange = (ind: any, tf: Timeframe) => {
+    if (tf === 'W') return ind.weeklyChange ?? 0;
+    if (tf === 'M') return ind.monthlyChange ?? 0;
+    return ind.dailyChange ?? 0;
   };
 
-  const sortedTop = [...(sectors || [])].sort((a: any, b: any) => getChange(b, topTf) - getChange(a, topTf));
-  const top5 = sortedTop.slice(0, 5);
+  const sortedTop = [...industries].sort((a: any, b: any) => getChange(b, topTf) - getChange(a, topTf));
+  const top10 = sortedTop.slice(0, 10);
 
-  const sortedBottom = [...(sectors || [])].sort((a: any, b: any) => getChange(b, bottomTf) - getChange(a, bottomTf));
-  const bottom5 = sortedBottom.slice(-5).reverse();
+  const sortedBottom = [...industries].sort((a: any, b: any) => getChange(a, bottomTf) - getChange(b, bottomTf));
+  const bottom10 = sortedBottom.slice(0, 10);
 
   const renderList = (items: any[], title: string, tf: Timeframe, setTf: (v: Timeframe) => void, switchId: string) => (
     <div className="glass-card rounded-xl p-4">
@@ -66,25 +68,25 @@ export function SectorPerformance() {
         <div className="label-text">{title}</div>
         <TimeframeSwitch value={tf} onChange={setTf} testId={switchId} />
       </div>
-      <div className="space-y-1">
-        {items.map((sector: any, idx: number) => {
-          const change = getChange(sector, tf);
+      <div className="space-y-0.5">
+        {items.map((ind: any, idx: number) => {
+          const change = getChange(ind, tf);
           const isPositive = change >= 0;
           return (
             <div
-              key={sector.ticker}
-              className="flex items-center justify-between gap-1 py-2 px-2 rounded-lg cursor-pointer transition-colors hover:bg-white/[0.03] group"
-              onClick={() => setLocation(`/sectors/${encodeURIComponent(sector.name)}`)}
-              data-testid={`row-sector-${sector.ticker}`}
+              key={ind.name}
+              className="flex items-center justify-between gap-1 py-1.5 px-2 rounded-lg cursor-pointer transition-colors hover:bg-white/[0.03] group"
+              onClick={() => setLocation(`/sectors/${encodeURIComponent(ind.sector)}/industries/${encodeURIComponent(ind.name)}`)}
+              data-testid={`row-industry-${ind.name.replace(/\s+/g, '-')}`}
             >
-              <div className="flex items-center gap-3">
-                <span className="text-[11px] text-white/20 font-mono w-4">{idx + 1}</span>
-                <div>
-                  <div className="text-[13px] font-medium text-white/80 group-hover:text-white transition-colors">{sector.name}</div>
-                  <div className="text-[10px] text-white/30 font-mono">{sector.ticker}</div>
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <span className="text-[11px] text-white/20 font-mono w-4 shrink-0">{idx + 1}</span>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-medium text-white/80 group-hover:text-white transition-colors truncate">{ind.name}</div>
+                  <div className="text-[10px] text-white/25 font-mono truncate">{ind.sector}</div>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 shrink-0">
                 <span className={cn("text-[13px] font-mono-nums font-semibold", isPositive ? "text-[#30d158]" : "text-[#ff453a]")}>
                   {isPositive ? '+' : ''}{change.toFixed(2)}%
                 </span>
@@ -99,10 +101,10 @@ export function SectorPerformance() {
 
   return (
     <div className="mb-8">
-      <h2 className="text-xl font-semibold tracking-tight mb-4 text-white" data-testid="text-sector-perf-title">Sector Performance</h2>
+      <h2 className="text-xl font-semibold tracking-tight mb-4 text-white" data-testid="text-industry-perf-title">Industry Performance</h2>
       <div className="grid md:grid-cols-2 gap-3">
-        {renderList(top5, 'TOP PERFORMERS', topTf, setTopTf, 'switch-top-perf-tf')}
-        {renderList(bottom5, 'WORST PERFORMERS', bottomTf, setBottomTf, 'switch-bottom-perf-tf')}
+        {renderList(top10, 'TOP PERFORMERS', topTf, setTopTf, 'switch-top-perf-tf')}
+        {renderList(bottom10, 'WORST PERFORMERS', bottomTf, setBottomTf, 'switch-bottom-perf-tf')}
       </div>
     </div>
   );

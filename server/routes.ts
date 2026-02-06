@@ -5,6 +5,7 @@ import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import * as yahoo from "./api/yahoo";
 import * as fmp from "./api/fmp";
+import { getCached, setCache, CACHE_TTL } from "./api/cache";
 
 const SECTORS_DATA = [
   { name: 'Technology', ticker: 'XLK', color: '#0a84ff', industries: ['Software-Infrastructure', 'Semiconductors', 'Software-Application', 'IT Services', 'Electronic Components', 'Computer Hardware', 'Data Storage', 'Cybersecurity', 'Cloud Computing', 'Consumer Electronics', 'Semiconductor Equipment', 'Communications Equipment', 'Technology Distributors', 'Electronic Manufacturing'] },
@@ -1013,6 +1014,93 @@ export async function registerRoutes(
       console.error('Sectors API error:', e.message);
     }
     res.json([]);
+  });
+
+  app.get('/api/market/industries/performance', async (req, res) => {
+    const cacheKey = 'industry_perf_all';
+    const cached = getCached<any>(cacheKey);
+    if (cached) return res.json(cached);
+
+    try {
+      const allIndustries: Array<{ name: string; sector: string; symbols: string[] }> = [];
+      for (const sector of SECTORS_DATA) {
+        for (const ind of sector.industries) {
+          const stocks = INDUSTRY_STOCKS[ind] || [];
+          allIndustries.push({
+            name: ind,
+            sector: sector.name,
+            symbols: stocks.slice(0, 2).map(s => s.symbol),
+          });
+        }
+      }
+
+      const uniqueSymbols = Array.from(new Set(allIndustries.flatMap(i => i.symbols)));
+
+      const quotes = await yahoo.getMultipleQuotes(uniqueSymbols);
+      const quoteMap = new Map<string, any>();
+      for (const q of quotes) {
+        if (q) quoteMap.set(q.symbol, q);
+      }
+
+      const histResults = new Map<string, any[]>();
+      const histPromises = uniqueSymbols.map(async (sym) => {
+        try {
+          const hist = await yahoo.getHistory(sym, '1M');
+          if (hist && hist.length > 0) {
+            histResults.set(sym, hist);
+          }
+        } catch {}
+      });
+      await Promise.allSettled(histPromises);
+
+      const industries = allIndustries.map(ind => {
+        const indQuotes = ind.symbols.map(s => quoteMap.get(s)).filter(Boolean);
+        const dailyChange = indQuotes.length > 0
+          ? Math.round(indQuotes.reduce((sum: number, q: any) => sum + (q.changePercent ?? 0), 0) / indQuotes.length * 100) / 100
+          : 0;
+
+        let weeklyChange = 0;
+        let monthlyChange = 0;
+        let weekCount = 0;
+        let monthCount = 0;
+
+        for (const sym of ind.symbols) {
+          const hist = histResults.get(sym);
+          if (!hist || hist.length < 2) continue;
+
+          const latest = hist[hist.length - 1];
+          const latestPrice = latest.close;
+
+          if (hist.length >= 6) {
+            const weekAgo = hist[Math.max(0, hist.length - 6)];
+            const wChange = ((latestPrice - weekAgo.close) / weekAgo.close) * 100;
+            weeklyChange += wChange;
+            weekCount++;
+          }
+
+          const monthAgo = hist[0];
+          const mChange = ((latestPrice - monthAgo.close) / monthAgo.close) * 100;
+          monthlyChange += mChange;
+          monthCount++;
+        }
+
+        return {
+          name: ind.name,
+          sector: ind.sector,
+          dailyChange,
+          weeklyChange: weekCount > 0 ? Math.round(weeklyChange / weekCount * 100) / 100 : 0,
+          monthlyChange: monthCount > 0 ? Math.round(monthlyChange / monthCount * 100) / 100 : 0,
+          stockCount: (INDUSTRY_STOCKS[ind.name] || []).length,
+        };
+      });
+
+      const result = { industries };
+      setCache(cacheKey, result, CACHE_TTL.INDUSTRY_PERF);
+      res.json(result);
+    } catch (e: any) {
+      console.error('Industry performance error:', e.message);
+      res.json({ industries: [] });
+    }
   });
 
   app.get('/api/market/breadth', (req, res) => {

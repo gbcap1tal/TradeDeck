@@ -47,6 +47,18 @@ export function useMarketStatus() {
   });
 }
 
+export function useIndustryPerformance() {
+  return useQuery({
+    queryKey: ['/api/market/industries/performance'],
+    queryFn: async () => {
+      const res = await fetch('/api/market/industries/performance', { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch industry performance");
+      return res.json();
+    },
+    refetchInterval: 120000,
+  });
+}
+
 export function useSectorDetail(sectorName: string) {
   return useQuery({
     queryKey: ['/api/sectors', sectorName],

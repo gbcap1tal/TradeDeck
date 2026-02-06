@@ -12,6 +12,7 @@ export const CACHE_TTL = {
   INDICES: 60,
   BREADTH: 120,
   NEWS: 900,
+  INDUSTRY_PERF: 300,
 };
 
 export function getCached<T>(key: string): T | undefined {
