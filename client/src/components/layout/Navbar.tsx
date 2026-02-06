@@ -42,7 +42,7 @@ export function Navbar() {
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-2.5 group" data-testid="link-home">
             <div className="w-7 h-7 rounded overflow-hidden flex-shrink-0">
-              <img src={logoImg} alt="TradeDeck" className="h-7 w-7 object-cover object-[25%_center]" />
+              <img src={logoImg} alt="TradeDeck" className="w-[200%] h-[200%] object-cover object-[28%_50%]" />
             </div>
             <span className="font-semibold text-[15px] tracking-tight hidden md:block text-white/90">TradeDeck</span>
           </Link>
