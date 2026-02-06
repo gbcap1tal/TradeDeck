@@ -95,10 +95,9 @@ export function SectorRotation() {
 
   if (isLoading) {
     return (
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold tracking-tight text-white">Sector Rotation</h2>
-        <p className="text-[11px] text-white/30 mb-4">RS vs Momentum Quadrant</p>
-        <div className="glass-card rounded-xl p-5 shimmer h-[420px]" />
+      <div>
+        <h2 className="text-xl font-semibold tracking-tight text-white mb-4">Sector Rotation</h2>
+        <div className="glass-card rounded-xl p-5 shimmer aspect-square" />
       </div>
     );
   }
@@ -106,7 +105,7 @@ export function SectorRotation() {
   if (!sectors?.length) return null;
 
   const W = 500;
-  const H = 400;
+  const H = 500;
   const PAD = { top: 30, right: 30, bottom: 55, left: 55 };
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
@@ -163,11 +162,10 @@ export function SectorRotation() {
   const hoveredData = hoveredSector ? positioned.find(p => p.sector.ticker === hoveredSector) : null;
 
   return (
-    <div className="mb-8">
-      <h2 className="text-xl font-semibold tracking-tight text-white" data-testid="text-rotation-title">Sector Rotation</h2>
-      <p className="text-[11px] text-white/30 mb-4">RS vs Momentum Quadrant</p>
-      <div className="glass-card rounded-xl p-5 relative" ref={containerRef} onMouseMove={handleMouseMove}>
-        <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="block">
+    <div>
+      <h2 className="text-xl font-semibold tracking-tight text-white mb-4" data-testid="text-rotation-title">Sector Rotation</h2>
+      <div className="glass-card rounded-xl p-5 relative aspect-square flex flex-col" ref={containerRef} onMouseMove={handleMouseMove}>
+        <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="block flex-1">
           {rsTicks.map(v => (
             <line key={`gx-${v}`} x1={scaleX(v)} y1={PAD.top} x2={scaleX(v)} y2={PAD.top + plotH} stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
           ))}

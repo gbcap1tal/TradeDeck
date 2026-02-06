@@ -33,10 +33,13 @@ export function MarketIndices() {
 
   if (isLoading) {
     return (
-      <div className="flex gap-4 overflow-x-auto pb-2 mb-8" style={{ scrollSnapType: 'x mandatory' }}>
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="glass-card rounded-xl p-5 min-w-[180px] flex-shrink-0 shimmer h-[120px]" style={{ scrollSnapAlign: 'start' }} />
-        ))}
+      <div className="mb-8">
+        <div className="label-text mb-3">Market Indices</div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="glass-card rounded-xl p-5 shimmer h-[110px]" />
+          ))}
+        </div>
       </div>
     );
   }
@@ -44,7 +47,7 @@ export function MarketIndices() {
   return (
     <div className="mb-8">
       <div className="label-text mb-3" data-testid="text-indices-label">Market Indices</div>
-      <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollSnapType: 'x mandatory' }}>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {indices?.map((index: any) => {
           const isPositive = index.change >= 0;
           const color = isPositive ? '#30d158' : '#ff453a';
@@ -52,20 +55,19 @@ export function MarketIndices() {
           return (
             <div
               key={index.symbol}
-              className="glass-card glass-card-hover rounded-xl p-4 min-w-[180px] flex-shrink-0"
-              style={{ scrollSnapAlign: 'start' }}
+              className="glass-card glass-card-hover rounded-xl p-4"
               data-testid={`card-index-${index.symbol}`}
             >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] text-white/40 font-medium">{index.name}</span>
-                <div className={cn("p-1 rounded-md", isPositive ? "bg-[#30d158]/10" : "bg-[#ff453a]/10")}>
+              <div className="flex items-center justify-between gap-1 mb-2">
+                <span className="text-[11px] text-white/40 font-medium truncate">{index.name}</span>
+                <div className={cn("p-1 rounded-md flex-shrink-0", isPositive ? "bg-[#30d158]/10" : "bg-[#ff453a]/10")}>
                   {isPositive ? <TrendingUp className="w-3 h-3 text-[#30d158]" /> : <TrendingDown className="w-3 h-3 text-[#ff453a]" />}
                 </div>
               </div>
               <div className="text-xl font-bold font-mono-nums tracking-tight text-white mb-1">
                 ${index.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-1">
                 <span className={cn("text-xs font-mono-nums font-medium", isPositive ? "text-[#30d158]" : "text-[#ff453a]")}>
                   {isPositive ? "+" : ""}{index.changePercent.toFixed(2)}%
                 </span>
