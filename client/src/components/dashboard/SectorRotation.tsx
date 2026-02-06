@@ -19,6 +19,10 @@ const QUADRANT_BG: Record<QuadrantKey, string> = {
 
 const NEUTRAL_COLOR = 'rgba(255,255,255,0.25)';
 
+const W = 500;
+const H = 500;
+const PAD = { top: 30, right: 30, bottom: 55, left: 55 };
+
 interface RRGSector {
   name: string;
   ticker: string;
@@ -63,6 +67,66 @@ export function SectorRotation() {
     return { typedSectors, rsMin, rsMax, momMin, momMax };
   }, [sectors]);
 
+  const resolvedPositions = useMemo(() => {
+    if (!chartData) return new Map<string, { cx: number; cy: number }>();
+
+    const { typedSectors: secs, rsMin: rMin, rsMax: rMax, momMin: mMin, momMax: mMax } = chartData;
+    const pW = W - PAD.left - PAD.right;
+    const pH = W - PAD.top - PAD.bottom;
+    const sx = (v: number) => PAD.left + ((v - rMin) / (rMax - rMin)) * pW;
+    const sy = (v: number) => PAD.top + ((mMax - v) / (mMax - mMin)) * pH;
+
+    const BUBBLE_R = 18;
+    const MIN_DIST = BUBBLE_R * 2 + 4;
+
+    const positions = secs.map(s => ({
+      ticker: s.ticker,
+      cx: sx(s.rsRatio),
+      cy: sy(s.rsMomentum),
+    }));
+
+    for (let iter = 0; iter < 20; iter++) {
+      let moved = false;
+      for (let i = 0; i < positions.length; i++) {
+        for (let j = i + 1; j < positions.length; j++) {
+          const a = positions[i];
+          const b = positions[j];
+          const dx = b.cx - a.cx;
+          const dy = b.cy - a.cy;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < MIN_DIST && dist > 0) {
+            const overlap = (MIN_DIST - dist) / 2;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            a.cx -= nx * overlap;
+            a.cy -= ny * overlap;
+            b.cx += nx * overlap;
+            b.cy += ny * overlap;
+            moved = true;
+          } else if (dist === 0) {
+            a.cx -= MIN_DIST / 2;
+            b.cx += MIN_DIST / 2;
+            moved = true;
+          }
+        }
+      }
+      if (!moved) break;
+    }
+
+    const plotLeft = PAD.left + BUBBLE_R;
+    const plotRight = PAD.left + pW - BUBBLE_R;
+    const plotTop = PAD.top + BUBBLE_R;
+    const plotBottom = PAD.top + pH - BUBBLE_R;
+    for (const p of positions) {
+      p.cx = Math.max(plotLeft, Math.min(plotRight, p.cx));
+      p.cy = Math.max(plotTop, Math.min(plotBottom, p.cy));
+    }
+
+    const map = new Map<string, { cx: number; cy: number }>();
+    for (const p of positions) map.set(p.ticker, { cx: p.cx, cy: p.cy });
+    return map;
+  }, [chartData]);
+
   if (isLoading) {
     return (
       <div>
@@ -76,9 +140,6 @@ export function SectorRotation() {
 
   const { typedSectors, rsMin, rsMax, momMin, momMax } = chartData;
 
-  const W = 500;
-  const H = 500;
-  const PAD = { top: 30, right: 30, bottom: 55, left: 55 };
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
 
@@ -170,9 +231,15 @@ export function SectorRotation() {
             if (sector.tail.length < 2) return null;
 
             const qColor = getQuadrantColor(sector);
-            const tailPoints = sector.tail.map(t =>
-              `${scaleX(t.rsRatio)},${scaleY(t.rsMomentum)}`
-            ).join(' ');
+            const pos = resolvedPositions.get(sector.ticker);
+            const endCx = pos?.cx ?? scaleX(sector.rsRatio);
+            const endCy = pos?.cy ?? scaleY(sector.rsMomentum);
+            const tailPoints = [
+              ...sector.tail.slice(0, -1).map(t =>
+                `${scaleX(t.rsRatio)},${scaleY(t.rsMomentum)}`
+              ),
+              `${endCx},${endCy}`
+            ].join(' ');
 
             return (
               <g key={`tail-${sector.ticker}`}>
@@ -205,8 +272,9 @@ export function SectorRotation() {
           {typedSectors.map((sector) => {
             const isHovered = hoveredSector === sector.ticker;
             const qColor = getQuadrantColor(sector);
-            const cx = scaleX(sector.rsRatio);
-            const cy = scaleY(sector.rsMomentum);
+            const pos = resolvedPositions.get(sector.ticker);
+            const cx = pos?.cx ?? scaleX(sector.rsRatio);
+            const cy = pos?.cy ?? scaleY(sector.rsMomentum);
 
             const circleStroke = isHovered ? qColor : NEUTRAL_COLOR;
             const circleFill = isHovered ? `${qColor}15` : 'rgba(255,255,255,0.03)';
