@@ -200,18 +200,19 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
 
   const allValues = [...earnings.sales, ...earnings.earnings.map(Math.abs)];
   const maxVal = Math.max(...allValues);
-  const topPad = 24;
-  const labelH = 36;
+  const topPad = 8;
+  const labelH = 40;
+  const maxBarPct = 0.82;
   const barAreaH = Math.max(dims.h - labelH - topPad, 0);
   const n = earnings.quarters.length;
-  const groupGap = dims.w > 0 ? Math.max(dims.w * 0.03, 6) : 8;
+  const groupGap = dims.w > 0 ? Math.max(dims.w * 0.04, 8) : 8;
   const groupW = n > 0 ? (dims.w - groupGap * (n - 1)) / n : 0;
-  const barGap = 2;
+  const barGap = 3;
   const barW = (groupW - barGap) / 2;
 
   return (
-    <div className="glass-card rounded-xl p-4 h-full flex flex-col" data-testid="card-earnings-sales">
-      <div className="flex items-center justify-between mb-2 flex-shrink-0">
+    <div className="glass-card rounded-xl px-4 py-3 h-full flex flex-col" data-testid="card-earnings-sales">
+      <div className="flex items-center justify-between mb-1 flex-shrink-0">
         <h2 className="text-[13px] font-semibold text-white/90 tracking-wide">Earnings & Sales</h2>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
@@ -266,8 +267,8 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
           {dims.w > 0 && dims.h > 0 && earnings.quarters.map((q: string, i: number) => {
             const salesPct = maxVal > 0 ? earnings.sales[i] / maxVal : 0;
             const epsPct = maxVal > 0 ? Math.abs(earnings.earnings[i]) / maxVal : 0;
-            const sBarH = Math.max(salesPct * barAreaH, 4);
-            const eBarH = Math.max(epsPct * barAreaH, 4);
+            const sBarH = Math.max(salesPct * maxBarPct * barAreaH, 4);
+            const eBarH = Math.max(epsPct * maxBarPct * barAreaH, 4);
             const x = i * (groupW + groupGap);
             const isHov = hovered === i;
             const eGrowth = earnings.earningsGrowth[i];

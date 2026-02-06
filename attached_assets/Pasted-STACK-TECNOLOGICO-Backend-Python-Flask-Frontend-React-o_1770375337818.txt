@@ -1,0 +1,851 @@
+STACK TECNOLOGICO:
+- Backend: Python (Flask)
+- Frontend: React o HTML/CSS/JavaScript vanilla
+- Database: SQLite per caching
+- Deployment: Replit
+
+API KEYS E DOCUMENTAZIONE:
+- Alpha Vantage Key: Q1ALRV8LHIHXFKNW
+  Docs: https://www.alphavantage.co/documentation/
+- Financial Modeling Prep Key: edn3aRrjuZcCCMjpkDRjY1I7GIG5yLsH
+  Docs: https://site.financialmodelingprep.com/developer/docs
+- yfinance (no key required)
+  Docs: https://ranaroussi.github.io/yfinance/index.html
+
+OBIETTIVO PARTE 1: Creare la struttura base del progetto e integrare TUTTE le API per recuperare dati di mercato.
+
+═══════════════════════════════════════════════════════════════
+
+STRUTTURA DEL PROGETTO:
+
+tradedeck/
+├── main.py                          # Entry point Flask
+├── requirements.txt                 # Dipendenze Python
+├── .env                            # Variabili ambiente (API keys)
+├── config.py                       # Configurazione app
+│
+├── api/                            # Moduli API
+│   ├── __init__.py
+│   ├── yfinance_client.py         # Client yfinance
+│   ├── alphavantage_client.py     # Client Alpha Vantage
+│   ├── fmp_client.py              # Client Financial Modeling Prep
+│   └── cache_manager.py           # Sistema di caching
+│
+├── utils/                          # Utilities
+│   ├── __init__.py
+│   ├── calculations.py            # Calcoli tecnici/fondamentali
+│   ├── formatters.py              # Formattazione dati
+│   └── constants.py               # Costanti (settori, indici, ecc)
+│
+├── routes/                         # Endpoints API
+│   ├── __init__.py
+│   ├── market.py                  # /api/market/*
+│   ├── stocks.py                  # /api/stocks/*
+│   └── sectors.py                 # /api/sectors/*
+│
+├── static/                         # File statici frontend
+│   ├── css/
+│   │   └── style.css
+│   ├── js/
+│   │   └── app.js
+│   └── images/
+│
+└── templates/                      # Template HTML
+    └── index.html
+
+═══════════════════════════════════════════════════════════════
+
+REQUIREMENTS.TXT:
+
+Flask==3.0.0
+Flask-CORS==4.0.0
+yfinance==0.2.36
+pandas==2.2.0
+numpy==1.26.3
+requests==2.31.0
+python-dotenv==1.0.0
+ta==0.11.0
+pandas-ta==0.3.14b0
+
+═══════════════════════════════════════════════════════════════
+
+FILE: .env
+
+ALPHA_VANTAGE_KEY=Q1ALRV8LHIHXFKNW
+FMP_KEY=edn3aRrjuZcCCMjpkDRjY1I7GIG5yLsH
+SECRET_KEY=tradedeck-secret-key-2026
+DEBUG=True
+
+═══════════════════════════════════════════════════════════════
+
+FILE: config.py
+
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+class Config:
+    # Flask
+    SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+    DEBUG = os.getenv('DEBUG', 'True') == 'True'
+    
+    # API Keys
+    ALPHA_VANTAGE_KEY = os.getenv('ALPHA_VANTAGE_KEY', 'Q1ALRV8LHIHXFKNW')
+    FMP_KEY = os.getenv('FMP_KEY', 'edn3aRrjuZcCCMjpkDRjY1I7GIG5yLsH')
+    
+    # API Base URLs
+    ALPHA_VANTAGE_BASE_URL = 'https://www.alphavantage.co/query'
+    FMP_BASE_URL = 'https://financialmodelingprep.com/api/v3'
+    
+    # Cache settings
+    CACHE_ENABLED = True
+    CACHE_EXPIRY_MINUTES = 15  # Dati real-time
+    CACHE_EXPIRY_HOURS_FUNDAMENTALS = 24  # Dati fondamentali
+    CACHE_EXPIRY_HOURS_SECTORS = 1  # Sector data
+    
+    # Rate limiting
+    ALPHA_VANTAGE_DAILY_LIMIT = 25
+    FMP_DAILY_LIMIT = 250
+    
+    # Market indices
+    MARKET_INDICES = ['SPY', 'QQQ', 'IWM', 'MDY', 'TLT', '^VIX']
+    
+    # Sectors (SPDR ETFs)
+    SECTOR_ETFS = {
+        'Technology': 'XLK',
+        'Financials': 'XLF',
+        'Healthcare': 'XLV',
+        'Consumer Discretionary': 'XLY',
+        'Communication Services': 'XLC',
+        'Industrials': 'XLI',
+        'Consumer Staples': 'XLP',
+        'Energy': 'XLE',
+        'Utilities': 'XLU',
+        'Real Estate': 'XLRE',
+        'Materials': 'XLB'
+    }
+
+═══════════════════════════════════════════════════════════════
+
+FILE: api/cache_manager.py
+
+import sqlite3
+import json
+import time
+from datetime import datetime, timedelta
+from config import Config
+
+class CacheManager:
+    def __init__(self, db_path='cache.db'):
+        self.db_path = db_path
+        self._init_db()
+    
+    def _init_db(self):
+        """Inizializza database SQLite per cache"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS cache (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                timestamp REAL NOT NULL,
+                expiry_minutes INTEGER NOT NULL
+            )
+        ''')
+        conn.commit()
+        conn.close()
+    
+    def get(self, key):
+        """Recupera valore dalla cache se non scaduto"""
+        if not Config.CACHE_ENABLED:
+            return None
+        
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('SELECT value, timestamp, expiry_minutes FROM cache WHERE key = ?', (key,))
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result:
+            value, timestamp, expiry_minutes = result
+            age_minutes = (time.time() - timestamp) / 60
+            
+            if age_minutes < expiry_minutes:
+                return json.loads(value)
+            else:
+                # Cache scaduta, elimina
+                self.delete(key)
+        
+        return None
+    
+    def set(self, key, value, expiry_minutes=None):
+        """Salva valore in cache"""
+        if not Config.CACHE_ENABLED:
+            return
+        
+        if expiry_minutes is None:
+            expiry_minutes = Config.CACHE_EXPIRY_MINUTES
+        
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT OR REPLACE INTO cache (key, value, timestamp, expiry_minutes)
+            VALUES (?, ?, ?, ?)
+        ''', (key, json.dumps(value), time.time(), expiry_minutes))
+        conn.commit()
+        conn.close()
+    
+    def delete(self, key):
+        """Elimina chiave dalla cache"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM cache WHERE key = ?', (key,))
+        conn.commit()
+        conn.close()
+    
+    def clear_all(self):
+        """Svuota tutta la cache"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM cache')
+        conn.commit()
+        conn.close()
+
+═══════════════════════════════════════════════════════════════
+
+FILE: api/yfinance_client.py
+
+import yfinance as yf
+import pandas as pd
+from datetime import datetime, timedelta
+from api.cache_manager import CacheManager
+from config import Config
+
+cache = CacheManager()
+
+class YFinanceClient:
+    
+    @staticmethod
+    def get_stock_data(ticker, period='1y'):
+        """
+        Recupera dati storici di una stock
+        
+        Args:
+            ticker: simbolo stock (es. 'AAPL')
+            period: periodo dati ('1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', 'max')
+        
+        Returns:
+            DataFrame con colonne [Date, Open, High, Low, Close, Volume]
+        """
+        cache_key = f"yf_hist_{ticker}_{period}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return pd.DataFrame(cached)
+        
+        try:
+            stock = yf.Ticker(ticker)
+            df = stock.history(period=period)
+            
+            if df.empty:
+                return None
+            
+            # Salva in cache
+            cache.set(cache_key, df.to_dict(), expiry_minutes=15)
+            return df
+        
+        except Exception as e:
+            print(f"Errore yfinance get_stock_data({ticker}): {e}")
+            return None
+    
+    @staticmethod
+    def get_stock_info(ticker):
+        """
+        Recupera informazioni base della stock
+        
+        Returns:
+            dict con: name, sector, industry, marketCap, float, etc.
+        """
+        cache_key = f"yf_info_{ticker}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+        
+        try:
+            stock = yf.Ticker(ticker)
+            info = stock.info
+            
+            result = {
+                'ticker': ticker,
+                'name': info.get('longName', 'N/A'),
+                'sector': info.get('sector', 'N/A'),
+                'industry': info.get('industry', 'N/A'),
+                'market_cap': info.get('marketCap'),
+                'float_shares': info.get('floatShares'),
+                'shares_outstanding': info.get('sharesOutstanding'),
+                'current_price': info.get('currentPrice'),
+                'previous_close': info.get('previousClose'),
+                'volume': info.get('volume'),
+                'avg_volume': info.get('averageVolume'),
+                'fifty_two_week_high': info.get('fiftyTwoWeekHigh'),
+                'fifty_two_week_low': info.get('fiftyTwoWeekLow'),
+            }
+            
+            # Cache per 24h (dati fondamentali cambiano poco)
+            cache.set(cache_key, result, expiry_minutes=Config.CACHE_EXPIRY_HOURS_FUNDAMENTALS * 60)
+            return result
+        
+        except Exception as e:
+            print(f"Errore yfinance get_stock_info({ticker}): {e}")
+            return None
+    
+    @staticmethod
+    def get_fundamentals(ticker):
+        """
+        Recupera dati fondamentali (EPS, Sales, Cash Flow)
+        
+        Returns:
+            dict con quarterly e annual data
+        """
+        cache_key = f"yf_fundamentals_{ticker}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+        
+        try:
+            stock = yf.Ticker(ticker)
+            
+            # Quarterly financials
+            quarterly_income = stock.quarterly_income_stmt
+            quarterly_cashflow = stock.quarterly_cashflow
+            
+            result = {
+                'quarterly_eps': [],
+                'quarterly_revenue': [],
+                'quarterly_fcf': [],
+            }
+            
+            # Estrai ultimi 4 quarters
+            if not quarterly_income.empty:
+                if 'Basic EPS' in quarterly_income.index:
+                    result['quarterly_eps'] = quarterly_income.loc['Basic EPS'].head(4).tolist()
+                if 'Total Revenue' in quarterly_income.index:
+                    result['quarterly_revenue'] = quarterly_income.loc['Total Revenue'].head(4).tolist()
+            
+            if not quarterly_cashflow.empty:
+                if 'Free Cash Flow' in quarterly_cashflow.index:
+                    result['quarterly_fcf'] = quarterly_cashflow.loc['Free Cash Flow'].head(4).tolist()
+            
+            # Cache per 24h
+            cache.set(cache_key, result, expiry_minutes=Config.CACHE_EXPIRY_HOURS_FUNDAMENTALS * 60)
+            return result
+        
+        except Exception as e:
+            print(f"Errore yfinance get_fundamentals({ticker}): {e}")
+            return None
+    
+    @staticmethod
+    def get_institutional_holders(ticker):
+        """
+        Recupera dati institutional ownership
+        
+        Returns:
+            dict con % ownership e numero istituzioni
+        """
+        cache_key = f"yf_institutional_{ticker}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+        
+        try:
+            stock = yf.Ticker(ticker)
+            info = stock.info
+            institutional_holders = stock.institutional_holders
+            
+            result = {
+                'institutional_ownership_pct': info.get('heldPercentInstitutions'),
+                'num_institutions': len(institutional_holders) if institutional_holders is not None else None,
+            }
+            
+            # Cache per 24h
+            cache.set(cache_key, result, expiry_minutes=Config.CACHE_EXPIRY_HOURS_FUNDAMENTALS * 60)
+            return result
+        
+        except Exception as e:
+            print(f"Errore yfinance get_institutional_holders({ticker}): {e}")
+            return None
+    
+    @staticmethod
+    def get_earnings_dates(ticker):
+        """
+        Recupera prossima data earnings
+        
+        Returns:
+            dict con next_earnings_date
+        """
+        cache_key = f"yf_earnings_{ticker}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+        
+        try:
+            stock = yf.Ticker(ticker)
+            calendar = stock.calendar
+            
+            result = {
+                'next_earnings_date': None
+            }
+            
+            if calendar is not None and 'Earnings Date' in calendar:
+                earnings_date = calendar['Earnings Date']
+                if isinstance(earnings_date, list) and len(earnings_date) > 0:
+                    result['next_earnings_date'] = earnings_date[0].strftime('%Y-%m-%d')
+                elif isinstance(earnings_date, pd.Timestamp):
+                    result['next_earnings_date'] = earnings_date.strftime('%Y-%m-%d')
+            
+            # Cache per 7 giorni
+            cache.set(cache_key, result, expiry_minutes=7 * 24 * 60)
+            return result
+        
+        except Exception as e:
+            print(f"Errore yfinance get_earnings_dates({ticker}): {e}")
+            return None
+    
+    @staticmethod
+    def get_multiple_tickers(tickers, period='1y'):
+        """
+        Recupera dati per multipli ticker contemporaneamente
+        
+        Args:
+            tickers: lista di simboli ['AAPL', 'MSFT', 'GOOGL']
+            period: periodo dati
+        
+        Returns:
+            dict {ticker: DataFrame}
+        """
+        result = {}
+        for ticker in tickers:
+            result[ticker] = YFinanceClient.get_stock_data(ticker, period)
+        return result
+
+═══════════════════════════════════════════════════════════════
+
+FILE: api/alphavantage_client.py
+
+import requests
+from api.cache_manager import CacheManager
+from config import Config
+
+cache = CacheManager()
+
+class AlphaVantageClient:
+    """
+    Client per Alpha Vantage API
+    Docs: https://www.alphavantage.co/documentation/
+    
+    Limite: 25 richieste/giorno (tier gratuito)
+    """
+    
+    BASE_URL = Config.ALPHA_VANTAGE_BASE_URL
+    API_KEY = Config.ALPHA_VANTAGE_KEY
+    
+    @staticmethod
+    def _make_request(params):
+        """Helper per fare richieste API"""
+        params['apikey'] = AlphaVantageClient.API_KEY
+        
+        try:
+            response = requests.get(AlphaVantageClient.BASE_URL, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            # Check per errori API
+            if 'Error Message' in data:
+                print(f"Alpha Vantage Error: {data['Error Message']}")
+                return None
+            
+            if 'Note' in data:
+                print(f"Alpha Vantage Rate Limit: {data['Note']}")
+                return None
+            
+            return data
+        
+        except Exception as e:
+            print(f"Errore Alpha Vantage request: {e}")
+            return None
+    
+    @staticmethod
+    def get_sector_performance():
+        """
+        Recupera performance di tutti i settori
+        Endpoint: SECTOR
+        
+        Returns:
+            dict con performance real-time, 1D, 5D, 1M, 3M, YTD, 1Y, 3Y, 5Y, 10Y
+        """
+        cache_key = "av_sector_performance"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+        
+        params = {
+            'function': 'SECTOR'
+        }
+        
+        data = AlphaVantageClient._make_request(params)
+        
+        if data is None:
+            return None
+        
+        # Estrai dati rilevanti
+        result = {
+            'real_time': data.get('Rank A: Real-Time Performance', {}),
+            '1_day': data.get('Rank B: 1 Day Performance', {}),
+            '5_day': data.get('Rank C: 5 Day Performance', {}),
+            '1_month': data.get('Rank D: 1 Month Performance', {}),
+            '3_month': data.get('Rank E: 3 Month Performance', {}),
+            'ytd': data.get('Rank F: Year-to-Date (YTD) Performance', {}),
+            '1_year': data.get('Rank G: 1 Year Performance', {}),
+            '3_year': data.get('Rank H: 3 Year Performance', {}),
+            '5_year': data.get('Rank I: 5 Year Performance', {}),
+            '10_year': data.get('Rank J: 10 Year Performance', {})
+        }
+        
+        # Cache per 1 ora
+        cache.set(cache_key, result, expiry_minutes=Config.CACHE_EXPIRY_HOURS_SECTORS * 60)
+        return result
+    
+    @staticmethod
+    def get_technical_indicator(ticker, indicator, interval='daily', time_period=14):
+        """
+        Recupera indicatori tecnici pre-calcolati
+        
+        Args:
+            ticker: simbolo stock
+            indicator: 'SMA', 'EMA', 'RSI', 'MACD', 'BBANDS', 'ATR', etc.
+            interval: 'daily', 'weekly', 'monthly'
+            time_period: periodo per l'indicatore
+        
+        Returns:
+            dict con dati indicatore
+        """
+        cache_key = f"av_indicator_{ticker}_{indicator}_{interval}_{time_period}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+        
+        params = {
+            'function': indicator,
+            'symbol': ticker,
+            'interval': interval,
+            'time_period': time_period,
+            'series_type': 'close'
+        }
+        
+        data = AlphaVantageClient._make_request(params)
+        
+        if data is None:
+            return None
+        
+        # Cache per 1 ora
+        cache.set(cache_key, data, expiry_minutes=60)
+        return data
+    
+    @staticmethod
+    def get_quote(ticker):
+        """
+        Recupera quote real-time
+        Endpoint: GLOBAL_QUOTE
+        
+        Returns:
+            dict con price, change, volume, etc.
+        """
+        cache_key = f"av_quote_{ticker}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+        
+        params = {
+            'function': 'GLOBAL_QUOTE',
+            'symbol': ticker
+        }
+        
+        data = AlphaVantageClient._make_request(params)
+        
+        if data is None or 'Global Quote' not in data:
+            return None
+        
+        quote = data['Global Quote']
+        
+        result = {
+            'symbol': quote.get('01. symbol'),
+            'price': float(quote.get('05. price', 0)),
+            'change': float(quote.get('09. change', 0)),
+            'change_percent': quote.get('10. change percent', '0%').replace('%', ''),
+            'volume': int(quote.get('06. volume', 0)),
+            'latest_trading_day': quote.get('07. latest trading day')
+        }
+        
+        # Cache per 5 minuti
+        cache.set(cache_key, result, expiry_minutes=5)
+        return result
+
+═══════════════════════════════════════════════════════════════
+
+FILE: api/fmp_client.py
+
+import requests
+from api.cache_manager import CacheManager
+from config import Config
+
+cache = CacheManager()
+
+class FMPClient:
+    """
+    Client per Financial Modeling Prep API
+    Docs: https://site.financialmodelingprep.com/developer/docs
+    
+    Limite: 250 richieste/giorno (tier gratuito)
+    """
+    
+    BASE_URL = Config.FMP_BASE_URL
+    API_KEY = Config.FMP_KEY
+    
+    @staticmethod
+    def _make_request(endpoint, params=None):
+        """Helper per fare richieste API"""
+        if params is None:
+            params = {}
+        
+        params['apikey'] = FMPClient.API_KEY
+        url = f"{FMPClient.BASE_URL}/{endpoint}"
+        
+        try:
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            # Check per errori
+            if isinstance(data, dict) and 'Error Message' in data:
+                print(f"FMP Error: {data['Error Message']}")
+                return None
+            
+            return data
+        
+        except Exception as e:
+            print(f"Errore FMP request: {e}")
+            return None
+    
+    @staticmethod
+    def get_company_profile(ticker):
+        """
+        Recupera profilo completo azienda
+        Endpoint: /profile/{ticker}
+        
+        Returns:
+            dict con sector, industry, description, CEO, employees, etc.
+        """
+        cache_key = f"fmp_profile_{ticker}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+        
+        data = FMPClient._make_request(f"profile/{ticker}")
+        
+        if data is None or len(data) == 0:
+            return None
+        
+        profile = data[0]
+        
+        result = {
+            'symbol': profile.get('symbol'),
+            'company_name': profile.get('companyName'),
+            'sector': profile.get('sector'),
+            'industry': profile.get('industry'),
+            'description': profile.get('description'),
+            'ceo': profile.get('ceo'),
+            'website': profile.get('website'),
+            'employees': profile.get('fullTimeEmployees'),
+            'market_cap': profile.get('mktCap'),
+            'price': profile.get('price'),
+            'beta': profile.get('beta'),
+            'ipo_date': profile.get('ipoDate')
+        }
+        
+        # Cache per 7 giorni
+        cache.set(cache_key, result, expiry_minutes=7 * 24 * 60)
+        return result
+    
+    @staticmethod
+    def get_institutional_holders(ticker):
+        """
+        Recupera institutional holders dettagliati
+        Endpoint: /institutional-holder/{ticker}
+        
+        Returns:
+            list di dict con holder, shares, date, change
+        """
+        cache_key = f"fmp_institutional_{ticker}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+        
+        data = FMPClient._make_request(f"institutional-holder/{ticker}")
+        
+        if data is None:
+            return None
+        
+        # Prendi top 20 holders
+        holders = data[:20] if len(data) > 20 else data
+        
+        result = []
+        for holder in holders:
+            result.append({
+                'holder': holder.get('holder'),
+                'shares': holder.get('shares'),
+                'date_reported': holder.get('dateReported'),
+                'change': holder.get('change'),
+                'percent_held': holder.get('percentHeld')
+            })
+        
+        # Cache per 24h
+        cache.set(cache_key, result, expiry_minutes=Config.CACHE_EXPIRY_HOURS_FUNDAMENTALS * 60)
+        return result
+    
+    @staticmethod
+    def get_income_statement(ticker, period='quarter', limit=4):
+        """
+        Recupera income statement
+        Endpoint: /income-statement/{ticker}
+        
+        Args:
+            period: 'quarter' o 'annual'
+            limit: numero di periodi
+        
+        Returns:
+            list di dict con revenue, eps, gross profit, etc.
+        """
+        cache_key = f"fmp_income_{ticker}_{period}_{limit}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+        
+        params = {
+            'period': period,
+            'limit': limit
+        }
+        
+        data = FMPClient._make_request(f"income-statement/{ticker}", params)
+        
+        if data is None:
+            return None
+        
+        result = []
+        for statement in data:
+            result.append({
+                'date': statement.get('date'),
+                'revenue': statement.get('revenue'),
+                'gross_profit': statement.get('grossProfit'),
+                'operating_income': statement.get('operatingIncome'),
+                'net_income': statement.get('netIncome'),
+                'eps': statement.get('eps'),
+                'eps_diluted': statement.get('epsdiluted')
+            })
+        
+        # Cache per 24h
+        cache.set(cache_key, result, expiry_minutes=Config.CACHE_EXPIRY_HOURS_FUNDAMENTALS * 60)
+        return result
+    
+    @staticmethod
+    def get_key_metrics(ticker, period='quarter', limit=4):
+        """
+        Recupera key metrics (PE ratio, ROE, etc.)
+        Endpoint: /key-metrics/{ticker}
+        
+        Returns:
+            list di dict con metriche finanziarie
+        """
+        cache_key = f"fmp_metrics_{ticker}_{period}_{limit}"
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+        
+        params = {
+            'period': period,
+            'limit': limit
+        }
+        
+        data = FMPClient._make_request(f"key-metrics/{ticker}", params)
+        
+        if data is None:
+            return None
+        
+        # Cache per 24h
+        cache.set(cache_key, data, expiry_minutes=Config.CACHE_EXPIRY_HOURS_FUNDAMENTALS * 60)
+        return data
+    
+    @staticmethod
+    def get_stock_screener(market_cap_more_than=None, sector=None, limit=100):
+        """
+        Stock screener
+        Endpoint: /stock-screener
+        
+        Returns:
+            list di stock che matchano i criteri
+        """
+        params = {
+            'limit': limit
+        }
+        
+        if market_cap_more_than:
+            params['marketCapMoreThan'] = market_cap_more_than
+        
+        if sector:
+            params['sector'] = sector
+        
+        data = FMPClient._make_request('stock-screener', params)
+        
+        return data
+    
+    @staticmethod
+    def get_earnings_calendar(from_date=None, to_date=None):
+        """
+        Calendario earnings
+        Endpoint: /earning_calendar
+        
+        Returns:
+            list di earnings dates
+        """
+        params = {}
+        
+        if from_date:
+            params['from'] = from_date
+        
+        if to_date:
+            params['to'] = to_date
+        
+        data = FMPClient._make_request('earning_calendar', params)
+        
+        return data
+
+═══════════════════════════════════════════════════════════════
+
+TASK PER REPLIT:
+
+1. Crea la struttura di cartelle esattamente come specificato sopra
+2. Implementa tutti i file mostrati sopra
+3. Il file .env è già configurato con le API keys corrette
+4. Testa che tutte e 3 le API funzionino:
+   - yfinance: recupera dati per 'AAPL'
+   - Alpha Vantage: recupera sector performance
+   - FMP: recupera company profile per 'AAPL'
+5. Verifica che il sistema di caching funzioni correttamente
+
+NOTE IMPORTANTI:
+- Usa SEMPRE il cache_manager per ridurre chiamate API
+- Gestisci TUTTI gli errori con try/except
+- Se un dato non è disponibile, ritorna None (non sollevare eccezioni)
+- Logga gli errori con print() per debug
+- Alpha Vantage ha limite 25 req/day → usa con parsimonia
+- FMP ha limite 250 req/day → più generoso ma comunque limitato
+- yfinance è illimitato → usa come fonte primaria
