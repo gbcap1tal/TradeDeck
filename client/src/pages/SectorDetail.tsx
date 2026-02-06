@@ -67,7 +67,7 @@ export default function SectorDetail() {
             <div className="flex-1 min-h-0 flex flex-col">
               <h1 className="text-2xl font-bold tracking-tight text-white mb-3" data-testid="text-sector-name">{data.sector.name}</h1>
               <div className="flex-1 min-h-0">
-                <div className="grid grid-cols-5 gap-3 h-full" data-testid="grid-industry-heatmap">
+                <div className={cn("grid gap-3 h-full", data.industries.length <= 5 ? "grid-cols-5" : data.industries.length <= 8 ? "grid-cols-4" : "grid-cols-5")} style={data.industries.length > 5 ? { gridTemplateRows: `repeat(${Math.ceil(data.industries.length / (data.industries.length <= 8 ? 4 : 5))}, 1fr)` } : undefined} data-testid="grid-industry-heatmap">
                   {data.industries.map((industry: any) => {
                     const change = industry.changePercent ?? 0;
                     const bg = getHeatmapColor(change);
