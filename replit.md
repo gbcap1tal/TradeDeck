@@ -49,8 +49,9 @@ Preferred communication style: Simple, everyday language.
 - `GET /api/market/sectors/:name/industries/:industry` — Industry stocks
 - `GET /api/stocks/:symbol/quote` — Stock quote
 - `GET /api/stocks/:symbol/history` — Stock price history
-- `GET /api/stocks/:symbol/canslim` — CANSLIM analysis
-- `GET /api/stocks/:symbol/earnings` — Earnings data
+- `GET /api/stocks/:symbol/canslim` — CANSLIM analysis (legacy, not used in current UI)
+- `GET /api/stocks/:symbol/quality?rsTimeframe=current|1M|3M|6M|12M` — Stock Quality data (details, fundamentals, profitability, trend)
+- `GET /api/stocks/:symbol/earnings` — Earnings data (quarters, sales, earnings, growth arrays)
 - `GET /api/stocks/:symbol/news` — Stock news
 - `GET /api/watchlists` — User watchlists (authenticated)
 - `POST /api/watchlists` — Create watchlist (authenticated)
