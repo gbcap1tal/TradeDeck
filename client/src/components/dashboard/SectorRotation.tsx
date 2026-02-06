@@ -17,42 +17,65 @@ function getQuadrant(rs: number, momentum: number, midRS: number): QuadrantKey {
   return 'weakening';
 }
 
-function distributeInRect(
-  count: number,
+function placeInQuadrant(
+  items: any[],
   rect: { x: number; y: number; w: number; h: number },
-  bubbleR: number
+  bubbleR: number,
+  rsMin: number,
+  rsMax: number,
+  momMin: number,
+  momMax: number,
 ): Array<{ cx: number; cy: number }> {
-  if (count === 0) return [];
+  if (items.length === 0) return [];
 
-  const insetX = bubbleR + 4;
-  const insetY = bubbleR + 4;
-  const areaX = rect.x + insetX;
-  const areaY = rect.y + insetY;
-  const areaW = rect.w - insetX * 2;
-  const areaH = rect.h - insetY * 2;
+  const inset = bubbleR + 6;
+  const minX = rect.x + inset;
+  const maxX = rect.x + rect.w - inset;
+  const minY = rect.y + inset;
+  const maxY = rect.y + rect.h - inset;
 
-  if (count === 1) {
-    return [{ cx: areaX + areaW / 2, cy: areaY + areaH / 2 }];
+  if (maxX <= minX || maxY <= minY) {
+    return items.map(() => ({ cx: rect.x + rect.w / 2, cy: rect.y + rect.h / 2 }));
   }
 
-  const cols = Math.ceil(Math.sqrt(count * (areaW / areaH)));
-  const rows = Math.ceil(count / cols);
+  const positions = items.map((s: any) => {
+    const normRS = rsMax === rsMin ? 0.5 : (s.rs - rsMin) / (rsMax - rsMin);
+    const normMom = momMax === momMin ? 0.5 : (s.rsMomentum - momMin) / (momMax - momMin);
+    return {
+      cx: minX + normRS * (maxX - minX),
+      cy: maxY - normMom * (maxY - minY),
+    };
+  });
 
-  const positions: Array<{ cx: number; cy: number }> = [];
-  let idx = 0;
-
-  for (let r = 0; r < rows && idx < count; r++) {
-    const itemsInRow = r === rows - 1 ? count - idx : cols;
-    const cellW = areaW / itemsInRow;
-    const cellH = areaH / rows;
-
-    for (let c = 0; c < itemsInRow && idx < count; c++) {
-      positions.push({
-        cx: areaX + c * cellW + cellW / 2,
-        cy: areaY + r * cellH + cellH / 2,
-      });
-      idx++;
+  const minDist = bubbleR * 2 + 6;
+  for (let iter = 0; iter < 30; iter++) {
+    let moved = false;
+    for (let i = 0; i < positions.length; i++) {
+      for (let j = i + 1; j < positions.length; j++) {
+        const dx = positions[j].cx - positions[i].cx;
+        const dy = positions[j].cy - positions[i].cy;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < minDist && dist > 0.01) {
+          const overlap = (minDist - dist) / 2 + 0.5;
+          const nx = dx / dist;
+          const ny = dy / dist;
+          positions[i].cx -= nx * overlap;
+          positions[i].cy -= ny * overlap;
+          positions[j].cx += nx * overlap;
+          positions[j].cy += ny * overlap;
+          moved = true;
+        } else if (dist <= 0.01) {
+          positions[j].cx += minDist * 0.5;
+          positions[j].cy += minDist * 0.3;
+          moved = true;
+        }
+      }
     }
+    for (const p of positions) {
+      p.cx = Math.max(minX, Math.min(maxX, p.cx));
+      p.cy = Math.max(minY, Math.min(maxY, p.cy));
+    }
+    if (!moved) break;
   }
 
   return positions;
@@ -125,7 +148,13 @@ export function SectorRotation() {
   (Object.keys(quadrants) as QuadrantKey[]).forEach((q) => {
     const items = quadrants[q];
     const rect = quadrantRects[q];
-    const positions = distributeInRect(items.length, rect, BUBBLE_R);
+    const qRS = items.map((s: any) => s.rs);
+    const qMom = items.map((s: any) => s.rsMomentum);
+    const positions = placeInQuadrant(
+      items, rect, BUBBLE_R,
+      qRS.length ? Math.min(...qRS) : 0, qRS.length ? Math.max(...qRS) : 100,
+      qMom.length ? Math.min(...qMom) : -5, qMom.length ? Math.max(...qMom) : 5,
+    );
     items.forEach((sector: any, i: number) => {
       positioned.push({ sector, cx: positions[i].cx, cy: positions[i].cy, color: QUADRANT_COLORS[q], quadrant: q });
     });
