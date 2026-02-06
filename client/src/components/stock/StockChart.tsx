@@ -1,5 +1,4 @@
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useStockHistory } from "@/hooks/use-stocks";
 import { useState } from 'react';
 import { format } from 'date-fns';
@@ -8,9 +7,10 @@ import { Loader2 } from "lucide-react";
 interface StockChartProps {
   symbol: string;
   currentPrice?: number;
+  compact?: boolean;
 }
 
-export function StockChart({ symbol, currentPrice }: StockChartProps) {
+export function StockChart({ symbol, currentPrice, compact }: StockChartProps) {
   const [range, setRange] = useState<'1D' | '1W' | '1M' | '3M' | '1Y' | '5Y'>('1M');
   const { data: history, isLoading } = useStockHistory(symbol, range);
 
@@ -19,51 +19,54 @@ export function StockChart({ symbol, currentPrice }: StockChartProps) {
     : true;
 
   const color = isPositive ? "#30d158" : "#ff453a";
+  const ranges = ['1D', '1W', '1M', '3M', '1Y', '5Y'] as const;
 
   if (isLoading) {
     return (
-      <div className="h-[380px] w-full flex items-center justify-center glass-card rounded-xl">
-        <Loader2 className="w-6 h-6 animate-spin text-white/20" />
+      <div className={cn("w-full flex items-center justify-center glass-card rounded-xl", compact ? "h-full" : "h-[380px]")}>
+        <Loader2 className="w-5 h-5 animate-spin text-white/15" />
       </div>
     );
   }
 
   return (
-    <div className="glass-card rounded-xl p-5" data-testid="card-stock-chart">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-5 gap-3">
-        <h3 className="text-[15px] font-semibold text-white/60">Price History</h3>
-        <Tabs value={range} onValueChange={(v) => setRange(v as any)} className="w-full sm:w-auto">
-          <TabsList className="grid grid-cols-6 w-full sm:w-auto bg-white/5 h-8 rounded-lg">
-            {['1D', '1W', '1M', '3M', '1Y', '5Y'].map((r) => (
-              <TabsTrigger
-                key={r}
-                value={r}
-                className="text-[11px] text-white/40 data-[state=active]:bg-white/10 data-[state=active]:text-white data-[state=active]:shadow-none rounded-md h-6"
-                data-testid={`tab-range-${r}`}
-              >
-                {r}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+    <div className={cn("glass-card rounded-xl flex flex-col", compact ? "h-full p-4" : "p-5")} data-testid="card-stock-chart">
+      <div className="flex items-center justify-between mb-3 flex-shrink-0">
+        <span className="label-text">Price</span>
+        <div className="flex items-center gap-0.5 rounded-md bg-white/[0.04] p-0.5" data-testid="switch-chart-range">
+          {ranges.map((r) => (
+            <button
+              key={r}
+              onClick={() => setRange(r)}
+              className={`px-1.5 py-0.5 text-[9px] font-semibold rounded transition-colors ${
+                range === r
+                  ? 'bg-white/10 text-white/80'
+                  : 'text-white/20 hover:text-white/40'
+              }`}
+              data-testid={`tab-range-${r}`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="h-[320px] w-full">
+      <div className={cn("flex-1 min-h-0", !compact && "h-[320px]")}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={history}>
             <defs>
               <linearGradient id={`gradient-${symbol}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={color} stopOpacity={0.2} />
+                <stop offset="5%" stopColor={color} stopOpacity={0.15} />
                 <stop offset="95%" stopColor={color} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
             <XAxis
               dataKey="time"
-              tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.25)' }}
+              tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.18)' }}
               tickLine={false}
               axisLine={false}
-              minTickGap={40}
+              minTickGap={50}
               tickFormatter={(str) => {
                 const date = new Date(str);
                 if (range === '1D') return format(date, 'HH:mm');
@@ -73,21 +76,21 @@ export function StockChart({ symbol, currentPrice }: StockChartProps) {
             />
             <YAxis
               domain={['auto', 'auto']}
-              tick={{ fontSize: 10, fill: 'rgba(255,255,255,0.25)' }}
+              tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.18)' }}
               tickLine={false}
               axisLine={false}
               tickFormatter={(val) => `$${val.toFixed(0)}`}
-              width={50}
+              width={40}
             />
             <Tooltip
               content={({ active, payload, label }) => {
                 if (active && payload && payload.length) {
                   return (
-                    <div className="bg-[#1a1a1a] border border-white/10 p-3 rounded-lg shadow-xl">
-                      <p className="text-[11px] text-white/40 mb-1">
+                    <div className="rounded-lg border border-white/8 px-3 py-2" style={{ background: 'rgba(20,20,20,0.95)', backdropFilter: 'blur(12px)' }}>
+                      <p className="text-[9px] text-white/30 mb-0.5">
                         {range === '1D' ? format(new Date(label), 'MMM d, HH:mm') : format(new Date(label), 'MMM d, yyyy')}
                       </p>
-                      <p className="text-lg font-bold font-mono-nums text-white">
+                      <p className="text-[14px] font-bold font-mono-nums text-white">
                         ${Number(payload[0].value).toFixed(2)}
                       </p>
                     </div>
@@ -100,7 +103,7 @@ export function StockChart({ symbol, currentPrice }: StockChartProps) {
               type="monotone"
               dataKey="value"
               stroke={color}
-              strokeWidth={2}
+              strokeWidth={1.5}
               fillOpacity={1}
               fill={`url(#gradient-${symbol})`}
             />
@@ -109,4 +112,8 @@ export function StockChart({ symbol, currentPrice }: StockChartProps) {
       </div>
     </div>
   );
+}
+
+function cn(...classes: (string | boolean | undefined)[]) {
+  return classes.filter(Boolean).join(' ');
 }
