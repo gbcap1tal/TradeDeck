@@ -200,8 +200,9 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
 
   const allValues = [...earnings.sales, ...earnings.earnings.map(Math.abs)];
   const maxVal = Math.max(...allValues);
+  const topPad = 16;
   const labelH = 28;
-  const barAreaH = Math.max(dims.h - labelH, 0);
+  const barAreaH = Math.max(dims.h - labelH - topPad, 0);
   const n = earnings.quarters.length;
   const groupGap = dims.w > 0 ? Math.max(dims.w * 0.03, 6) : 8;
   const groupW = n > 0 ? (dims.w - groupGap * (n - 1)) / n : 0;
@@ -282,7 +283,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                 <rect x={x} y={0} width={groupW} height={dims.h} fill="transparent" />
                 <rect
                   x={x}
-                  y={barAreaH - sBarH}
+                  y={topPad + barAreaH - sBarH}
                   width={barW}
                   height={sBarH}
                   rx={2}
@@ -290,7 +291,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                 />
                 <rect
                   x={x + barW + barGap}
-                  y={barAreaH - eBarH}
+                  y={topPad + barAreaH - eBarH}
                   width={barW}
                   height={eBarH}
                   rx={2}
@@ -298,7 +299,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                 />
                 <text
                   x={x + groupW / 2}
-                  y={barAreaH + 14}
+                  y={topPad + barAreaH + 14}
                   textAnchor="middle"
                   fill="rgba(255,255,255,0.35)"
                   fontSize="9"
@@ -309,7 +310,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                 {i > 0 && (
                   <text
                     x={x + groupW / 2}
-                    y={barAreaH + 24}
+                    y={topPad + barAreaH + 24}
                     textAnchor="middle"
                     fill={eGrowth >= 0 ? 'rgba(48,209,88,0.8)' : 'rgba(255,69,58,0.7)'}
                     fontSize="9"
