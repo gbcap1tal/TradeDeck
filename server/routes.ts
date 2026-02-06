@@ -210,7 +210,14 @@ function getStockHistory(symbol: string, range: string = '1M') {
   
   for (let i = 0; i < points; i++) {
     const vol = range === '1D' ? 0.002 : 0.015;
-    price = price * (1 + (seededRandom(symbol + i.toString() + range) - 0.48) * vol);
+    const open = price;
+    const r1 = seededRandom(symbol + i.toString() + range);
+    const r2 = seededRandom(symbol + i.toString() + range + 'h');
+    const r3 = seededRandom(symbol + i.toString() + range + 'l');
+    price = price * (1 + (r1 - 0.48) * vol);
+    const close = Math.round(price * 100) / 100;
+    const high = Math.round(Math.max(open, close) * (1 + r2 * vol * 0.5) * 100) / 100;
+    const low = Math.round(Math.min(open, close) * (1 - r3 * vol * 0.5) * 100) / 100;
     const time = new Date(now);
     
     if (range === '1D') {
@@ -221,7 +228,11 @@ function getStockHistory(symbol: string, range: string = '1M') {
     
     data.push({
       time: range === '1D' ? time.toISOString() : time.toISOString().split('T')[0],
-      value: Math.round(price * 100) / 100,
+      value: close,
+      open: Math.round(open * 100) / 100,
+      high,
+      low,
+      close,
     });
   }
   return data;
