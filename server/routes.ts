@@ -511,13 +511,31 @@ export async function registerRoutes(
       rsMomentum: 0,
     };
 
-    const industries = sectorConfig.industries.map(ind => ({
-      name: ind,
-      changePercent: 0,
-      stockCount: INDUSTRY_STOCKS[ind]?.length || 5,
-      rs: 0,
-      topStocks: (INDUSTRY_STOCKS[ind] || []).slice(0, 3).map(s => s.symbol),
-    }));
+    const allSymbols: string[] = [];
+    for (const ind of sectorConfig.industries) {
+      const stocks = INDUSTRY_STOCKS[ind] || [];
+      stocks.forEach(s => { if (!allSymbols.includes(s.symbol)) allSymbols.push(s.symbol); });
+    }
+
+    let allQuotes: any[] = [];
+    try {
+      allQuotes = await yahoo.getMultipleQuotes(allSymbols);
+    } catch {}
+
+    const industries = sectorConfig.industries.map(ind => {
+      const stocks = INDUSTRY_STOCKS[ind] || [];
+      const industryQuotes = stocks.map(s => allQuotes.find((q: any) => q?.symbol === s.symbol)).filter(Boolean);
+      const avgChange = industryQuotes.length > 0
+        ? Math.round(industryQuotes.reduce((sum: number, q: any) => sum + (q.changePercent ?? 0), 0) / industryQuotes.length * 100) / 100
+        : 0;
+      return {
+        name: ind,
+        changePercent: avgChange,
+        stockCount: stocks.length,
+        rs: 0,
+        topStocks: stocks.slice(0, 3).map(s => s.symbol),
+      };
+    });
 
     res.json({ sector, industries });
   });
