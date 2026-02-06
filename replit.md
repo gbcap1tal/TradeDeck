@@ -2,9 +2,9 @@
 
 ## Overview
 
-TradingCockpit is a full-stack financial markets dashboard application designed with an Apple-inspired dark minimal aesthetic. It provides market overview data including major indices (SPY, QQQ, IWM, VIX, TLT), sector/industry performance analysis, relative strength tracking, sector rotation visualization, market breadth indicators, and individual stock detail pages with CANSLIM scoring.
+TradingCockpit (TradeDeck) is a full-stack financial markets dashboard application designed with an Apple-inspired dark minimal aesthetic (#0a0a0a-#1a1a1a). It provides market overview data including major indices (SPY, QQQ, IWM, VIX, TLT), sector/industry performance analysis, relative strength tracking, market breadth indicators, and individual stock detail pages with Stock Quality metrics and earnings visualization.
 
-The application currently uses **simulated/mock market data** generated server-side (no live financial data API is connected yet). The data generation logic lives in `server/routes.ts` with hardcoded sector, industry, and stock definitions.
+The application uses **live financial data** from Yahoo Finance (quotes, history, indices, sector ETFs) and Financial Modeling Prep (earnings, income statements, cash flow, company profiles). API clients are in `server/api/yahoo.ts` and `server/api/fmp.ts` with a shared caching layer in `server/api/cache.ts`.
 
 ## User Preferences
 
@@ -37,7 +37,7 @@ Preferred communication style: Simple, everyday language.
 - **Framework**: Express.js with TypeScript, run via `tsx`
 - **Entry point**: `server/index.ts` creates HTTP server, registers routes, serves static in production or Vite dev middleware in development
 - **API prefix**: All API routes start with `/api/`
-- **Data**: Mock data generated with deterministic randomness from base prices defined in `server/routes.ts`. Sectors, industries, and stocks are all hardcoded arrays with simulated price movements.
+- **Data**: Live data from Yahoo Finance and FMP APIs via `server/api/yahoo.ts` and `server/api/fmp.ts`. Sectors and industries use hardcoded mappings in `server/routes.ts` enriched with real ETF quotes. Market breadth still uses simulated data.
 - **Build**: Custom build script at `script/build.ts` using esbuild for server and Vite for client. Production output goes to `dist/`.
 
 ### API Route Structure
@@ -106,5 +106,9 @@ Preferred communication style: Simple, everyday language.
 - **date-fns**: Date formatting
 - **zod** + **drizzle-zod**: Schema validation
 
-### Not Yet Connected
-- No live financial data API is integrated. All market data is simulated server-side. The architecture is ready to swap in a real data provider (e.g., Alpha Vantage, Polygon.io, IEX Cloud) by replacing the mock data generation in `server/routes.ts`.
+### Live Data Sources
+- **Yahoo Finance** (via `yahoo-finance2` npm package): Stock quotes, price history, indices, sector ETF quotes, company statistics. Unlimited requests, no API key needed.
+- **Financial Modeling Prep** (via REST API, `FMP_KEY` secret): Quarterly income statements, cash flow statements, company profiles. Free tier limited to 250 req/day, max 5 records per query. Uses stable API (`/stable/` endpoints).
+- **Alpha Vantage** (`ALPHA_VANTAGE_KEY` secret): Reserved for future use. 25 req/day limit.
+- **Caching**: In-memory TTL cache in `server/api/cache.ts` with varying TTLs (quotes: 60s, history: 300s, fundamentals: 3600s, profile: 86400s).
+- **Market breadth data** is still simulated (no free API available for advance/decline data).

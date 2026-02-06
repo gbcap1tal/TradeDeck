@@ -1,15 +1,16 @@
 import { getCached, setCache, CACHE_TTL } from './cache';
 
-const FMP_BASE = 'https://financialmodelingprep.com/api/v3';
+const FMP_STABLE = 'https://financialmodelingprep.com/stable';
+const FMP_V3 = 'https://financialmodelingprep.com/api/v3';
 
-async function fmpRequest(endpoint: string, params: Record<string, string> = {}): Promise<any> {
+async function fmpStableRequest(endpoint: string, params: Record<string, string> = {}): Promise<any> {
   const apiKey = process.env.FMP_KEY;
   if (!apiKey) {
     console.error('FMP_KEY not set');
     return null;
   }
 
-  const url = new URL(`${FMP_BASE}/${endpoint}`);
+  const url = new URL(`${FMP_STABLE}/${endpoint}`);
   url.searchParams.set('apikey', apiKey);
   for (const [k, v] of Object.entries(params)) {
     url.searchParams.set(k, v);
@@ -18,15 +19,29 @@ async function fmpRequest(endpoint: string, params: Record<string, string> = {})
   try {
     const resp = await fetch(url.toString(), { signal: AbortSignal.timeout(10000) });
     if (!resp.ok) {
-      console.error(`FMP ${endpoint} HTTP ${resp.status}`);
+      console.error(`FMP stable ${endpoint} HTTP ${resp.status}`);
       return null;
     }
-    const data = await resp.json();
-    if (data && typeof data === 'object' && 'Error Message' in data) {
-      console.error(`FMP error: ${data['Error Message']}`);
+    const text = await resp.text();
+    if (text.startsWith('Premium') || text.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed && typeof parsed === 'object' && 'Error Message' in parsed) {
+          console.error(`FMP error: ${parsed['Error Message']}`);
+          return null;
+        }
+        return parsed;
+      } catch {
+        console.error(`FMP rate limit or error: ${text.slice(0, 100)}`);
+        return null;
+      }
+    }
+    try {
+      return JSON.parse(text);
+    } catch {
+      console.error(`FMP parse error: ${text.slice(0, 100)}`);
       return null;
     }
-    return data;
   } catch (e: any) {
     console.error(`FMP request error (${endpoint}):`, e.message);
     return null;
@@ -38,10 +53,13 @@ export async function getCompanyProfile(symbol: string) {
   const cached = getCached<any>(key);
   if (cached) return cached;
 
-  const data = await fmpRequest(`profile/${symbol}`);
-  if (!data || !Array.isArray(data) || data.length === 0) return null;
+  const data = await fmpStableRequest('profile', { symbol });
+  if (!data) return null;
 
-  const p = data[0];
+  const arr = Array.isArray(data) ? data : [data];
+  if (arr.length === 0) return null;
+
+  const p = arr[0];
   const result = {
     symbol: p.symbol,
     name: p.companyName,
@@ -57,12 +75,13 @@ export async function getCompanyProfile(symbol: string) {
   return result;
 }
 
-export async function getIncomeStatement(symbol: string, period: string = 'quarter', limit: number = 8) {
-  const key = `fmp_income_${symbol}_${period}_${limit}`;
+export async function getIncomeStatement(symbol: string, period: string = 'quarter', limit: number = 5) {
+  const safeLimit = Math.min(limit, 5);
+  const key = `fmp_income_${symbol}_${period}_${safeLimit}`;
   const cached = getCached<any[]>(key);
   if (cached) return cached;
 
-  const data = await fmpRequest(`income-statement/${symbol}`, { period, limit: limit.toString() });
+  const data = await fmpStableRequest('income-statement', { symbol, period, limit: safeLimit.toString() });
   if (!data || !Array.isArray(data)) return null;
 
   const result = data.map((s: any) => ({
@@ -72,7 +91,7 @@ export async function getIncomeStatement(symbol: string, period: string = 'quart
     operatingIncome: s.operatingIncome,
     netIncome: s.netIncome,
     eps: s.eps,
-    epsDiluted: s.epsdiluted,
+    epsDiluted: s.epsDiluted || s.epsdiluted,
   }));
 
   setCache(key, result, CACHE_TTL.EARNINGS);
@@ -84,7 +103,7 @@ export async function getEarningsData(symbol: string) {
   const cached = getCached<any>(key);
   if (cached) return cached;
 
-  const incomeData = await getIncomeStatement(symbol, 'quarter', 8);
+  const incomeData = await getIncomeStatement(symbol, 'quarter', 5);
   if (!incomeData || incomeData.length === 0) return null;
 
   const sorted = [...incomeData].reverse();
@@ -116,14 +135,14 @@ export async function getStockNews(symbol: string) {
   const cached = getCached<any[]>(key);
   if (cached) return cached;
 
-  const data = await fmpRequest('stock_news', { tickers: symbol, limit: '5' });
+  const data = await fmpStableRequest('stock-news', { symbol, limit: '5' });
   if (!data || !Array.isArray(data)) return null;
 
   const result = data.map((n: any, i: number) => ({
     id: String(i + 1),
     headline: n.title,
-    summary: n.text?.slice(0, 200) || '',
-    source: n.site || 'News',
+    summary: (n.text || '').slice(0, 200),
+    source: n.site || n.publishedBy || 'News',
     url: n.url || '#',
     timestamp: new Date(n.publishedDate).getTime(),
     relatedSymbols: [symbol],
@@ -139,7 +158,7 @@ export async function getKeyMetrics(symbol: string) {
   const cached = getCached<any>(key);
   if (cached) return cached;
 
-  const data = await fmpRequest(`key-metrics/${symbol}`, { period: 'quarter', limit: '4' });
+  const data = await fmpStableRequest('key-metrics', { symbol, period: 'quarter', limit: '4' });
   if (!data || !Array.isArray(data) || data.length === 0) return null;
 
   setCache(key, data, CACHE_TTL.FUNDAMENTALS);
@@ -151,7 +170,7 @@ export async function getCashFlowStatement(symbol: string) {
   const cached = getCached<any[]>(key);
   if (cached) return cached;
 
-  const data = await fmpRequest(`cash-flow-statement/${symbol}`, { period: 'quarter', limit: '4' });
+  const data = await fmpStableRequest('cash-flow-statement', { symbol, period: 'quarter', limit: '4' });
   if (!data || !Array.isArray(data)) return null;
 
   setCache(key, data, CACHE_TTL.FUNDAMENTALS);
@@ -163,7 +182,7 @@ export async function getSectorPerformance() {
   const cached = getCached<any[]>(key);
   if (cached) return cached;
 
-  const data = await fmpRequest('sector-performance');
+  const data = await fmpStableRequest('sector-performance');
   if (!data || !Array.isArray(data)) return null;
 
   setCache(key, data, CACHE_TTL.SECTORS);

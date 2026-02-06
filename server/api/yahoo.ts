@@ -1,9 +1,7 @@
-import yahooFinance from 'yahoo-finance2';
+import YahooFinance from 'yahoo-finance2';
 import { getCached, setCache, CACHE_TTL } from './cache';
 
-try { (yahooFinance as any).suppressNotices(['yahooSurvey']); } catch {}
-
-const yf = yahooFinance as any;
+const yf: any = new (YahooFinance as any)();
 
 const INDEX_NAMES: Record<string, string> = {
   SPY: 'S&P 500',
