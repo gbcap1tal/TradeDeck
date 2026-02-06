@@ -16,11 +16,7 @@ export function StockChart({ symbol, currentPrice, compact }: StockChartProps) {
   const [chartType, setChartType] = useState<'line' | 'candle'>('line');
   const { data: history, isLoading } = useStockHistory(symbol, range);
 
-  const isPositive = history && history.length > 0
-    ? (history[history.length - 1].value >= history[0].value)
-    : true;
-
-  const color = isPositive ? "#30d158" : "#ff453a";
+  const chartColor = "#FBBB04";
   const ranges = ['1D', '1W', '1M', '3M', '1Y', '5Y'] as const;
 
   if (isLoading) {
@@ -86,8 +82,8 @@ export function StockChart({ symbol, currentPrice, compact }: StockChartProps) {
             <AreaChart data={history}>
               <defs>
                 <linearGradient id={`gradient-${symbol}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={color} stopOpacity={0.15} />
-                  <stop offset="95%" stopColor={color} stopOpacity={0} />
+                  <stop offset="5%" stopColor={chartColor} stopOpacity={0.15} />
+                  <stop offset="95%" stopColor={chartColor} stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
@@ -132,7 +128,7 @@ export function StockChart({ symbol, currentPrice, compact }: StockChartProps) {
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke={color}
+                stroke={chartColor}
                 strokeWidth={1.5}
                 fillOpacity={1}
                 fill={`url(#gradient-${symbol})`}
