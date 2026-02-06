@@ -18,7 +18,6 @@ const QUADRANT_BG: Record<QuadrantKey, string> = {
 };
 
 const NEUTRAL_COLOR = 'rgba(255,255,255,0.25)';
-const NEUTRAL_COLOR_FAINT = 'rgba(255,255,255,0.12)';
 
 interface RRGSector {
   name: string;
@@ -167,11 +166,10 @@ export function SectorRotation() {
 
           {typedSectors.map((sector) => {
             const isHovered = hoveredSector === sector.ticker;
-            const qColor = getQuadrantColor(sector);
-            const strokeColor = isHovered ? qColor : NEUTRAL_COLOR_FAINT;
-
+            if (!isHovered) return null;
             if (sector.tail.length < 2) return null;
 
+            const qColor = getQuadrantColor(sector);
             const tailPoints = sector.tail.map(t =>
               `${scaleX(t.rsRatio)},${scaleY(t.rsMomentum)}`
             ).join(' ');
@@ -181,25 +179,22 @@ export function SectorRotation() {
                 <polyline
                   points={tailPoints}
                   fill="none"
-                  stroke={strokeColor}
-                  strokeWidth={isHovered ? 2.5 : 1}
-                  opacity={isHovered ? 0.9 : 0.5}
+                  stroke={qColor}
+                  strokeWidth={1}
+                  opacity={0.6}
                   strokeLinejoin="round"
                   strokeLinecap="round"
-                  style={{ transition: 'stroke 0.25s ease, opacity 0.25s ease, stroke-width 0.25s ease' }}
                 />
                 {sector.tail.slice(0, -1).map((t, i) => {
-                  const dotColor = isHovered ? qColor : NEUTRAL_COLOR_FAINT;
                   const progress = (i + 1) / sector.tail.length;
                   return (
                     <circle
                       key={`td-${sector.ticker}-${i}`}
                       cx={scaleX(t.rsRatio)}
                       cy={scaleY(t.rsMomentum)}
-                      r={isHovered ? 2.5 : 1.5}
-                      fill={dotColor}
-                      opacity={isHovered ? 0.3 + progress * 0.7 : 0.3 + progress * 0.4}
-                      style={{ transition: 'fill 0.25s ease, opacity 0.25s ease' }}
+                      r={1.5}
+                      fill={qColor}
+                      opacity={0.3 + progress * 0.5}
                     />
                   );
                 })}
@@ -214,7 +209,7 @@ export function SectorRotation() {
             const cy = scaleY(sector.rsMomentum);
 
             const circleStroke = isHovered ? qColor : NEUTRAL_COLOR;
-            const circleFill = isHovered ? `${qColor}20` : 'rgba(255,255,255,0.03)';
+            const circleFill = isHovered ? `${qColor}15` : 'rgba(255,255,255,0.03)';
             const textFill = isHovered ? '#fff' : NEUTRAL_COLOR;
 
             return (
@@ -228,11 +223,11 @@ export function SectorRotation() {
                 <circle
                   cx={cx}
                   cy={cy}
-                  r={isHovered ? 22 : 18}
+                  r={18}
                   fill={circleFill}
                   stroke={circleStroke}
-                  strokeWidth={isHovered ? 2.5 : 1}
-                  style={{ transition: 'all 0.2s ease' }}
+                  strokeWidth={1}
+                  style={{ transition: 'stroke 0.2s ease, fill 0.2s ease' }}
                 />
                 <text
                   x={cx}
