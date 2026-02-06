@@ -14,7 +14,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useMarketStatus } from "@/hooks/use-market";
-import logoImg from "@assets/download_(3)_1770368859583.png";
+import logoImg from "@assets/Screenshot_2026-02-06_alle_10.14.14_1770369914698.png";
 
 export function Navbar() {
   const [location, setLocation] = useLocation();
@@ -41,9 +41,7 @@ export function Navbar() {
       <div className="max-w-[1400px] mx-auto h-full px-6 flex items-center justify-between gap-6">
         <div className="flex items-center gap-8">
           <Link href="/" className="flex items-center gap-2.5 group" data-testid="link-home">
-            <div className="w-7 h-7 rounded overflow-hidden flex-shrink-0">
-              <img src={logoImg} alt="TradeDeck" className="w-[200%] h-[200%] object-cover object-[28%_50%]" />
-            </div>
+            <img src={logoImg} alt="TradeDeck" className="h-7 w-7 rounded flex-shrink-0" />
             <span className="font-semibold text-[15px] tracking-tight hidden md:block text-white/90">TradeDeck</span>
           </Link>
 
