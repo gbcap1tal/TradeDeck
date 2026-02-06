@@ -24,6 +24,19 @@ export function useSectorPerformance() {
   });
 }
 
+export function useSectorRotation() {
+  return useQuery({
+    queryKey: ['/api/market/sectors/rotation'],
+    queryFn: async () => {
+      const res = await fetch('/api/market/sectors/rotation', { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch rotation data");
+      const data = await res.json();
+      return data.sectors || [];
+    },
+    refetchInterval: 300000,
+  });
+}
+
 export function useMarketBreadth() {
   return useQuery({
     queryKey: ['/api/market/breadth'],

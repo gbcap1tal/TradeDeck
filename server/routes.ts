@@ -1016,6 +1016,167 @@ export async function registerRoutes(
     res.json([]);
   });
 
+  app.get('/api/market/sectors/rotation', async (req, res) => {
+    const cacheKey = 'rrg_rotation';
+    const cached = getCached<any>(cacheKey);
+    if (cached) return res.json(cached);
+
+    try {
+      const SECTOR_ETFS = [
+        { name: 'Technology', ticker: 'XLK', color: '#0a84ff' },
+        { name: 'Financials', ticker: 'XLF', color: '#30d158' },
+        { name: 'Healthcare', ticker: 'XLV', color: '#ff453a' },
+        { name: 'Energy', ticker: 'XLE', color: '#ffd60a' },
+        { name: 'Consumer Discretionary', ticker: 'XLY', color: '#bf5af2' },
+        { name: 'Consumer Staples', ticker: 'XLP', color: '#ff9f0a' },
+        { name: 'Industrials', ticker: 'XLI', color: '#64d2ff' },
+        { name: 'Materials', ticker: 'XLB', color: '#ac8e68' },
+        { name: 'Real Estate', ticker: 'XLRE', color: '#32ade6' },
+        { name: 'Utilities', ticker: 'XLU', color: '#86d48e' },
+        { name: 'Communication Services', ticker: 'XLC', color: '#e040fb' },
+      ];
+
+      const allTickers = ['SPY', ...SECTOR_ETFS.map(s => s.ticker)];
+      const historyResults = await Promise.allSettled(
+        allTickers.map(t => yahoo.getHistory(t, '3M'))
+      );
+
+      const historyMap = new Map<string, Array<{ time: string; close: number }>>();
+      allTickers.forEach((ticker, i) => {
+        const r = historyResults[i];
+        if (r.status === 'fulfilled' && r.value && r.value.length > 0) {
+          historyMap.set(ticker, r.value);
+        }
+      });
+
+      const spyHist = historyMap.get('SPY');
+      if (!spyHist || spyHist.length < 20) {
+        return res.json({ sectors: [] });
+      }
+
+      const spyByDate = new Map<string, number>();
+      spyHist.forEach(d => spyByDate.set(d.time, d.close));
+
+      const RS_PERIOD = 10;
+      const MOM_PERIOD = 10;
+      const TAIL_LENGTH = 5;
+
+      const calcSMA = (arr: number[], period: number): number[] => {
+        const result: number[] = [];
+        for (let i = 0; i < arr.length; i++) {
+          if (i < period - 1) {
+            result.push(NaN);
+          } else {
+            let sum = 0;
+            for (let j = i - period + 1; j <= i; j++) sum += arr[j];
+            result.push(sum / period);
+          }
+        }
+        return result;
+      }
+
+      const sectors = SECTOR_ETFS.map(sector => {
+        const sectorHist = historyMap.get(sector.ticker);
+        if (!sectorHist || sectorHist.length < 25) {
+          return null;
+        }
+
+        const alignedDates: string[] = [];
+        const ratios: number[] = [];
+
+        for (const day of sectorHist) {
+          const spyClose = spyByDate.get(day.time);
+          if (spyClose && spyClose > 0) {
+            alignedDates.push(day.time);
+            ratios.push(day.close / spyClose);
+          }
+        }
+
+        if (ratios.length < 25) return null;
+
+        const ratioSMA = calcSMA(ratios, RS_PERIOD);
+        const rsRatio: number[] = ratios.map((r, i) =>
+          isNaN(ratioSMA[i]) ? NaN : (r / ratioSMA[i]) * 100
+        );
+
+        const rsRatioSMA = calcSMA(
+          rsRatio.filter(v => !isNaN(v)),
+          MOM_PERIOD
+        );
+
+        const validRS = rsRatio.filter(v => !isNaN(v));
+        const rsMomentum: number[] = validRS.map((r, i) =>
+          i < rsRatioSMA.length && !isNaN(rsRatioSMA[i]) && rsRatioSMA[i] > 0
+            ? (r / rsRatioSMA[i]) * 100
+            : NaN
+        );
+
+        const validPairs: Array<{ date: string; rsRatio: number; rsMomentum: number }> = [];
+        let validIdx = 0;
+        for (let i = 0; i < rsRatio.length; i++) {
+          if (!isNaN(rsRatio[i])) {
+            if (validIdx < rsMomentum.length && !isNaN(rsMomentum[validIdx])) {
+              const dateIdx = i;
+              validPairs.push({
+                date: alignedDates[dateIdx],
+                rsRatio: Math.round(rsRatio[i] * 100) / 100,
+                rsMomentum: Math.round(rsMomentum[validIdx] * 100) / 100,
+              });
+            }
+            validIdx++;
+          }
+        }
+
+        if (validPairs.length === 0) return null;
+
+        const weeklyPairs: typeof validPairs = [];
+        for (let i = 0; i < validPairs.length; i += 5) {
+          weeklyPairs.push(validPairs[Math.min(i, validPairs.length - 1)]);
+        }
+        if (weeklyPairs[weeklyPairs.length - 1] !== validPairs[validPairs.length - 1]) {
+          weeklyPairs.push(validPairs[validPairs.length - 1]);
+        }
+
+        const tail = weeklyPairs.slice(-TAIL_LENGTH);
+        const current = validPairs[validPairs.length - 1];
+
+        let quadrant: string;
+        if (current.rsRatio >= 100 && current.rsMomentum >= 100) quadrant = 'leading';
+        else if (current.rsRatio >= 100 && current.rsMomentum < 100) quadrant = 'weakening';
+        else if (current.rsRatio < 100 && current.rsMomentum >= 100) quadrant = 'improving';
+        else quadrant = 'lagging';
+
+        const prev = validPairs.length > 1 ? validPairs[validPairs.length - 2] : current;
+        const heading = Math.atan2(
+          current.rsMomentum - prev.rsMomentum,
+          current.rsRatio - prev.rsRatio
+        ) * (180 / Math.PI);
+
+        return {
+          name: sector.name,
+          ticker: sector.ticker,
+          color: sector.color,
+          rsRatio: current.rsRatio,
+          rsMomentum: current.rsMomentum,
+          quadrant,
+          heading: Math.round(heading * 10) / 10,
+          tail: tail.map(t => ({
+            date: t.date,
+            rsRatio: t.rsRatio,
+            rsMomentum: t.rsMomentum,
+          })),
+        };
+      }).filter(Boolean);
+
+      const result = { sectors };
+      setCache(cacheKey, result, CACHE_TTL.SECTORS);
+      return res.json(result);
+    } catch (e: any) {
+      console.error('RRG rotation error:', e.message);
+      return res.json({ sectors: [] });
+    }
+  });
+
   app.get('/api/market/industries/performance', async (req, res) => {
     const cacheKey = 'industry_perf_all';
     const cached = getCached<any>(cacheKey);

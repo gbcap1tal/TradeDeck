@@ -43,7 +43,9 @@ Preferred communication style: Simple, everyday language.
 ### API Route Structure
 - `GET /api/market/indices` — Major market indices data
 - `GET /api/market/sectors` — Sector performance data
-- `GET /api/market/breadth` — Market breadth indicators
+- `GET /api/market/sectors/rotation` — RRG (Relative Rotation Graph) data: RS-Ratio & RS-Momentum for 11 sector ETFs vs SPY with 5-point weekly tails
+- `GET /api/market/industries/performance` — Top/bottom industry performance with D/W/M timeframes
+- `GET /api/market/breadth` — Market breadth indicators (simulated)
 - `GET /api/market/status` — Market open/close status
 - `GET /api/market/sectors/:name` — Sector detail with industries
 - `GET /api/market/sectors/:name/industries/:industry` — Industry stocks
