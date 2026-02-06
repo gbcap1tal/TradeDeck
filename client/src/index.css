@@ -1,46 +1,55 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: 220 10% 10%;
-  --foreground: 0 0% 98%;
+  --background: 0 0% 4%;
+  --foreground: 0 0% 100%;
 
-  --card: 220 10% 12%;
-  --card-foreground: 0 0% 98%;
+  --card: 0 0% 7%;
+  --card-foreground: 0 0% 100%;
 
-  --popover: 220 10% 12%;
-  --popover-foreground: 0 0% 98%;
+  --popover: 0 0% 7%;
+  --popover-foreground: 0 0% 100%;
 
-  --primary: 45 90% 55%;
-  --primary-foreground: 220 10% 10%;
+  --primary: 211 100% 50%;
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 220 10% 18%;
-  --secondary-foreground: 0 0% 98%;
+  --secondary: 0 0% 10%;
+  --secondary-foreground: 0 0% 100%;
 
-  --muted: 220 10% 15%;
-  --muted-foreground: 220 5% 65%;
+  --muted: 0 0% 12%;
+  --muted-foreground: 0 0% 56%;
 
-  --accent: 220 10% 20%;
-  --accent-foreground: 0 0% 98%;
+  --accent: 0 0% 14%;
+  --accent-foreground: 0 0% 100%;
 
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 98%;
+  --destructive: 4 88% 61%;
+  --destructive-foreground: 0 0% 100%;
 
-  --border: 220 10% 18%;
-  --input: 220 10% 20%;
-  --ring: 45 90% 55%;
+  --border: 0 0% 14%;
+  --input: 0 0% 14%;
+  --ring: 211 100% 50%;
 
-  --radius: 1rem;
+  --radius: 0.75rem;
 
-  /* Custom Status Colors */
-  --up: 142 76% 45%;
-  --down: 0 84% 60%;
-  
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --up: 145 65% 52%;
+  --down: 4 88% 61%;
+  --warning: 50 100% 50%;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+
+  --sidebar: 0 0% 5%;
+  --sidebar-foreground: 0 0% 100%;
+  --sidebar-border: 0 0% 14%;
+  --sidebar-ring: 211 100% 50%;
+  --sidebar-primary: 211 100% 50%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 0 0% 10%;
+  --sidebar-accent-foreground: 0 0% 100%;
 }
 
 @layer base {
@@ -48,18 +57,35 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
-  }
-  
-  h1, h2, h3, h4, h5, h6 {
-    @apply tracking-tight;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Financial numbers should use mono font */
+  h1, h2, h3, h4, h5, h6 {
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
+
   .font-mono-nums {
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
   }
 }
 
@@ -70,19 +96,68 @@
   .text-down {
     color: hsl(var(--down));
   }
+  .text-warning {
+    color: hsl(var(--warning));
+  }
+  .bg-up {
+    background-color: hsl(var(--up));
+  }
+  .bg-down {
+    background-color: hsl(var(--down));
+  }
   .bg-up-subtle {
-    background-color: hsla(142, 76%, 36%, 0.1);
+    background-color: hsla(145, 65%, 52%, 0.12);
   }
   .bg-down-subtle {
-    background-color: hsla(0, 84%, 60%, 0.1);
+    background-color: hsla(4, 88%, 61%, 0.12);
   }
-  
-  /* Glass effect for modern UI */
+
   .glass {
-    @apply bg-background/80 backdrop-blur-md border-b border-border/50;
+    background: rgba(10, 10, 10, 0.8);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
-  
+
   .glass-card {
-    @apply bg-card/50 backdrop-blur-sm border border-border/50 shadow-lg;
+    background: rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .glass-card-hover {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .glass-card-hover:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transform: translateY(-1px);
+  }
+
+  .label-text {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: hsl(var(--muted-foreground));
+  }
+
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.03) 0%,
+      rgba(255, 255, 255, 0.08) 50%,
+      rgba(255, 255, 255, 0.03) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
   }
 }

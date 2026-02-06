@@ -1,9 +1,10 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { MarketIndices } from "@/components/dashboard/MarketIndices";
 import { SectorPerformance } from "@/components/dashboard/SectorPerformance";
+import { MarketBreadth } from "@/components/dashboard/MarketBreadth";
+import { MarketHeatmap } from "@/components/dashboard/MarketHeatmap";
 import { useMarketStatus } from "@/hooks/use-market";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Clock, Globe } from "lucide-react";
+import { Clock } from "lucide-react";
 import { format } from "date-fns";
 
 export default function Market() {
@@ -12,39 +13,27 @@ export default function Market() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
-      
-      <main className="container mx-auto px-4 py-8 flex-1">
-        <h1 className="text-3xl font-bold mb-8">Markets</h1>
-
-        {/* Status Bar */}
-        <div className="mb-8 p-4 rounded-xl bg-card border border-border flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <div className={`w-3 h-3 rounded-full ${status?.isOpen ? 'bg-up animate-pulse' : 'bg-destructive'}`} />
-            <span className="font-medium">Market is {status?.isOpen ? 'Open' : 'Closed'}</span>
+      <main className="flex-1">
+        <div className="max-w-[1400px] mx-auto px-6 py-8">
+          <div className="flex items-center justify-between mb-8">
+            <h1 className="text-2xl font-bold tracking-tight text-white">Markets</h1>
+            <div className="glass-card rounded-lg px-4 py-2 flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${status?.isOpen ? 'bg-[#30d158] animate-pulse' : 'bg-[#ff453a]'}`} />
+                <span className="text-[13px] text-white/60 font-medium">{status?.isOpen ? 'Open' : 'Closed'}</span>
+              </div>
+              <div className="h-3 w-px bg-white/10" />
+              <div className="flex items-center gap-1.5 text-white/30 text-[12px]">
+                <Clock className="w-3 h-3" />
+                <span>Next: {status ? format(new Date(status.nextOpen), "MMM d, h:mm a") : '-'}</span>
+              </div>
+            </div>
           </div>
-          <div className="h-4 w-px bg-border" />
-          <div className="flex items-center gap-2 text-muted-foreground text-sm">
-            <Clock className="w-4 h-4" />
-            <span>Next Open: {status ? format(new Date(status.nextOpen), "MMM d, h:mm a") : '-'}</span>
-          </div>
-        </div>
 
-        <MarketIndices />
-        
-        <div className="grid md:grid-cols-2 gap-8 mt-8">
+          <MarketIndices />
+          <MarketHeatmap />
+          <MarketBreadth />
           <SectorPerformance />
-          
-          <Card className="glass-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Globe className="w-5 h-5 text-primary" />
-                Global Markets
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">Global indices data integration coming soon.</p>
-            </CardContent>
-          </Card>
         </div>
       </main>
     </div>

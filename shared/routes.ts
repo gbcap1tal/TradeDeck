@@ -1,9 +1,6 @@
 import { z } from 'zod';
 import { insertWatchlistSchema, insertWatchlistItemSchema, watchlists, watchlistItems } from './schema';
 
-// ============================================
-// SHARED ERROR SCHEMAS
-// ============================================
 export const errorSchemas = {
   validation: z.object({
     message: z.string(),
@@ -20,11 +17,67 @@ export const errorSchemas = {
   }),
 };
 
-// ============================================
-// API CONTRACT
-// ============================================
+const sectorDataSchema = z.object({
+  name: z.string(),
+  ticker: z.string(),
+  price: z.number(),
+  change: z.number(),
+  changePercent: z.number(),
+  marketCap: z.number(),
+  rs: z.number(),
+  rsMomentum: z.number(),
+  color: z.string(),
+  industries: z.array(z.object({
+    name: z.string(),
+    changePercent: z.number(),
+    stockCount: z.number(),
+    rs: z.number(),
+  })).optional(),
+});
+
+const industryStockSchema = z.object({
+  symbol: z.string(),
+  name: z.string(),
+  price: z.number(),
+  change: z.number(),
+  changePercent: z.number(),
+  volume: z.number(),
+  marketCap: z.number(),
+  rs: z.number(),
+  canslimGrade: z.string(),
+});
+
+const breadthSchema = z.object({
+  advanceDeclineRatio: z.number(),
+  newHighs: z.number(),
+  newLows: z.number(),
+  above50MA: z.number(),
+  above200MA: z.number(),
+  upVolume: z.number(),
+  downVolume: z.number(),
+});
+
+const canslimSchema = z.object({
+  overall: z.object({ grade: z.string(), score: z.number(), color: z.string() }),
+  metrics: z.array(z.object({
+    letter: z.string(),
+    name: z.string(),
+    value: z.number(),
+    unit: z.string(),
+    grade: z.string(),
+    color: z.string(),
+  })),
+});
+
+const earningsDataSchema = z.object({
+  quarters: z.array(z.string()),
+  sales: z.array(z.number()),
+  earnings: z.array(z.number()),
+  salesGrowth: z.array(z.number()),
+  earningsGrowth: z.array(z.number()),
+});
+
 export const api = {
-  // Market Data Endpoints
   market: {
     indices: {
       method: 'GET' as const,
@@ -36,6 +89,7 @@ export const api = {
           price: z.number(),
           change: z.number(),
           changePercent: z.number(),
+          sparkline: z.array(z.number()).optional(),
         })),
       },
     },
@@ -43,11 +97,14 @@ export const api = {
       method: 'GET' as const,
       path: '/api/market/sectors',
       responses: {
-        200: z.array(z.object({
-          name: z.string(),
-          changePercent: z.number(),
-          performance: z.enum(["positive", "negative", "neutral"]),
-        })),
+        200: z.array(sectorDataSchema),
+      },
+    },
+    breadth: {
+      method: 'GET' as const,
+      path: '/api/market/breadth',
+      responses: {
+        200: breadthSchema,
       },
     },
     status: {
@@ -62,7 +119,43 @@ export const api = {
       },
     },
   },
-  
+
+  sectors: {
+    detail: {
+      method: 'GET' as const,
+      path: '/api/sectors/:sectorName',
+      responses: {
+        200: z.object({
+          sector: sectorDataSchema,
+          industries: z.array(z.object({
+            name: z.string(),
+            changePercent: z.number(),
+            stockCount: z.number(),
+            rs: z.number(),
+            topStocks: z.array(z.string()),
+          })),
+        }),
+        404: errorSchemas.notFound,
+      },
+    },
+    industryStocks: {
+      method: 'GET' as const,
+      path: '/api/sectors/:sectorName/industries/:industryName',
+      responses: {
+        200: z.object({
+          industry: z.object({
+            name: z.string(),
+            sector: z.string(),
+            changePercent: z.number(),
+            rs: z.number(),
+          }),
+          stocks: z.array(industryStockSchema),
+        }),
+        404: errorSchemas.notFound,
+      },
+    },
+  },
+
   stocks: {
     quote: {
       method: 'GET' as const,
@@ -70,6 +163,7 @@ export const api = {
       responses: {
         200: z.object({
           symbol: z.string(),
+          name: z.string(),
           price: z.number(),
           change: z.number(),
           changePercent: z.number(),
@@ -81,6 +175,11 @@ export const api = {
           marketCap: z.number().optional(),
           peRatio: z.number().optional(),
           dividendYield: z.number().optional(),
+          sector: z.string().optional(),
+          industry: z.string().optional(),
+          rs: z.number().optional(),
+          week52High: z.number().optional(),
+          week52Low: z.number().optional(),
         }),
         404: errorSchemas.notFound,
       },
@@ -96,6 +195,22 @@ export const api = {
           time: z.string(),
           value: z.number(),
         })),
+        404: errorSchemas.notFound,
+      },
+    },
+    canslim: {
+      method: 'GET' as const,
+      path: '/api/stocks/:symbol/canslim',
+      responses: {
+        200: canslimSchema,
+        404: errorSchemas.notFound,
+      },
+    },
+    earnings: {
+      method: 'GET' as const,
+      path: '/api/stocks/:symbol/earnings',
+      responses: {
+        200: earningsDataSchema,
         404: errorSchemas.notFound,
       },
     },
@@ -178,6 +293,8 @@ export const api = {
     },
   },
 };
+
+export type CreateWatchlistRequest = z.infer<typeof insertWatchlistSchema>;
 
 export function buildUrl(path: string, params?: Record<string, string | number>): string {
   let url = path;

@@ -1,56 +1,64 @@
 import { useQuery } from "@tanstack/react-query";
-import { api, buildUrl } from "@shared/routes";
 
-// GET /api/stocks/:symbol/quote
 export function useStockQuote(symbol: string) {
   return useQuery({
-    queryKey: [api.stocks.quote.path, symbol],
+    queryKey: ['/api/stocks', symbol, 'quote'],
     queryFn: async () => {
-      const url = buildUrl(api.stocks.quote.path, { symbol });
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch(`/api/stocks/${symbol}/quote`, { credentials: "include" });
       if (!res.ok) {
         if (res.status === 404) return null;
         throw new Error(`Failed to fetch quote for ${symbol}`);
       }
-      return api.stocks.quote.responses[200].parse(await res.json());
+      return res.json();
     },
     enabled: !!symbol,
-    refetchInterval: 10000, // Real-time feel
+    refetchInterval: 15000,
   });
 }
 
-// GET /api/stocks/:symbol/history
 export function useStockHistory(symbol: string, range: '1D' | '1W' | '1M' | '3M' | '1Y' | '5Y' = '1M') {
   return useQuery({
-    queryKey: [api.stocks.history.path, symbol, range],
+    queryKey: ['/api/stocks', symbol, 'history', range],
     queryFn: async () => {
-      const url = buildUrl(api.stocks.history.path, { symbol });
-      // In a real app, we'd pass range as query param, but schema defines it as optional body/query. 
-      // For GET requests, we usually append query params. 
-      // The schema defines 'input' which typically implies body for POST/PUT or query for GET.
-      // Assuming query param for GET here based on standard practice and potential schema usage.
-      const queryUrl = `${url}?range=${range}`; 
-      
-      const res = await fetch(queryUrl, { credentials: "include" });
-      if (!res.ok) {
-        if (res.status === 404) return [];
-        throw new Error("Failed to fetch stock history");
-      }
-      return api.stocks.history.responses[200].parse(await res.json());
+      const res = await fetch(`/api/stocks/${symbol}/history?range=${range}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
     },
     enabled: !!symbol,
   });
 }
 
-// GET /api/stocks/:symbol/news
+export function useStockCANSLIM(symbol: string) {
+  return useQuery({
+    queryKey: ['/api/stocks', symbol, 'canslim'],
+    queryFn: async () => {
+      const res = await fetch(`/api/stocks/${symbol}/canslim`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!symbol,
+  });
+}
+
+export function useStockEarnings(symbol: string) {
+  return useQuery({
+    queryKey: ['/api/stocks', symbol, 'earnings'],
+    queryFn: async () => {
+      const res = await fetch(`/api/stocks/${symbol}/earnings`, { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!symbol,
+  });
+}
+
 export function useStockNews(symbol: string) {
   return useQuery({
-    queryKey: [api.stocks.news.path, symbol],
+    queryKey: ['/api/stocks', symbol, 'news'],
     queryFn: async () => {
-      const url = buildUrl(api.stocks.news.path, { symbol });
-      const res = await fetch(url, { credentials: "include" });
+      const res = await fetch(`/api/stocks/${symbol}/news`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch stock news");
-      return api.stocks.news.responses[200].parse(await res.json());
+      return res.json();
     },
     enabled: !!symbol,
   });

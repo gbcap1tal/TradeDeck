@@ -1,58 +1,80 @@
 import { useMarketIndices } from "@/hooks/use-market";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { TrendingUp, TrendingDown } from "lucide-react";
+
+function Sparkline({ data, color, width = 80, height = 28 }: { data: number[]; color: string; width?: number; height?: number }) {
+  if (!data || data.length < 2) return null;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+
+  const points = data.map((value, i) => {
+    const x = (i / (data.length - 1)) * width;
+    const y = height - ((value - min) / range) * height;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <svg width={width} height={height} className="block">
+      <polyline
+        points={points}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export function MarketIndices() {
   const { data: indices, isLoading } = useMarketIndices();
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-24 w-full rounded-xl" />
+      <div className="flex gap-4 overflow-x-auto pb-2 mb-8" style={{ scrollSnapType: 'x mandatory' }}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="glass-card rounded-xl p-5 min-w-[180px] flex-shrink-0 shimmer h-[120px]" style={{ scrollSnapAlign: 'start' }} />
         ))}
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-      {indices?.map((index) => {
-        const isPositive = index.change >= 0;
-        return (
-          <div 
-            key={index.symbol}
-            className="glass-card rounded-xl p-4 hover:border-primary/20 transition-all duration-300 hover:-translate-y-1"
-          >
-            <div className="flex justify-between items-start mb-2">
-              <div>
-                <h3 className="font-bold text-foreground">{index.name}</h3>
-                <span className="text-xs text-muted-foreground font-mono">{index.symbol}</span>
+    <div className="mb-8">
+      <div className="label-text mb-3" data-testid="text-indices-label">Market Indices</div>
+      <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollSnapType: 'x mandatory' }}>
+        {indices?.map((index: any) => {
+          const isPositive = index.change >= 0;
+          const color = isPositive ? '#30d158' : '#ff453a';
+
+          return (
+            <div
+              key={index.symbol}
+              className="glass-card glass-card-hover rounded-xl p-4 min-w-[180px] flex-shrink-0"
+              style={{ scrollSnapAlign: 'start' }}
+              data-testid={`card-index-${index.symbol}`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] text-white/40 font-medium">{index.name}</span>
+                <div className={cn("p-1 rounded-md", isPositive ? "bg-[#30d158]/10" : "bg-[#ff453a]/10")}>
+                  {isPositive ? <TrendingUp className="w-3 h-3 text-[#30d158]" /> : <TrendingDown className="w-3 h-3 text-[#ff453a]" />}
+                </div>
               </div>
-              <div className={cn(
-                "p-1.5 rounded-full",
-                isPositive ? "bg-up-subtle text-up" : "bg-down-subtle text-down"
-              )}>
-                {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+              <div className="text-xl font-bold font-mono-nums tracking-tight text-white mb-1">
+                ${index.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+              <div className="flex items-center justify-between">
+                <span className={cn("text-xs font-mono-nums font-medium", isPositive ? "text-[#30d158]" : "text-[#ff453a]")}>
+                  {isPositive ? "+" : ""}{index.changePercent.toFixed(2)}%
+                </span>
+                <Sparkline data={index.sparkline || []} color={color} width={60} height={20} />
               </div>
             </div>
-            
-            <div className="flex items-baseline gap-2 mt-2">
-              <span className="text-2xl font-bold font-mono-nums tracking-tight">
-                {index.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-            
-            <div className={cn(
-              "text-xs font-mono font-medium mt-1 flex items-center gap-1",
-              isPositive ? "text-up" : "text-down"
-            )}>
-              {isPositive ? "+" : ""}{index.change.toFixed(2)} ({isPositive ? "+" : ""}{index.changePercent.toFixed(2)}%)
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
