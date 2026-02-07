@@ -27,9 +27,8 @@ function getEnrichedStocksSync(industryName: string, finvizData: FinvizSectorDat
   return mergeStockLists(hardcoded, allFinvizStocks);
 }
 
-async function computeSectorsData(): Promise<any[]> {
+async function computeSectorsData(finvizData: FinvizSectorData | null = null): Promise<any[]> {
   const data = await yahoo.getSectorETFs();
-  const finvizData = await getFinvizData().catch(() => null);
   if (!data || data.length === 0) return [];
 
   const withIndustries = data.map((sector: any) => {
@@ -44,18 +43,18 @@ async function computeSectorsData(): Promise<any[]> {
   return withIndustries;
 }
 
-async function computeIndustryPerformance(): Promise<any> {
-  const finvizData = await getFinvizData().catch(() => null);
+async function computeIndustryPerformance(finvizData: FinvizSectorData | null = null, etfOnly: boolean = false): Promise<any> {
   const allIndustries: Array<{ name: string; sector: string; etf: string | null; fallbackSymbols: string[]; enrichedCount: number }> = [];
   for (const sector of SECTORS_DATA) {
     for (const ind of sector.industries) {
       const etf = INDUSTRY_ETF_MAP[ind] || null;
       const enrichedStocks = getEnrichedStocksSync(ind, finvizData);
+      const fallbackSymbols = (etf || etfOnly) ? [] : enrichedStocks.slice(0, 5).map(s => s.symbol);
       allIndustries.push({
         name: ind,
         sector: sector.name,
         etf,
-        fallbackSymbols: etf ? [] : enrichedStocks.slice(0, 5).map(s => s.symbol),
+        fallbackSymbols,
         enrichedCount: enrichedStocks.length,
       });
     }
@@ -65,13 +64,14 @@ async function computeIndustryPerformance(): Promise<any> {
   const fallbackSymbols = allIndustries.flatMap(i => i.fallbackSymbols);
   const uniqueSymbols = Array.from(new Set([...etfSymbols, ...fallbackSymbols]));
 
-  const quotes = await yahoo.getMultipleQuotes(uniqueSymbols);
+  const [quotes, histResults] = await Promise.all([
+    yahoo.getMultipleQuotes(uniqueSymbols),
+    yahoo.getMultipleHistories(uniqueSymbols, '1M'),
+  ]);
   const quoteMap = new Map<string, any>();
   for (const q of quotes) {
     if (q) quoteMap.set(q.symbol, q);
   }
-
-  const histResults = await yahoo.getMultipleHistories(uniqueSymbols, '1M');
 
   const industries = allIndustries.map(ind => {
     let dailyChange = 0;
@@ -288,9 +288,34 @@ function initBackgroundTasks() {
 
   setTimeout(async () => {
     console.log('[bg] Starting background data pre-computation...');
+    const bgStart = Date.now();
+
+    const fastTasks = Promise.allSettled([
+      (async () => {
+        console.log('[bg] Pre-computing sectors data (without Finviz)...');
+        const sectors = await computeSectorsData(null);
+        setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
+        console.log(`[bg] Sectors pre-computed: ${sectors.length} sectors in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+      })(),
+      (async () => {
+        console.log('[bg] Pre-computing industry performance (ETF-only fast mode)...');
+        const perfData = await computeIndustryPerformance(null, true);
+        setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
+        console.log(`[bg] Industry performance pre-computed: ${perfData.industries?.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+      })(),
+      (async () => {
+        console.log('[bg] Pre-computing rotation data...');
+        const rotData = await computeRotationData();
+        setCache('rrg_rotation', rotData, CACHE_TTL.SECTORS);
+        console.log(`[bg] Rotation pre-computed: ${rotData.sectors?.length} sectors in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+      })(),
+    ]);
+
+    await fastTasks;
+    console.log(`[bg] Fast data ready in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
 
     try {
-      console.log('[bg] Pre-computing Finviz data...');
+      console.log('[bg] Pre-computing Finviz data (background enrichment)...');
       const finvizData = await getFinvizData();
       if (finvizData) {
         let totalStocks = 0;
@@ -299,46 +324,29 @@ function initBackgroundTasks() {
             totalStocks += stocks.length;
           }
         }
-        console.log(`[bg] Finviz complete: ${Object.keys(finvizData).length} sectors, ${totalStocks} stocks`);
+        console.log(`[bg] Finviz complete: ${Object.keys(finvizData).length} sectors, ${totalStocks} stocks in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+
+        const [sectors2, perfData2] = await Promise.all([
+          computeSectorsData(finvizData),
+          computeIndustryPerformance(finvizData),
+        ]);
+        setCache('sectors_data', sectors2, CACHE_TTL.SECTORS);
+        setCache('industry_perf_all', perfData2, CACHE_TTL.INDUSTRY_PERF);
+        console.log(`[bg] Enriched data updated with Finviz in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
       }
     } catch (err: any) {
-      console.log(`[bg] Finviz fetch error: ${err.message}`);
+      console.log(`[bg] Finviz enrichment error: ${err.message}`);
     }
-
-    try {
-      console.log('[bg] Pre-computing sectors data...');
-      const sectors = await computeSectorsData();
-      setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
-      console.log(`[bg] Sectors pre-computed: ${sectors.length} sectors`);
-    } catch (err: any) {
-      console.log(`[bg] Sectors pre-compute error: ${err.message}`);
-    }
-
-    try {
-      console.log('[bg] Pre-computing industry performance...');
-      const perfData = await computeIndustryPerformance();
-      setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
-      console.log(`[bg] Industry performance pre-computed: ${perfData.industries?.length} industries`);
-    } catch (err: any) {
-      console.log(`[bg] Industry perf pre-compute error: ${err.message}`);
-    }
-
-    try {
-      console.log('[bg] Pre-computing rotation data...');
-      const rotData = await computeRotationData();
-      setCache('rrg_rotation', rotData, CACHE_TTL.SECTORS);
-      console.log(`[bg] Rotation pre-computed: ${rotData.sectors?.length} sectors`);
-    } catch (err: any) {
-      console.log(`[bg] Rotation pre-compute error: ${err.message}`);
-    }
-  }, 5000);
+  }, 1000);
 
   setInterval(() => {
-    backgroundRefresh('sectors_data', computeSectorsData, CACHE_TTL.SECTORS);
+    const cachedFinviz = getCached<FinvizSectorData>('finviz_sector_data') || null;
+    backgroundRefresh('sectors_data', () => computeSectorsData(cachedFinviz), CACHE_TTL.SECTORS);
   }, CACHE_TTL.SECTORS * 1000);
 
   setInterval(() => {
-    backgroundRefresh('industry_perf_all', computeIndustryPerformance, CACHE_TTL.INDUSTRY_PERF);
+    const cachedFinviz = getCached<FinvizSectorData>('finviz_sector_data') || null;
+    backgroundRefresh('industry_perf_all', () => computeIndustryPerformance(cachedFinviz), CACHE_TTL.INDUSTRY_PERF);
   }, CACHE_TTL.INDUSTRY_PERF * 1000);
 
   setInterval(() => {

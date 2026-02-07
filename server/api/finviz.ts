@@ -2,7 +2,8 @@ import * as cheerio from 'cheerio';
 import { getCached, setCache } from './cache';
 
 const FINVIZ_CACHE_TTL = 86400; // 24 hours
-const REQUEST_DELAY = 300; // ms between requests
+const REQUEST_DELAY = 100; // ms between requests within a sector
+const CONCURRENT_SECTORS = 4; // number of sectors to scrape in parallel
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 export interface FinvizStock {
@@ -136,17 +137,24 @@ async function scrapeSector(sectorFilter: string): Promise<FinvizStock[]> {
 async function scrapeAllStocks(): Promise<FinvizStock[]> {
   const allStocks: FinvizStock[] = [];
 
-  console.log('[finviz] Starting sector-by-sector scrape...');
+  console.log('[finviz] Starting parallel sector scrape...');
+  const startTime = Date.now();
 
-  for (const sectorFilter of FINVIZ_SECTORS) {
-    const stocks = await scrapeSector(sectorFilter);
-    allStocks.push(...stocks);
-    const industries = new Set(stocks.map(s => s.industry));
-    console.log(`[finviz] ${sectorFilter}: ${stocks.length} stocks, ${industries.size} industries`);
-    await sleep(500);
+  for (let i = 0; i < FINVIZ_SECTORS.length; i += CONCURRENT_SECTORS) {
+    const batch = FINVIZ_SECTORS.slice(i, i + CONCURRENT_SECTORS);
+    const results = await Promise.allSettled(batch.map(s => scrapeSector(s)));
+    for (let j = 0; j < results.length; j++) {
+      const r = results[j];
+      if (r.status === 'fulfilled' && r.value.length > 0) {
+        allStocks.push(...r.value);
+        const industries = new Set(r.value.map(s => s.industry));
+        console.log(`[finviz] ${batch[j]}: ${r.value.length} stocks, ${industries.size} industries`);
+      }
+    }
   }
 
-  console.log(`[finviz] Scrape complete: ${allStocks.length} total stocks`);
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  console.log(`[finviz] Scrape complete: ${allStocks.length} total stocks in ${elapsed}s`);
   return allStocks;
 }
 

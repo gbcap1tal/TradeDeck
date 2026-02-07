@@ -63,7 +63,7 @@ async function batchConcurrent<T>(items: T[], fn: (item: T) => Promise<any>, con
 }
 
 export async function getMultipleQuotes(symbols: string[]) {
-  const results = await batchConcurrent(symbols, s => getQuote(s), 15);
+  const results = await batchConcurrent(symbols, s => getQuote(s), 25);
   return results.filter(Boolean);
 }
 
@@ -77,7 +77,7 @@ export async function getMultipleHistories(symbols: string[], range: string = '1
       }
     } catch {}
     return null;
-  }, 10);
+  }, 20);
   return results;
 }
 
