@@ -104,7 +104,7 @@ export function SectorPerformance() {
 
   return (
     <div className="mb-8">
-      <h2 className="text-xl font-semibold tracking-tight mb-4 text-white" data-testid="text-industry-perf-title">Industry Performance</h2>
+      <div className="section-title mb-4" data-testid="text-industry-perf-title">Industry Performance</div>
       <div className="grid md:grid-cols-2 gap-3">
         {renderList(top10, 'TOP PERFORMERS', topTf, setTopTf, 'switch-top-perf-tf')}
         {renderList(bottom10, 'WORST PERFORMERS', bottomTf, setBottomTf, 'switch-bottom-perf-tf')}

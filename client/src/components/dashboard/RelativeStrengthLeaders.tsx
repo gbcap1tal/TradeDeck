@@ -38,7 +38,7 @@ export function RelativeStrengthLeaders() {
   if (isLoading) {
     return (
       <div className="mb-8">
-        <h2 className="text-xl font-semibold tracking-tight mb-4 text-white">RS Leaders</h2>
+        <div className="section-title mb-4">RS Leaders</div>
         <div className="flex gap-3 overflow-x-auto pb-2">
           {[1, 2, 3, 4, 5].map(i => <div key={i} className="glass-card rounded-xl min-w-[200px] h-[160px] shimmer flex-shrink-0" />)}
         </div>
@@ -52,7 +52,7 @@ export function RelativeStrengthLeaders() {
 
   return (
     <div className="mb-8">
-      <h2 className="text-xl font-semibold tracking-tight mb-4 text-white" data-testid="text-rs-leaders-title">RS Leaders</h2>
+      <div className="section-title mb-4" data-testid="text-rs-leaders-title">RS Leaders</div>
       <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollSnapType: 'x mandatory' }}>
         {topSectors.map((sector: any) => {
           const MomentumIcon = sector.rsMomentum > 1 ? TrendingUp : sector.rsMomentum < -1 ? TrendingDown : Minus;

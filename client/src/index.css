@@ -145,6 +145,14 @@
     color: hsl(var(--muted-foreground));
   }
 
+  .section-title {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: hsl(var(--muted-foreground));
+  }
+
   .shimmer {
     background: linear-gradient(
       90deg,

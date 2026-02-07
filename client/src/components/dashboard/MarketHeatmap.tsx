@@ -35,7 +35,7 @@ export function MarketHeatmap() {
     return (
       <div>
         <div className="flex items-center justify-between gap-2 mb-4">
-          <h2 className="text-xl font-semibold tracking-tight text-white">Market Heatmap</h2>
+          <div className="section-title">Market Heatmap</div>
         </div>
         <div className="glass-card rounded-xl p-5 aspect-square">
           <div className="grid grid-cols-3 gap-2 h-full">
@@ -60,7 +60,7 @@ export function MarketHeatmap() {
   return (
     <div>
       <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
-        <h2 className="text-xl font-semibold tracking-tight text-white" data-testid="text-heatmap-title">Market Heatmap</h2>
+        <div className="section-title" data-testid="text-heatmap-title">Market Heatmap</div>
         <TimeframeSwitch value={timeframe} onChange={setTimeframe} />
       </div>
       <div className="glass-card rounded-xl p-4 aspect-square flex flex-col">

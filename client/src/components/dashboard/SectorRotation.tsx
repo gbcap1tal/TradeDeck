@@ -130,7 +130,7 @@ export function SectorRotation() {
   if (isLoading) {
     return (
       <div>
-        <h2 className="text-xl font-semibold tracking-tight text-white mb-4">Sector Rotation</h2>
+        <div className="section-title mb-4">Sector Rotation</div>
         <div className="glass-card rounded-xl p-5 shimmer aspect-square" />
       </div>
     );
@@ -179,7 +179,7 @@ export function SectorRotation() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold tracking-tight text-white mb-4" data-testid="text-rotation-title">Sector Rotation</h2>
+      <div className="section-title mb-4" data-testid="text-rotation-title">Sector Rotation</div>
       <div className="glass-card rounded-xl p-5 relative flex flex-col" ref={containerRef} onMouseMove={handleMouseMove}>
         <div className="flex items-center gap-2 mb-3">
           <span className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">RRG vs SPY</span>
