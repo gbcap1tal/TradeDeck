@@ -155,7 +155,7 @@ export function Navbar() {
             <Input
               ref={inputRef}
               placeholder="Search ticker..."
-              className="pl-8 h-8 text-[13px] bg-white/5 border-white/10 text-white placeholder:text-white/30 focus-visible:ring-[#0a84ff]/50 focus-visible:border-white/20"
+              className="pl-8 h-8 text-[13px] bg-white/5 border-white/10 text-white placeholder:text-white/30 focus-visible:ring-white/20 focus-visible:border-white/20"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -215,7 +215,7 @@ export function Navbar() {
             </div>
           ) : (
             <a href="/api/login" data-testid="button-login">
-              <Button size="sm" className="h-8 text-[13px] bg-[#0a84ff] hover:bg-[#0a84ff]/80 text-white font-medium">
+              <Button size="sm" variant="outline" className="h-8 text-[13px] text-white/70 font-medium">
                 Log In
               </Button>
             </a>

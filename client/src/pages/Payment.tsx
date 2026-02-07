@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Check, Shield } from "lucide-react";
+import { ArrowLeft, Shield } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
@@ -67,7 +67,7 @@ export default function Payment() {
                 "Email alerts for critical market events",
               ].map((feature, i) => (
                 <div key={i} className="flex items-start gap-3">
-                  <Check className="w-4 h-4 text-[#30d158] mt-0.5 shrink-0" />
+                  <span className="w-1 h-1 rounded-full bg-white/30 mt-2 shrink-0" />
                   <span className="text-[13px] text-white/70">{feature}</span>
                 </div>
               ))}
