@@ -1007,7 +1007,7 @@ export async function registerRoutes(
               rs: 0,
             })),
           };
-        });
+        }).sort((a: any, b: any) => (b.changePercent ?? 0) - (a.changePercent ?? 0));
         return res.json(withIndustries);
       }
     } catch (e: any) {
@@ -1328,7 +1328,7 @@ export async function registerRoutes(
         rs: 0,
         topStocks: stocks.slice(0, 3).map(s => s.symbol),
       };
-    });
+    }).sort((a, b) => b.changePercent - a.changePercent);
 
     res.json({ sector, industries });
   });

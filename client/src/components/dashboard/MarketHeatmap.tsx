@@ -48,13 +48,13 @@ export function MarketHeatmap() {
     );
   }
 
-  const sorted = [...(sectors || [])].sort((a: any, b: any) => Math.abs(b.marketCap) - Math.abs(a.marketCap));
-
   const getChange = (sector: any) => {
     if (timeframe === 'W') return sector.changePercent * 2.3 + (sector.rs % 3 - 1);
     if (timeframe === 'M') return sector.changePercent * 4.5 + (sector.rs % 5 - 2);
     return sector.changePercent;
   };
+
+  const sorted = [...(sectors || [])].sort((a: any, b: any) => getChange(b) - getChange(a));
 
   return (
     <div>
