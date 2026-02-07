@@ -7,6 +7,49 @@ import * as yahoo from "./api/yahoo";
 import * as fmp from "./api/fmp";
 import { getCached, setCache, CACHE_TTL } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP, INDUSTRY_STOCKS } from "./data/sectors";
+import { getFinvizData, mergeStockLists, getFinvizNamesForIndustry, type FinvizSectorData } from "./api/finviz";
+
+function getEnrichedStocksSync(industryName: string, finvizData: FinvizSectorData | null): Array<{ symbol: string; name: string }> {
+  const hardcoded = INDUSTRY_STOCKS[industryName] || [];
+  if (!finvizData) return hardcoded;
+
+  const finvizNames = getFinvizNamesForIndustry(industryName);
+  let allFinvizStocks: Array<{ symbol: string; name: string }> = [];
+
+  for (const sectorData of Object.values(finvizData)) {
+    for (const [finvizIndustry, stocks] of Object.entries(sectorData.stocks)) {
+      if (finvizNames.includes(finvizIndustry) || finvizIndustry === industryName) {
+        allFinvizStocks = allFinvizStocks.concat(stocks);
+      }
+    }
+  }
+
+  return mergeStockLists(hardcoded, allFinvizStocks);
+}
+
+let finvizInitialized = false;
+function initFinvizBackground() {
+  if (finvizInitialized) return;
+  finvizInitialized = true;
+  setTimeout(() => {
+    console.log('[finviz] Starting background data fetch...');
+    getFinvizData().then(data => {
+      if (data) {
+        let totalStocks = 0;
+        for (const s of Object.values(data)) {
+          for (const stocks of Object.values(s.stocks)) {
+            totalStocks += stocks.length;
+          }
+        }
+        console.log(`[finviz] Background fetch complete: ${Object.keys(data).length} sectors, ${totalStocks} stocks`);
+      } else {
+        console.log('[finviz] Background fetch returned no data (may be rate-limited)');
+      }
+    }).catch(err => {
+      console.log(`[finviz] Background fetch error: ${err.message}`);
+    });
+  }, 10000);
+}
 
 function seededRandom(seed: string) {
   let hash = 0;
@@ -26,6 +69,8 @@ export async function registerRoutes(
   await setupAuth(app);
   registerAuthRoutes(app);
 
+  initFinvizBackground();
+
   app.get('/api/market/indices', async (req, res) => {
     try {
       const data = await yahoo.getIndices();
@@ -41,19 +86,25 @@ export async function registerRoutes(
   app.get('/api/market/sectors', async (req, res) => {
     try {
       const data = await yahoo.getSectorETFs();
+      const finvizData = await getFinvizData().catch(() => null);
       if (data && data.length > 0) {
-        const withIndustries = data.map((sector: any) => {
+        const withIndustries = await Promise.all(data.map(async (sector: any) => {
           const config = SECTORS_DATA.find(s => s.name === sector.name);
-          return {
-            ...sector,
-            industries: (config?.industries || []).map(ind => ({
+          const industries = await Promise.all((config?.industries || []).map(async (ind: string) => {
+            const enriched = getEnrichedStocksSync(ind, finvizData);
+            return {
               name: ind,
               changePercent: 0,
-              stockCount: INDUSTRY_STOCKS[ind]?.length || 5,
+              stockCount: enriched.length,
               rs: 0,
-            })),
+            };
+          }));
+          return {
+            ...sector,
+            industries,
           };
-        }).sort((a: any, b: any) => (b.changePercent ?? 0) - (a.changePercent ?? 0));
+        }));
+        withIndustries.sort((a: any, b: any) => (b.changePercent ?? 0) - (a.changePercent ?? 0));
         return res.json(withIndustries);
       }
     } catch (e: any) {
@@ -220,16 +271,18 @@ export async function registerRoutes(
     if (cached) return res.json(cached);
 
     try {
-      const allIndustries: Array<{ name: string; sector: string; etf: string | null; fallbackSymbols: string[] }> = [];
+      const finvizData = await getFinvizData().catch(() => null);
+      const allIndustries: Array<{ name: string; sector: string; etf: string | null; fallbackSymbols: string[]; enrichedCount: number }> = [];
       for (const sector of SECTORS_DATA) {
         for (const ind of sector.industries) {
           const etf = INDUSTRY_ETF_MAP[ind] || null;
-          const stocks = INDUSTRY_STOCKS[ind] || [];
+          const enrichedStocks = getEnrichedStocksSync(ind, finvizData);
           allIndustries.push({
             name: ind,
             sector: sector.name,
             etf,
-            fallbackSymbols: etf ? [] : stocks.slice(0, 5).map(s => s.symbol),
+            fallbackSymbols: etf ? [] : enrichedStocks.slice(0, 5).map(s => s.symbol),
+            enrichedCount: enrichedStocks.length,
           });
         }
       }
@@ -305,7 +358,7 @@ export async function registerRoutes(
           dailyChange,
           weeklyChange,
           monthlyChange,
-          stockCount: (INDUSTRY_STOCKS[ind.name] || []).length,
+          stockCount: ind.enrichedCount,
           hasETF: !!ind.etf,
         };
       });
@@ -351,6 +404,8 @@ export async function registerRoutes(
       return res.status(404).json({ message: "Sector not found" });
     }
 
+    const finvizData = await getFinvizData().catch(() => null);
+
     let sectorQuote: any = null;
     try {
       sectorQuote = await yahoo.getQuote(sectorConfig.ticker);
@@ -368,6 +423,11 @@ export async function registerRoutes(
       rsMomentum: 0,
     };
 
+    const enrichedIndustryStocks: Record<string, Array<{ symbol: string; name: string }>> = {};
+    for (const ind of sectorConfig.industries) {
+      enrichedIndustryStocks[ind] = getEnrichedStocksSync(ind, finvizData);
+    }
+
     const etfSymbols: string[] = [];
     const fallbackSymbols: string[] = [];
     for (const ind of sectorConfig.industries) {
@@ -375,7 +435,7 @@ export async function registerRoutes(
       if (etf) {
         if (!etfSymbols.includes(etf)) etfSymbols.push(etf);
       } else {
-        const stocks = INDUSTRY_STOCKS[ind] || [];
+        const stocks = enrichedIndustryStocks[ind] || [];
         stocks.slice(0, 5).forEach(s => { if (!fallbackSymbols.includes(s.symbol)) fallbackSymbols.push(s.symbol); });
       }
     }
@@ -391,7 +451,7 @@ export async function registerRoutes(
     }
 
     const industries = sectorConfig.industries.map(ind => {
-      const stocks = INDUSTRY_STOCKS[ind] || [];
+      const stocks = enrichedIndustryStocks[ind] || [];
       const etf = INDUSTRY_ETF_MAP[ind];
       let avgChange = 0;
 
@@ -428,7 +488,8 @@ export async function registerRoutes(
       return res.status(404).json({ message: "Industry not found" });
     }
 
-    const stockDefs = INDUSTRY_STOCKS[industryName] || [];
+    const finvizData = await getFinvizData().catch(() => null);
+    const stockDefs = getEnrichedStocksSync(industryName, finvizData);
     const symbols = stockDefs.map(s => s.symbol);
 
     let quotes: any[] = [];

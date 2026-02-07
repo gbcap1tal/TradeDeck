@@ -13,6 +13,7 @@ export const CACHE_TTL = {
   BREADTH: 120,
   NEWS: 900,
   INDUSTRY_PERF: 300,
+  FINVIZ: 86400,
 };
 
 export function getCached<T>(key: string): T | undefined {
