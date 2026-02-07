@@ -379,8 +379,19 @@ function initBackgroundTasks() {
   }, CACHE_TTL.SECTORS * 1000);
 
   setInterval(() => {
-    backgroundRefresh('market_breadth', () => computeMarketBreadth(true), CACHE_TTL.BREADTH);
-  }, CACHE_TTL.BREADTH * 1000);
+    const now = new Date();
+    const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const day = et.getDay();
+    if (day === 0 || day === 6) return;
+    const hours = et.getHours();
+    const minutes = et.getMinutes();
+    const timeMinutes = hours * 60 + minutes;
+    const nearOpen = timeMinutes >= 565 && timeMinutes <= 600;
+    const nearClose = timeMinutes >= 955 && timeMinutes <= 1020;
+    if (nearOpen || nearClose) {
+      backgroundRefresh('market_breadth', () => computeMarketBreadth(true), CACHE_TTL.BREADTH);
+    }
+  }, 300000);
 }
 
 function seededRandom(seed: string) {
@@ -467,11 +478,11 @@ export async function registerRoutes(
 
     const stale = getStale<any>(cacheKey);
     if (stale) {
-      backgroundRefresh(cacheKey, () => computeMarketBreadth(true), CACHE_TTL.BREADTH || 1800);
+      backgroundRefresh(cacheKey, () => computeMarketBreadth(true), CACHE_TTL.BREADTH);
       return res.json(stale);
     }
 
-    backgroundRefresh(cacheKey, () => computeMarketBreadth(true), CACHE_TTL.BREADTH || 1800);
+    backgroundRefresh(cacheKey, () => computeMarketBreadth(true), CACHE_TTL.BREADTH);
     res.status(202).json({ _warming: true });
   });
 

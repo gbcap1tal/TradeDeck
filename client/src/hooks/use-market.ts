@@ -58,7 +58,7 @@ export function useMarketBreadth() {
     refetchInterval: (query) => {
       const data = query.state.data as any;
       if (data && !data.fullyEnriched) return 10000;
-      return 120000;
+      return 300000;
     },
     retry: (failureCount, error) => {
       if (error?.message === "Data warming up") return failureCount < 60;

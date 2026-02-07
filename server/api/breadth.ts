@@ -84,19 +84,17 @@ function score25PercentRatio(ratio: number): number {
 
 function scoreAbove50MA(pct: number): number {
   if (pct >= 70) return 10;
-  if (pct >= 60) return 8;
-  if (pct >= 50) return 6;
-  if (pct >= 40) return 4;
-  if (pct >= 30) return 2;
+  if (pct >= 60) return 7;
+  if (pct >= 45) return 5;
+  if (pct >= 30) return 3;
   return 0;
 }
 
 function scoreAbove200MA(pct: number): number {
-  if (pct >= 65) return 10;
-  if (pct >= 55) return 8;
-  if (pct >= 45) return 5;
-  if (pct >= 35) return 3;
-  if (pct >= 25) return 1;
+  if (pct >= 70) return 10;
+  if (pct >= 60) return 7;
+  if (pct >= 45) return 4;
+  if (pct >= 30) return 1;
   return 0;
 }
 
@@ -135,12 +133,37 @@ function getScoreColor(score: number): string {
   return '#dc2626';
 }
 
+function isUSMarketHours(): boolean {
+  const now = new Date();
+  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const day = et.getDay();
+  if (day === 0 || day === 6) return false;
+  const hours = et.getHours();
+  const minutes = et.getMinutes();
+  const timeMinutes = hours * 60 + minutes;
+  return timeMinutes >= 540 && timeMinutes <= 1020;
+}
+
+function isNearMarketOpenOrClose(): boolean {
+  const now = new Date();
+  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const day = et.getDay();
+  if (day === 0 || day === 6) return false;
+  const hours = et.getHours();
+  const minutes = et.getMinutes();
+  const timeMinutes = hours * 60 + minutes;
+  const openWindow = timeMinutes >= 565 && timeMinutes <= 600;
+  const closeWindow = timeMinutes >= 955 && timeMinutes <= 1020;
+  return openWindow || closeWindow;
+}
+
 export interface BreadthData {
   overallScore: number;
   scoreChange5d: number;
   status: string;
   statusColor: string;
   fullyEnriched: boolean;
+  lastComputedAt: string;
   tiers: {
     trend: {
       score: number;
@@ -176,6 +199,7 @@ export interface BreadthData {
       };
     };
   };
+  universeSize: number;
 }
 
 export async function computeTrendTier(): Promise<BreadthData['tiers']['trend']> {
@@ -217,14 +241,16 @@ export async function computeQuoteBreadth(): Promise<{
   netHighs52w: { value: number; highs: number; lows: number; score: number; max: number };
   fourPercent: { value: number; bulls: number; bears: number; score: number; max: number };
   vixLevel: { value: number; score: number; max: number };
+  universeSize: number;
 }> {
-  const quotes = await yahoo.getMultipleQuotes(SP500_TICKERS);
+  const [sp500Quotes, broadData] = await Promise.all([
+    yahoo.getMultipleQuotes(SP500_TICKERS),
+    yahoo.getBroadMarketData(),
+  ]);
 
   let above50 = 0, above200 = 0, total50 = 0, total200 = 0;
-  let newHighs = 0, newLows = 0;
-  let bulls4 = 0, bears4 = 0;
 
-  for (const q of quotes) {
+  for (const q of sp500Quotes) {
     if (!q || !q.price) continue;
 
     if (q.fiftyDayAverage > 0) {
@@ -235,16 +261,31 @@ export async function computeQuoteBreadth(): Promise<{
       total200++;
       if (q.price > q.twoHundredDayAverage) above200++;
     }
-
-    if (q.week52High > 0 && q.price >= q.week52High * 0.98) newHighs++;
-    if (q.week52Low > 0 && q.price <= q.week52Low * 1.02) newLows++;
-
-    const dailyChangePct = q.changePercent ?? 0;
-    const vol = q.volume ?? 0;
-    const avgVol = q.avgVolume10Day || q.avgVolume || 0;
-    if (dailyChangePct >= 4 && vol >= 100000 && vol > avgVol) bulls4++;
-    if (dailyChangePct <= -4 && vol >= 100000 && vol > avgVol) bears4++;
   }
+
+  const mergedUniverse = new Map<string, any>();
+  for (const q of sp500Quotes) {
+    if (q && q.symbol && q.price) {
+      mergedUniverse.set(q.symbol, q);
+    }
+  }
+  for (const s of broadData.universe) {
+    if (s && s.symbol && s.price && s.marketCap >= 1e9) {
+      if (!mergedUniverse.has(s.symbol)) {
+        mergedUniverse.set(s.symbol, s);
+      }
+    }
+  }
+
+  let newHighs = 0, newLows = 0;
+  for (const s of mergedUniverse.values()) {
+    if (!s || !s.price) continue;
+    if (s.week52High > 0 && s.price >= s.week52High * 0.98) newHighs++;
+    if (s.week52Low > 0 && s.price <= s.week52Low * 1.02) newLows++;
+  }
+
+  const bulls4 = broadData.movers.bulls4.length;
+  const bears4 = broadData.movers.bears4.length;
 
   const pctAbove50 = total50 > 0 ? Math.round((above50 / total50) * 1000) / 10 : 50;
   const pctAbove200 = total200 > 0 ? Math.round((above200 / total200) * 1000) / 10 : 50;
@@ -263,6 +304,7 @@ export async function computeQuoteBreadth(): Promise<{
     netHighs52w: { value: netHighs, highs: newHighs, lows: newLows, score: scoreNetHighs(netHighs), max: 8 },
     fourPercent: { value: ratio4, bulls: bulls4, bears: bears4, score: score4PercentRatio(ratio4), max: 15 },
     vixLevel: { value: vixLevel, score: scoreVIX(vixLevel), max: 7 },
+    universeSize: mergedUniverse.size,
   };
 }
 
@@ -277,31 +319,17 @@ export async function computeQuarterlyBreadth(): Promise<{
     if (!hist || hist.length < 20) return;
 
     const closes = hist.map((h: any) => h.close);
-    const volumes = hist.map((h: any) => {
-      const vol = h.volume;
-      if (vol && vol > 0) return vol;
-      return 0;
-    });
-
-    const last65 = closes.slice(-Math.min(65, closes.length));
     const latestClose = closes[closes.length - 1];
-    const min65 = Math.min(...last65);
-    const max65 = Math.max(...last65);
 
-    const last20Closes = closes.slice(-20);
-    const last20Volumes = volumes.slice(-20);
-    const avgClose20 = last20Closes.reduce((a: number, b: number) => a + b, 0) / last20Closes.length;
-    const validVols = last20Volumes.filter((v: number) => v > 0);
-    const avgVol20 = validVols.length > 0 ? validVols.reduce((a: number, b: number) => a + b, 0) / validVols.length : 0;
-    const liquidity = avgClose20 * avgVol20;
+    const lookbackIndex = Math.max(0, closes.length - 65);
+    const price65dAgo = closes[lookbackIndex];
 
-    if (liquidity < 250000) return;
+    if (!price65dAgo || price65dAgo <= 0) return;
 
-    const bullPct = min65 > 0 ? ((latestClose - min65) / min65) * 100 : 0;
-    const bearPct = max65 > 0 ? ((latestClose - max65) / max65) * 100 : 0;
+    const changePct = ((latestClose - price65dAgo) / price65dAgo) * 100;
 
-    if (bullPct >= 25) bulls25++;
-    if (bearPct <= -25) bears25++;
+    if (changePct >= 25) bulls25++;
+    if (changePct <= -25) bears25++;
   });
 
   const ratio25 = bears25 > 0 ? Math.round((bulls25 / bears25) * 100) / 100 : (bulls25 > 0 ? 10 : 1);
@@ -311,17 +339,25 @@ export async function computeQuarterlyBreadth(): Promise<{
   };
 }
 
+let lastFullComputeTime: string | null = null;
+
 export async function computeMarketBreadth(fullScan: boolean = false): Promise<BreadthData> {
+  const cachedFull = getCached<BreadthData>('breadth_full_result');
+  if (cachedFull && !fullScan) {
+    return cachedFull;
+  }
+
   const trendTier = await computeTrendTier();
 
   let momentumScore = 0;
   let breadthScore = 0;
   let strengthScore = 0;
+  let universeSize = 0;
 
   let fourPercentData = { value: 1, bulls: 0, bears: 0, score: 7, max: 15 };
   let twentyFivePercentData = { value: 1, bulls: 0, bears: 0, score: 4, max: 10 };
-  let above50maData = { value: 50, score: 6, max: 10 };
-  let above200maData = { value: 50, score: 5, max: 10 };
+  let above50maData = { value: 50, score: 5, max: 10 };
+  let above200maData = { value: 50, score: 4, max: 10 };
   let netHighsData = { value: 0, highs: 0, lows: 0, score: 2, max: 8 };
   let vixData = { value: 20, score: 5, max: 7 };
 
@@ -337,6 +373,8 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
     above200maData = quoteBreadth.above200ma;
     netHighsData = quoteBreadth.netHighs52w;
     vixData = quoteBreadth.vixLevel;
+    universeSize = quoteBreadth.universeSize;
+    lastFullComputeTime = new Date().toISOString();
   } else {
     try {
       const vixQuote = await yahoo.getQuote('^VIX');
@@ -363,12 +401,13 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
     ? overallScore - previousScores[0]
     : 0;
 
-  return {
+  const result: BreadthData = {
     overallScore,
     scoreChange5d,
     status: getScoreStatus(overallScore),
     statusColor: getScoreColor(overallScore),
     fullyEnriched: fullScan,
+    lastComputedAt: lastFullComputeTime || new Date().toISOString(),
     tiers: {
       trend: trendTier,
       momentum: {
@@ -399,5 +438,12 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
         },
       },
     },
+    universeSize,
   };
+
+  if (fullScan) {
+    setCache('breadth_full_result', result, 1800);
+  }
+
+  return result;
 }

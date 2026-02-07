@@ -145,6 +145,9 @@ export function MarketBreadth() {
           {!breadth.fullyEnriched && (
             <span className="text-[9px] text-white/20 animate-pulse">scanning...</span>
           )}
+          {breadth.universeSize > 0 && (
+            <span className="text-[9px] text-white/20">{breadth.universeSize} stocks</span>
+          )}
         </div>
       </div>
 

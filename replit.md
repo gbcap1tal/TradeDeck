@@ -37,7 +37,7 @@ Preferred communication style: Simple, everyday language.
 - **Framework**: Express.js with TypeScript, run via `tsx`
 - **Entry point**: `server/index.ts` creates HTTP server, registers routes, serves static in production or Vite dev middleware in development
 - **API prefix**: All API routes start with `/api/`
-- **Data**: Live data from Yahoo Finance and FMP APIs via `server/api/yahoo.ts` and `server/api/fmp.ts`. Sectors and industries use hardcoded mappings in `server/routes.ts` enriched with real ETF quotes. Market Quality Score uses real S&P 500 breadth analysis via `server/api/breadth.ts`.
+- **Data**: Live data from Yahoo Finance and FMP APIs via `server/api/yahoo.ts` and `server/api/fmp.ts`. Sectors and industries use hardcoded mappings in `server/routes.ts` enriched with real ETF quotes. Market Quality Score uses S&P 500 + Yahoo screener broad universe (~600 stocks) via `server/api/breadth.ts`. 4% movers sourced from Yahoo screener (all exchanges, $1B+ market cap). Net H/L from merged S&P 500 + screener universe. 25% quarterly compares current price vs 65 trading days ago. Refreshes at market open/close only.
 - **Build**: Custom build script at `script/build.ts` using esbuild for server and Vite for client. Production output goes to `dist/`.
 
 ### API Route Structure

@@ -276,3 +276,95 @@ export async function getStockSummary(symbol: string) {
     return null;
   }
 }
+
+export async function getScreenerResults(screenerId: string, count: number = 250) {
+  const key = `yf_screener_${screenerId}_${count}`;
+  const cached = getCached<any[]>(key);
+  if (cached) return cached;
+
+  try {
+    const result = await yf.screener(screenerId, { count });
+    if (!result || !result.quotes) return [];
+
+    const data = result.quotes.map((q: any) => ({
+      symbol: q.symbol,
+      price: q.regularMarketPrice ?? 0,
+      change: q.regularMarketChange ?? 0,
+      changePercent: q.regularMarketChangePercent ?? 0,
+      volume: q.regularMarketVolume ?? 0,
+      marketCap: q.marketCap ?? 0,
+      week52High: q.fiftyTwoWeekHigh ?? 0,
+      week52Low: q.fiftyTwoWeekLow ?? 0,
+      fiftyDayAverage: q.fiftyDayAverage ?? 0,
+      twoHundredDayAverage: q.twoHundredDayAverage ?? 0,
+      avgVolume: q.averageDailyVolume3Month ?? 0,
+    }));
+
+    setCache(key, data, CACHE_TTL.QUOTE);
+    return data;
+  } catch (e: any) {
+    console.error(`Yahoo screener error for ${screenerId}:`, e.message);
+    return [];
+  }
+}
+
+export async function getBroadMarketData(): Promise<{
+  movers: { bulls4: any[]; bears4: any[] };
+  universe: any[];
+}> {
+  const key = 'yf_broad_market';
+  const cached = getCached<any>(key);
+  if (cached) return cached;
+
+  try {
+    const [gainers, losers, actives, anchors, largeValue, growthTech] = await Promise.allSettled([
+      getScreenerResults('day_gainers', 250),
+      getScreenerResults('day_losers', 250),
+      getScreenerResults('most_actives', 250),
+      getScreenerResults('portfolio_anchors', 250),
+      getScreenerResults('undervalued_large_caps', 250),
+      getScreenerResults('growth_technology_stocks', 250),
+    ]);
+
+    const extract = (r: PromiseSettledResult<any[]>) => r.status === 'fulfilled' ? r.value : [];
+
+    const allGainers = extract(gainers);
+    const allLosers = extract(losers);
+    const allActives = extract(actives);
+    const allAnchors = extract(anchors);
+    const allLargeValue = extract(largeValue);
+    const allGrowthTech = extract(growthTech);
+
+    const universeMap = new Map<string, any>();
+    const addToUniverse = (stocks: any[]) => {
+      for (const s of stocks) {
+        if (s.marketCap >= 1e9 && s.symbol && !s.symbol.includes('.')) {
+          universeMap.set(s.symbol, s);
+        }
+      }
+    };
+
+    addToUniverse(allGainers);
+    addToUniverse(allLosers);
+    addToUniverse(allActives);
+    addToUniverse(allAnchors);
+    addToUniverse(allLargeValue);
+    addToUniverse(allGrowthTech);
+
+    const universe = [...universeMap.values()];
+
+    const bulls4 = universe.filter(s => s.changePercent >= 4);
+    const bears4 = universe.filter(s => s.changePercent <= -4);
+
+    const data = {
+      movers: { bulls4, bears4 },
+      universe,
+    };
+
+    setCache(key, data, 1800);
+    return data;
+  } catch (e: any) {
+    console.error('Yahoo broad market error:', e.message);
+    return { movers: { bulls4: [], bears4: [] }, universe: [] };
+  }
+}
