@@ -52,11 +52,33 @@ export async function getQuote(symbol: string) {
   }
 }
 
+async function batchConcurrent<T>(items: T[], fn: (item: T) => Promise<any>, concurrency: number = 10): Promise<any[]> {
+  const results: any[] = [];
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency);
+    const batchResults = await Promise.allSettled(batch.map(fn));
+    results.push(...batchResults.map(r => r.status === 'fulfilled' ? r.value : null));
+  }
+  return results;
+}
+
 export async function getMultipleQuotes(symbols: string[]) {
-  const results = await Promise.allSettled(symbols.map(s => getQuote(s)));
-  return results
-    .map((r, i) => r.status === 'fulfilled' ? r.value : null)
-    .filter(Boolean);
+  const results = await batchConcurrent(symbols, s => getQuote(s), 15);
+  return results.filter(Boolean);
+}
+
+export async function getMultipleHistories(symbols: string[], range: string = '1M'): Promise<Map<string, any[]>> {
+  const results = new Map<string, any[]>();
+  await batchConcurrent(symbols, async (sym) => {
+    try {
+      const hist = await getHistory(sym, range);
+      if (hist && hist.length > 0) {
+        results.set(sym, hist);
+      }
+    } catch {}
+    return null;
+  }, 10);
+  return results;
 }
 
 export async function getHistory(symbol: string, range: string = '1M') {

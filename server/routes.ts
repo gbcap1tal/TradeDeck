@@ -5,7 +5,7 @@ import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import * as yahoo from "./api/yahoo";
 import * as fmp from "./api/fmp";
-import { getCached, setCache, CACHE_TTL } from "./api/cache";
+import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP, INDUSTRY_STOCKS } from "./data/sectors";
 import { getFinvizData, mergeStockLists, getFinvizNamesForIndustry, type FinvizSectorData } from "./api/finviz";
 
@@ -27,28 +27,323 @@ function getEnrichedStocksSync(industryName: string, finvizData: FinvizSectorDat
   return mergeStockLists(hardcoded, allFinvizStocks);
 }
 
-let finvizInitialized = false;
-function initFinvizBackground() {
-  if (finvizInitialized) return;
-  finvizInitialized = true;
-  setTimeout(() => {
-    console.log('[finviz] Starting background data fetch...');
-    getFinvizData().then(data => {
-      if (data) {
+async function computeSectorsData(): Promise<any[]> {
+  const data = await yahoo.getSectorETFs();
+  const finvizData = await getFinvizData().catch(() => null);
+  if (!data || data.length === 0) return [];
+
+  const withIndustries = data.map((sector: any) => {
+    const config = SECTORS_DATA.find(s => s.name === sector.name);
+    const industries = (config?.industries || []).map((ind: string) => {
+      const enriched = getEnrichedStocksSync(ind, finvizData);
+      return { name: ind, changePercent: 0, stockCount: enriched.length, rs: 0 };
+    });
+    return { ...sector, industries };
+  });
+  withIndustries.sort((a: any, b: any) => (b.changePercent ?? 0) - (a.changePercent ?? 0));
+  return withIndustries;
+}
+
+async function computeIndustryPerformance(): Promise<any> {
+  const finvizData = await getFinvizData().catch(() => null);
+  const allIndustries: Array<{ name: string; sector: string; etf: string | null; fallbackSymbols: string[]; enrichedCount: number }> = [];
+  for (const sector of SECTORS_DATA) {
+    for (const ind of sector.industries) {
+      const etf = INDUSTRY_ETF_MAP[ind] || null;
+      const enrichedStocks = getEnrichedStocksSync(ind, finvizData);
+      allIndustries.push({
+        name: ind,
+        sector: sector.name,
+        etf,
+        fallbackSymbols: etf ? [] : enrichedStocks.slice(0, 5).map(s => s.symbol),
+        enrichedCount: enrichedStocks.length,
+      });
+    }
+  }
+
+  const etfSymbols = allIndustries.map(i => i.etf).filter(Boolean) as string[];
+  const fallbackSymbols = allIndustries.flatMap(i => i.fallbackSymbols);
+  const uniqueSymbols = Array.from(new Set([...etfSymbols, ...fallbackSymbols]));
+
+  const quotes = await yahoo.getMultipleQuotes(uniqueSymbols);
+  const quoteMap = new Map<string, any>();
+  for (const q of quotes) {
+    if (q) quoteMap.set(q.symbol, q);
+  }
+
+  const histResults = await yahoo.getMultipleHistories(uniqueSymbols, '1M');
+
+  const industries = allIndustries.map(ind => {
+    let dailyChange = 0;
+    let weeklyChange = 0;
+    let monthlyChange = 0;
+
+    if (ind.etf) {
+      const etfQuote = quoteMap.get(ind.etf);
+      if (etfQuote) {
+        dailyChange = Math.round((etfQuote.changePercent ?? 0) * 100) / 100;
+      }
+      const hist = histResults.get(ind.etf);
+      if (hist && hist.length >= 2) {
+        const latest = hist[hist.length - 1];
+        if (hist.length >= 6) {
+          const weekAgo = hist[Math.max(0, hist.length - 6)];
+          weeklyChange = Math.round(((latest.close - weekAgo.close) / weekAgo.close) * 10000) / 100;
+        }
+        const monthAgo = hist[0];
+        monthlyChange = Math.round(((latest.close - monthAgo.close) / monthAgo.close) * 10000) / 100;
+      }
+    } else {
+      const indQuotes = ind.fallbackSymbols.map(s => quoteMap.get(s)).filter(Boolean);
+      dailyChange = indQuotes.length > 0
+        ? Math.round(indQuotes.reduce((sum: number, q: any) => sum + (q.changePercent ?? 0), 0) / indQuotes.length * 100) / 100
+        : 0;
+
+      let weekCount = 0, monthCount = 0;
+      for (const sym of ind.fallbackSymbols) {
+        const hist = histResults.get(sym);
+        if (!hist || hist.length < 2) continue;
+        const latest = hist[hist.length - 1];
+        if (hist.length >= 6) {
+          const weekAgo = hist[Math.max(0, hist.length - 6)];
+          weeklyChange += ((latest.close - weekAgo.close) / weekAgo.close) * 100;
+          weekCount++;
+        }
+        const monthAgo = hist[0];
+        monthlyChange += ((latest.close - monthAgo.close) / monthAgo.close) * 100;
+        monthCount++;
+      }
+      weeklyChange = weekCount > 0 ? Math.round(weeklyChange / weekCount * 100) / 100 : 0;
+      monthlyChange = monthCount > 0 ? Math.round(monthlyChange / monthCount * 100) / 100 : 0;
+    }
+
+    return {
+      name: ind.name,
+      sector: ind.sector,
+      dailyChange,
+      weeklyChange,
+      monthlyChange,
+      stockCount: ind.enrichedCount,
+      hasETF: !!ind.etf,
+    };
+  });
+
+  return { industries };
+}
+
+const RRG_SECTOR_ETFS = [
+  { name: 'Technology', ticker: 'XLK', color: '#0a84ff' },
+  { name: 'Financials', ticker: 'XLF', color: '#30d158' },
+  { name: 'Healthcare', ticker: 'XLV', color: '#ff453a' },
+  { name: 'Energy', ticker: 'XLE', color: '#ffd60a' },
+  { name: 'Consumer Discretionary', ticker: 'XLY', color: '#bf5af2' },
+  { name: 'Consumer Staples', ticker: 'XLP', color: '#ff9f0a' },
+  { name: 'Industrials', ticker: 'XLI', color: '#64d2ff' },
+  { name: 'Materials', ticker: 'XLB', color: '#ac8e68' },
+  { name: 'Real Estate', ticker: 'XLRE', color: '#32ade6' },
+  { name: 'Utilities', ticker: 'XLU', color: '#86d48e' },
+  { name: 'Communication Services', ticker: 'XLC', color: '#e040fb' },
+];
+
+async function computeRotationData(): Promise<any> {
+  const allTickers = ['SPY', ...RRG_SECTOR_ETFS.map(s => s.ticker)];
+  const historyResults = await Promise.allSettled(
+    allTickers.map(t => yahoo.getHistory(t, '1Y'))
+  );
+
+  const historyMap = new Map<string, Array<{ time: string; close: number }>>();
+  allTickers.forEach((ticker, i) => {
+    const r = historyResults[i];
+    if (r.status === 'fulfilled' && r.value && r.value.length > 0) {
+      historyMap.set(ticker, r.value);
+    }
+  });
+
+  const spyHist = historyMap.get('SPY');
+  if (!spyHist || spyHist.length < 30) return { sectors: [] };
+
+  const spyByDate = new Map<string, number>();
+  spyHist.forEach(d => spyByDate.set(d.time, d.close));
+
+  const RS_PERIOD = 10;
+  const MOM_PERIOD = 5;
+  const TAIL_LENGTH = 10;
+
+  const calcSMA = (arr: number[], period: number): number[] => {
+    const result: number[] = [];
+    for (let i = 0; i < arr.length; i++) {
+      if (i < period - 1) {
+        result.push(NaN);
+      } else {
+        let sum = 0;
+        for (let j = i - period + 1; j <= i; j++) sum += arr[j];
+        result.push(sum / period);
+      }
+    }
+    return result;
+  };
+
+  const sectors = RRG_SECTOR_ETFS.map(sector => {
+    const sectorHist = historyMap.get(sector.ticker);
+    if (!sectorHist || sectorHist.length < 30) return null;
+
+    const alignedDates: string[] = [];
+    const ratios: number[] = [];
+
+    for (const day of sectorHist) {
+      const spyClose = spyByDate.get(day.time);
+      if (spyClose && spyClose > 0) {
+        alignedDates.push(day.time);
+        ratios.push(day.close / spyClose);
+      }
+    }
+
+    if (ratios.length < 30) return null;
+
+    const ratioSMA = calcSMA(ratios, RS_PERIOD);
+    const rsRatio: number[] = ratios.map((r, i) =>
+      isNaN(ratioSMA[i]) ? NaN : (r / ratioSMA[i]) * 100
+    );
+
+    const rsMomentum: number[] = rsRatio.map((r, i) => {
+      if (isNaN(r) || i < MOM_PERIOD) return NaN;
+      const prev = rsRatio[i - MOM_PERIOD];
+      if (isNaN(prev) || prev === 0) return NaN;
+      return ((r - prev) / prev) * 100;
+    });
+
+    const validPairs: Array<{ date: string; rsRatio: number; rsMomentum: number }> = [];
+    for (let i = 0; i < rsRatio.length; i++) {
+      if (!isNaN(rsRatio[i]) && !isNaN(rsMomentum[i])) {
+        validPairs.push({
+          date: alignedDates[i],
+          rsRatio: Math.round(rsRatio[i] * 100) / 100,
+          rsMomentum: Math.round(rsMomentum[i] * 100) / 100,
+        });
+      }
+    }
+
+    if (validPairs.length === 0) return null;
+
+    const weeklyPairs: typeof validPairs = [];
+    for (let i = 0; i < validPairs.length; i += 5) {
+      weeklyPairs.push(validPairs[Math.min(i, validPairs.length - 1)]);
+    }
+    if (weeklyPairs[weeklyPairs.length - 1] !== validPairs[validPairs.length - 1]) {
+      weeklyPairs.push(validPairs[validPairs.length - 1]);
+    }
+
+    const tail = weeklyPairs.slice(-TAIL_LENGTH);
+    const current = validPairs[validPairs.length - 1];
+
+    let quadrant: string;
+    if (current.rsRatio >= 100 && current.rsMomentum >= 0) quadrant = 'leading';
+    else if (current.rsRatio >= 100 && current.rsMomentum < 0) quadrant = 'weakening';
+    else if (current.rsRatio < 100 && current.rsMomentum >= 0) quadrant = 'improving';
+    else quadrant = 'lagging';
+
+    const prev = validPairs.length > 1 ? validPairs[validPairs.length - 2] : current;
+    let heading = Math.atan2(
+      current.rsMomentum - prev.rsMomentum,
+      current.rsRatio - prev.rsRatio
+    ) * (180 / Math.PI);
+    if (heading < 0) heading += 360;
+
+    return {
+      name: sector.name,
+      ticker: sector.ticker,
+      color: sector.color,
+      rsRatio: current.rsRatio,
+      rsMomentum: current.rsMomentum,
+      quadrant,
+      heading: Math.round(heading * 10) / 10,
+      tail: tail.map(t => ({
+        date: t.date,
+        rsRatio: t.rsRatio,
+        rsMomentum: t.rsMomentum,
+      })),
+    };
+  }).filter(Boolean);
+
+  return { sectors };
+}
+
+function backgroundRefresh(cacheKey: string, computeFn: () => Promise<any>, ttl: number) {
+  if (isRefreshing(cacheKey)) return;
+  markRefreshing(cacheKey);
+  computeFn().then(data => {
+    setCache(cacheKey, data, ttl);
+    console.log(`[cache] Background refresh complete: ${cacheKey}`);
+  }).catch(err => {
+    console.error(`[cache] Background refresh failed: ${cacheKey}:`, err.message);
+  }).finally(() => {
+    clearRefreshing(cacheKey);
+  });
+}
+
+let bgInitialized = false;
+function initBackgroundTasks() {
+  if (bgInitialized) return;
+  bgInitialized = true;
+
+  setTimeout(async () => {
+    console.log('[bg] Starting background data pre-computation...');
+
+    try {
+      console.log('[bg] Pre-computing Finviz data...');
+      const finvizData = await getFinvizData();
+      if (finvizData) {
         let totalStocks = 0;
-        for (const s of Object.values(data)) {
+        for (const s of Object.values(finvizData)) {
           for (const stocks of Object.values(s.stocks)) {
             totalStocks += stocks.length;
           }
         }
-        console.log(`[finviz] Background fetch complete: ${Object.keys(data).length} sectors, ${totalStocks} stocks`);
-      } else {
-        console.log('[finviz] Background fetch returned no data (may be rate-limited)');
+        console.log(`[bg] Finviz complete: ${Object.keys(finvizData).length} sectors, ${totalStocks} stocks`);
       }
-    }).catch(err => {
-      console.log(`[finviz] Background fetch error: ${err.message}`);
-    });
-  }, 10000);
+    } catch (err: any) {
+      console.log(`[bg] Finviz fetch error: ${err.message}`);
+    }
+
+    try {
+      console.log('[bg] Pre-computing sectors data...');
+      const sectors = await computeSectorsData();
+      setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
+      console.log(`[bg] Sectors pre-computed: ${sectors.length} sectors`);
+    } catch (err: any) {
+      console.log(`[bg] Sectors pre-compute error: ${err.message}`);
+    }
+
+    try {
+      console.log('[bg] Pre-computing industry performance...');
+      const perfData = await computeIndustryPerformance();
+      setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
+      console.log(`[bg] Industry performance pre-computed: ${perfData.industries?.length} industries`);
+    } catch (err: any) {
+      console.log(`[bg] Industry perf pre-compute error: ${err.message}`);
+    }
+
+    try {
+      console.log('[bg] Pre-computing rotation data...');
+      const rotData = await computeRotationData();
+      setCache('rrg_rotation', rotData, CACHE_TTL.SECTORS);
+      console.log(`[bg] Rotation pre-computed: ${rotData.sectors?.length} sectors`);
+    } catch (err: any) {
+      console.log(`[bg] Rotation pre-compute error: ${err.message}`);
+    }
+  }, 5000);
+
+  setInterval(() => {
+    backgroundRefresh('sectors_data', computeSectorsData, CACHE_TTL.SECTORS);
+  }, CACHE_TTL.SECTORS * 1000);
+
+  setInterval(() => {
+    backgroundRefresh('industry_perf_all', computeIndustryPerformance, CACHE_TTL.INDUSTRY_PERF);
+  }, CACHE_TTL.INDUSTRY_PERF * 1000);
+
+  setInterval(() => {
+    backgroundRefresh('rrg_rotation', computeRotationData, CACHE_TTL.SECTORS);
+  }, CACHE_TTL.SECTORS * 1000);
 }
 
 function seededRandom(seed: string) {
@@ -69,7 +364,7 @@ export async function registerRoutes(
   await setupAuth(app);
   registerAuthRoutes(app);
 
-  initFinvizBackground();
+  initBackgroundTasks();
 
   app.get('/api/market/indices', async (req, res) => {
     try {
@@ -84,28 +379,21 @@ export async function registerRoutes(
   });
 
   app.get('/api/market/sectors', async (req, res) => {
+    const cacheKey = 'sectors_data';
+    const cached = getCached<any>(cacheKey);
+    if (cached) return res.json(cached);
+
+    const stale = getStale<any>(cacheKey);
+    if (stale) {
+      backgroundRefresh(cacheKey, computeSectorsData, CACHE_TTL.SECTORS);
+      return res.json(stale);
+    }
+
     try {
-      const data = await yahoo.getSectorETFs();
-      const finvizData = await getFinvizData().catch(() => null);
-      if (data && data.length > 0) {
-        const withIndustries = await Promise.all(data.map(async (sector: any) => {
-          const config = SECTORS_DATA.find(s => s.name === sector.name);
-          const industries = await Promise.all((config?.industries || []).map(async (ind: string) => {
-            const enriched = getEnrichedStocksSync(ind, finvizData);
-            return {
-              name: ind,
-              changePercent: 0,
-              stockCount: enriched.length,
-              rs: 0,
-            };
-          }));
-          return {
-            ...sector,
-            industries,
-          };
-        }));
-        withIndustries.sort((a: any, b: any) => (b.changePercent ?? 0) - (a.changePercent ?? 0));
-        return res.json(withIndustries);
+      const data = await computeSectorsData();
+      if (data.length > 0) {
+        setCache(cacheKey, data, CACHE_TTL.SECTORS);
+        return res.json(data);
       }
     } catch (e: any) {
       console.error('Sectors API error:', e.message);
@@ -118,145 +406,14 @@ export async function registerRoutes(
     const cached = getCached<any>(cacheKey);
     if (cached) return res.json(cached);
 
+    const stale = getStale<any>(cacheKey);
+    if (stale) {
+      backgroundRefresh(cacheKey, computeRotationData, CACHE_TTL.SECTORS);
+      return res.json(stale);
+    }
+
     try {
-      const SECTOR_ETFS = [
-        { name: 'Technology', ticker: 'XLK', color: '#0a84ff' },
-        { name: 'Financials', ticker: 'XLF', color: '#30d158' },
-        { name: 'Healthcare', ticker: 'XLV', color: '#ff453a' },
-        { name: 'Energy', ticker: 'XLE', color: '#ffd60a' },
-        { name: 'Consumer Discretionary', ticker: 'XLY', color: '#bf5af2' },
-        { name: 'Consumer Staples', ticker: 'XLP', color: '#ff9f0a' },
-        { name: 'Industrials', ticker: 'XLI', color: '#64d2ff' },
-        { name: 'Materials', ticker: 'XLB', color: '#ac8e68' },
-        { name: 'Real Estate', ticker: 'XLRE', color: '#32ade6' },
-        { name: 'Utilities', ticker: 'XLU', color: '#86d48e' },
-        { name: 'Communication Services', ticker: 'XLC', color: '#e040fb' },
-      ];
-
-      const allTickers = ['SPY', ...SECTOR_ETFS.map(s => s.ticker)];
-      const historyResults = await Promise.allSettled(
-        allTickers.map(t => yahoo.getHistory(t, '1Y'))
-      );
-
-      const historyMap = new Map<string, Array<{ time: string; close: number }>>();
-      allTickers.forEach((ticker, i) => {
-        const r = historyResults[i];
-        if (r.status === 'fulfilled' && r.value && r.value.length > 0) {
-          historyMap.set(ticker, r.value);
-        }
-      });
-
-      const spyHist = historyMap.get('SPY');
-      if (!spyHist || spyHist.length < 30) {
-        return res.json({ sectors: [] });
-      }
-
-      const spyByDate = new Map<string, number>();
-      spyHist.forEach(d => spyByDate.set(d.time, d.close));
-
-      const RS_PERIOD = 10;
-      const MOM_PERIOD = 5;
-      const TAIL_LENGTH = 10;
-
-      const calcSMA = (arr: number[], period: number): number[] => {
-        const result: number[] = [];
-        for (let i = 0; i < arr.length; i++) {
-          if (i < period - 1) {
-            result.push(NaN);
-          } else {
-            let sum = 0;
-            for (let j = i - period + 1; j <= i; j++) sum += arr[j];
-            result.push(sum / period);
-          }
-        }
-        return result;
-      };
-
-      const sectors = SECTOR_ETFS.map(sector => {
-        const sectorHist = historyMap.get(sector.ticker);
-        if (!sectorHist || sectorHist.length < 30) {
-          return null;
-        }
-
-        const alignedDates: string[] = [];
-        const ratios: number[] = [];
-
-        for (const day of sectorHist) {
-          const spyClose = spyByDate.get(day.time);
-          if (spyClose && spyClose > 0) {
-            alignedDates.push(day.time);
-            ratios.push(day.close / spyClose);
-          }
-        }
-
-        if (ratios.length < 30) return null;
-
-        const ratioSMA = calcSMA(ratios, RS_PERIOD);
-        const rsRatio: number[] = ratios.map((r, i) =>
-          isNaN(ratioSMA[i]) ? NaN : (r / ratioSMA[i]) * 100
-        );
-
-        const rsMomentum: number[] = rsRatio.map((r, i) => {
-          if (isNaN(r) || i < MOM_PERIOD) return NaN;
-          const prev = rsRatio[i - MOM_PERIOD];
-          if (isNaN(prev) || prev === 0) return NaN;
-          return ((r - prev) / prev) * 100;
-        });
-
-        const validPairs: Array<{ date: string; rsRatio: number; rsMomentum: number }> = [];
-        for (let i = 0; i < rsRatio.length; i++) {
-          if (!isNaN(rsRatio[i]) && !isNaN(rsMomentum[i])) {
-            validPairs.push({
-              date: alignedDates[i],
-              rsRatio: Math.round(rsRatio[i] * 100) / 100,
-              rsMomentum: Math.round(rsMomentum[i] * 100) / 100,
-            });
-          }
-        }
-
-        if (validPairs.length === 0) return null;
-
-        const weeklyPairs: typeof validPairs = [];
-        for (let i = 0; i < validPairs.length; i += 5) {
-          weeklyPairs.push(validPairs[Math.min(i, validPairs.length - 1)]);
-        }
-        if (weeklyPairs[weeklyPairs.length - 1] !== validPairs[validPairs.length - 1]) {
-          weeklyPairs.push(validPairs[validPairs.length - 1]);
-        }
-
-        const tail = weeklyPairs.slice(-TAIL_LENGTH);
-        const current = validPairs[validPairs.length - 1];
-
-        let quadrant: string;
-        if (current.rsRatio >= 100 && current.rsMomentum >= 0) quadrant = 'leading';
-        else if (current.rsRatio >= 100 && current.rsMomentum < 0) quadrant = 'weakening';
-        else if (current.rsRatio < 100 && current.rsMomentum >= 0) quadrant = 'improving';
-        else quadrant = 'lagging';
-
-        const prev = validPairs.length > 1 ? validPairs[validPairs.length - 2] : current;
-        let heading = Math.atan2(
-          current.rsMomentum - prev.rsMomentum,
-          current.rsRatio - prev.rsRatio
-        ) * (180 / Math.PI);
-        if (heading < 0) heading += 360;
-
-        return {
-          name: sector.name,
-          ticker: sector.ticker,
-          color: sector.color,
-          rsRatio: current.rsRatio,
-          rsMomentum: current.rsMomentum,
-          quadrant,
-          heading: Math.round(heading * 10) / 10,
-          tail: tail.map(t => ({
-            date: t.date,
-            rsRatio: t.rsRatio,
-            rsMomentum: t.rsMomentum,
-          })),
-        };
-      }).filter(Boolean);
-
-      const result = { sectors };
+      const result = await computeRotationData();
       setCache(cacheKey, result, CACHE_TTL.SECTORS);
       return res.json(result);
     } catch (e: any) {
@@ -270,100 +427,14 @@ export async function registerRoutes(
     const cached = getCached<any>(cacheKey);
     if (cached) return res.json(cached);
 
+    const stale = getStale<any>(cacheKey);
+    if (stale) {
+      backgroundRefresh(cacheKey, computeIndustryPerformance, CACHE_TTL.INDUSTRY_PERF);
+      return res.json(stale);
+    }
+
     try {
-      const finvizData = await getFinvizData().catch(() => null);
-      const allIndustries: Array<{ name: string; sector: string; etf: string | null; fallbackSymbols: string[]; enrichedCount: number }> = [];
-      for (const sector of SECTORS_DATA) {
-        for (const ind of sector.industries) {
-          const etf = INDUSTRY_ETF_MAP[ind] || null;
-          const enrichedStocks = getEnrichedStocksSync(ind, finvizData);
-          allIndustries.push({
-            name: ind,
-            sector: sector.name,
-            etf,
-            fallbackSymbols: etf ? [] : enrichedStocks.slice(0, 5).map(s => s.symbol),
-            enrichedCount: enrichedStocks.length,
-          });
-        }
-      }
-
-      const etfSymbols = allIndustries.map(i => i.etf).filter(Boolean) as string[];
-      const fallbackSymbols = allIndustries.flatMap(i => i.fallbackSymbols);
-      const uniqueSymbols = Array.from(new Set([...etfSymbols, ...fallbackSymbols]));
-
-      const quotes = await yahoo.getMultipleQuotes(uniqueSymbols);
-      const quoteMap = new Map<string, any>();
-      for (const q of quotes) {
-        if (q) quoteMap.set(q.symbol, q);
-      }
-
-      const histResults = new Map<string, any[]>();
-      const histPromises = uniqueSymbols.map(async (sym) => {
-        try {
-          const hist = await yahoo.getHistory(sym, '1M');
-          if (hist && hist.length > 0) {
-            histResults.set(sym, hist);
-          }
-        } catch {}
-      });
-      await Promise.allSettled(histPromises);
-
-      const industries = allIndustries.map(ind => {
-        let dailyChange = 0;
-        let weeklyChange = 0;
-        let monthlyChange = 0;
-
-        if (ind.etf) {
-          const etfQuote = quoteMap.get(ind.etf);
-          if (etfQuote) {
-            dailyChange = Math.round((etfQuote.changePercent ?? 0) * 100) / 100;
-          }
-          const hist = histResults.get(ind.etf);
-          if (hist && hist.length >= 2) {
-            const latest = hist[hist.length - 1];
-            if (hist.length >= 6) {
-              const weekAgo = hist[Math.max(0, hist.length - 6)];
-              weeklyChange = Math.round(((latest.close - weekAgo.close) / weekAgo.close) * 10000) / 100;
-            }
-            const monthAgo = hist[0];
-            monthlyChange = Math.round(((latest.close - monthAgo.close) / monthAgo.close) * 10000) / 100;
-          }
-        } else {
-          const indQuotes = ind.fallbackSymbols.map(s => quoteMap.get(s)).filter(Boolean);
-          dailyChange = indQuotes.length > 0
-            ? Math.round(indQuotes.reduce((sum: number, q: any) => sum + (q.changePercent ?? 0), 0) / indQuotes.length * 100) / 100
-            : 0;
-
-          let weekCount = 0, monthCount = 0;
-          for (const sym of ind.fallbackSymbols) {
-            const hist = histResults.get(sym);
-            if (!hist || hist.length < 2) continue;
-            const latest = hist[hist.length - 1];
-            if (hist.length >= 6) {
-              const weekAgo = hist[Math.max(0, hist.length - 6)];
-              weeklyChange += ((latest.close - weekAgo.close) / weekAgo.close) * 100;
-              weekCount++;
-            }
-            const monthAgo = hist[0];
-            monthlyChange += ((latest.close - monthAgo.close) / monthAgo.close) * 100;
-            monthCount++;
-          }
-          weeklyChange = weekCount > 0 ? Math.round(weeklyChange / weekCount * 100) / 100 : 0;
-          monthlyChange = monthCount > 0 ? Math.round(monthlyChange / monthCount * 100) / 100 : 0;
-        }
-
-        return {
-          name: ind.name,
-          sector: ind.sector,
-          dailyChange,
-          weeklyChange,
-          monthlyChange,
-          stockCount: ind.enrichedCount,
-          hasETF: !!ind.etf,
-        };
-      });
-
-      const result = { industries };
+      const result = await computeIndustryPerformance();
       setCache(cacheKey, result, CACHE_TTL.INDUSTRY_PERF);
       res.json(result);
     } catch (e: any) {

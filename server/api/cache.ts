@@ -2,6 +2,10 @@ import NodeCache from 'node-cache';
 
 const cache = new NodeCache({ checkperiod: 120 });
 
+const staleCache = new NodeCache({ checkperiod: 0, stdTTL: 0 });
+
+const refreshingKeys = new Set<string>();
+
 export const CACHE_TTL = {
   QUOTE: 60,
   HISTORY: 300,
@@ -20,8 +24,25 @@ export function getCached<T>(key: string): T | undefined {
   return cache.get<T>(key);
 }
 
+export function getStale<T>(key: string): T | undefined {
+  return staleCache.get<T>(key);
+}
+
 export function setCache<T>(key: string, value: T, ttlSeconds: number): void {
   cache.set(key, value, ttlSeconds);
+  staleCache.set(key, value, 0);
+}
+
+export function isRefreshing(key: string): boolean {
+  return refreshingKeys.has(key);
+}
+
+export function markRefreshing(key: string): void {
+  refreshingKeys.add(key);
+}
+
+export function clearRefreshing(key: string): void {
+  refreshingKeys.delete(key);
 }
 
 export function clearCache(): void {
