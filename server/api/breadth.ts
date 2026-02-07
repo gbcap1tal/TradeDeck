@@ -326,42 +326,60 @@ export async function computeQuarterlyBreadth(): Promise<{
   twentyFivePercent: { value: number; bulls: number; bears: number; score: number; max: number };
 }> {
   const broadData = await yahoo.getBroadMarketData();
-  const tickers = broadData.universe
+  const allStocks = broadData.universe
     .filter((s: any) => s && s.symbol && s.marketCap >= 1e9)
-    .map((s: any) => s.symbol);
-  console.log(`[breadth] 25% quarterly: scanning ${tickers.length} stocks for history`);
+    .sort((a: any, b: any) => (b.marketCap || 0) - (a.marketCap || 0));
 
-  const batchSize = 50;
-  let bulls25 = 0, bears25 = 0;
+  const SAMPLE_SIZE = 300;
+  let sampleTickers: string[];
 
-  for (let i = 0; i < tickers.length; i += batchSize) {
-    const batch = tickers.slice(i, i + batchSize);
-    const histMap = await yahoo.getMultipleHistories(batch, '3M');
-
-    histMap.forEach((hist) => {
-      if (!hist || hist.length < 20) return;
-
-      const closes = hist.map((h: any) => h.close);
-      const latestClose = closes[closes.length - 1];
-
-      const lookbackIndex = Math.max(0, closes.length - 65);
-      const price65dAgo = closes[lookbackIndex];
-
-      if (!price65dAgo || price65dAgo <= 0) return;
-
-      const changePct = ((latestClose - price65dAgo) / price65dAgo) * 100;
-
-      if (changePct >= 25) bulls25++;
-      if (changePct <= -25) bears25++;
-    });
+  if (allStocks.length <= SAMPLE_SIZE) {
+    sampleTickers = allStocks.map((s: any) => s.symbol);
+  } else {
+    const top100 = allStocks.slice(0, 100).map((s: any) => s.symbol);
+    const remaining = allStocks.slice(100);
+    const step = Math.floor(remaining.length / (SAMPLE_SIZE - 100));
+    const sampled: string[] = [];
+    for (let i = 0; i < remaining.length && sampled.length < (SAMPLE_SIZE - 100); i += step) {
+      sampled.push(remaining[i].symbol);
+    }
+    sampleTickers = [...top100, ...sampled];
   }
 
-  console.log(`[breadth] 25% quarterly results: bulls=${bulls25}, bears=${bears25} from ${tickers.length} stocks`);
+  console.log(`[breadth] 25% quarterly: sampling ${sampleTickers.length} of ${allStocks.length} stocks`);
 
-  const ratio25 = bears25 > 0 ? Math.round((bulls25 / bears25) * 100) / 100 : (bulls25 > 0 ? 10 : 1);
+  let bulls25 = 0, bears25 = 0, validCount = 0;
+
+  const histMap = await yahoo.getMultipleHistories(sampleTickers, '3M');
+
+  histMap.forEach((hist) => {
+    if (!hist || hist.length < 20) return;
+
+    const closes = hist.map((h: any) => h.close);
+    const latestClose = closes[closes.length - 1];
+
+    const lookbackIndex = Math.max(0, closes.length - 65);
+    const price65dAgo = closes[lookbackIndex];
+
+    if (!price65dAgo || price65dAgo <= 0) return;
+
+    validCount++;
+    const changePct = ((latestClose - price65dAgo) / price65dAgo) * 100;
+
+    if (changePct >= 25) bulls25++;
+    if (changePct <= -25) bears25++;
+  });
+
+  const scaleFactor = validCount > 0 ? allStocks.length / validCount : 1;
+  const estBulls = Math.round(bulls25 * scaleFactor);
+  const estBears = Math.round(bears25 * scaleFactor);
+
+  console.log(`[breadth] 25% quarterly results: sample bulls=${bulls25}, bears=${bears25} (${validCount} valid), estimated bulls=${estBulls}, bears=${estBears} from ${allStocks.length} total`);
+
+  const ratio25 = estBears > 0 ? Math.round((estBulls / estBears) * 100) / 100 : (estBulls > 0 ? 10 : 1);
 
   return {
-    twentyFivePercent: { value: ratio25, bulls: bulls25, bears: bears25, score: score25PercentRatio(ratio25), max: 11 },
+    twentyFivePercent: { value: ratio25, bulls: estBulls, bears: estBears, score: score25PercentRatio(ratio25), max: 11 },
   };
 }
 

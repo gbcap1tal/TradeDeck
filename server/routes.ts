@@ -39,12 +39,26 @@ async function computeSectorsData(): Promise<any[]> {
   const data = await yahoo.getSectorETFs();
   if (!data || data.length === 0) return [];
 
+  const industryPerfCache = getCached<any>('industry_perf_all');
+  const industryPerfMap = new Map<string, any>();
+  if (industryPerfCache?.industries) {
+    for (const ind of industryPerfCache.industries) {
+      industryPerfMap.set(ind.name, ind);
+    }
+  }
+
   const withIndustries = data.map((sector: any) => {
     const config = SECTORS_DATA.find(s => s.name === sector.name);
     const industries = getIndustriesForSector(sector.name);
     const industryData = industries.map((ind: string) => {
       const stocks = getStocksForIndustry(ind);
-      return { name: ind, changePercent: 0, stockCount: stocks.length, rs: 0 };
+      const perfData = industryPerfMap.get(ind);
+      return {
+        name: ind,
+        changePercent: perfData?.dailyChange ?? 0,
+        stockCount: stocks.length,
+        rs: 0,
+      };
     });
     return { ...sector, industries: industryData, color: config?.color };
   });
@@ -358,6 +372,11 @@ function initBackgroundTasks() {
           const perfData2 = await computeIndustryPerformance();
           setCache('industry_perf_all', perfData2, CACHE_TTL.INDUSTRY_PERF);
           console.log(`[bg] Full industry performance complete: ${perfData2.industries?.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+
+          console.log('[bg] Refreshing sectors with industry performance data...');
+          const sectorsRefreshed = await computeSectorsData();
+          setCache('sectors_data', sectorsRefreshed, CACHE_TTL.SECTORS);
+          console.log(`[bg] Sectors refreshed with perf data in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
         } catch (err: any) {
           console.log(`[bg] Industry perf enrichment error: ${err.message}`);
         }

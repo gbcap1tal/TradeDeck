@@ -3,8 +3,8 @@ import { getCached, setCache, CACHE_TTL } from './cache';
 
 const yf: any = new (YahooFinance as any)();
 
-const MAX_CONCURRENT = 3;
-const MIN_DELAY_MS = 300;
+const MAX_CONCURRENT = 8;
+const MIN_DELAY_MS = 100;
 let activeRequests = 0;
 const requestQueue: Array<{ resolve: () => void }> = [];
 
@@ -112,21 +112,21 @@ export async function getQuote(symbol: string) {
   return null;
 }
 
-async function batchConcurrent<T>(items: T[], fn: (item: T) => Promise<any>, concurrency: number = 5): Promise<any[]> {
+async function batchConcurrent<T>(items: T[], fn: (item: T) => Promise<any>, concurrency: number = 10): Promise<any[]> {
   const results: any[] = [];
   for (let i = 0; i < items.length; i += concurrency) {
     const batch = items.slice(i, i + concurrency);
     const batchResults = await Promise.allSettled(batch.map(fn));
     results.push(...batchResults.map(r => r.status === 'fulfilled' ? r.value : null));
     if (i + concurrency < items.length) {
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 100));
     }
   }
   return results;
 }
 
 export async function getMultipleQuotes(symbols: string[]) {
-  const results = await batchConcurrent(symbols, s => getQuote(s), 5);
+  const results = await batchConcurrent(symbols, s => getQuote(s), 10);
   return results.filter(Boolean);
 }
 
@@ -140,7 +140,7 @@ export async function getMultipleHistories(symbols: string[], range: string = '1
       }
     } catch {}
     return null;
-  }, 5);
+  }, 10);
   return results;
 }
 
@@ -390,9 +390,12 @@ async function getYahooAuth(): Promise<{ crumb: string; cookie: string } | null>
   return null;
 }
 
-async function fetchCustomScreenerPage(offset: number, size: number): Promise<any[]> {
+async function fetchCustomScreenerPage(offset: number, size: number, retryCount: number = 0): Promise<any[]> {
   const auth = await getYahooAuth();
-  if (!auth) return [];
+  if (!auth) {
+    console.error(`[yahoo] Custom screener: no auth available`);
+    return [];
+  }
 
   const payload = {
     offset,
@@ -428,13 +431,24 @@ async function fetchCustomScreenerPage(offset: number, size: number): Promise<an
 
     if (!resp.ok) {
       console.error(`[yahoo] Custom screener HTTP ${resp.status} at offset ${offset}`);
+      if ((resp.status === 401 || resp.status === 403) && retryCount < 2) {
+        cachedYahooAuth = null;
+        await new Promise(r => setTimeout(r, 1000));
+        return fetchCustomScreenerPage(offset, size, retryCount + 1);
+      }
       return [];
     }
     const json = await resp.json() as any;
     const quotes = json?.finance?.result?.[0]?.quotes;
     if (Array.isArray(quotes)) return quotes;
+    console.error(`[yahoo] Custom screener unexpected response structure at offset ${offset}`);
   } catch (e: any) {
     console.error(`[yahoo] Custom screener error at offset ${offset}:`, e.message);
+    if (retryCount < 2) {
+      cachedYahooAuth = null;
+      await new Promise(r => setTimeout(r, 2000));
+      return fetchCustomScreenerPage(offset, size, retryCount + 1);
+    }
   }
 
   return [];
@@ -445,48 +459,59 @@ export async function getAllUSEquities(): Promise<any[]> {
   const cached = getCached<any[]>(key);
   if (cached) return cached;
 
-  try {
-    const pageSize = 250;
-    const allQuotes: any[] = [];
-    let offset = 0;
-    const maxPages = 12;
-
-    for (let page = 0; page < maxPages; page++) {
-      const quotes = await fetchCustomScreenerPage(offset, pageSize);
-      if (!quotes || quotes.length === 0) break;
-
-      for (const q of quotes) {
-        if (q.symbol && !q.symbol.includes('.')) {
-          allQuotes.push({
-            symbol: q.symbol,
-            price: q.regularMarketPrice ?? 0,
-            change: q.regularMarketChange ?? 0,
-            changePercent: q.regularMarketChangePercent ?? 0,
-            volume: q.regularMarketVolume ?? 0,
-            marketCap: q.marketCap ?? 0,
-            week52High: q.fiftyTwoWeekHigh ?? 0,
-            week52Low: q.fiftyTwoWeekLow ?? 0,
-            fiftyDayAverage: q.fiftyDayAverage ?? 0,
-            twoHundredDayAverage: q.twoHundredDayAverage ?? 0,
-            avgVolume: q.averageDailyVolume3Month ?? 0,
-          });
-        }
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      if (attempt > 0) {
+        console.log(`[yahoo] Custom screener retry attempt ${attempt + 1}...`);
+        cachedYahooAuth = null;
+        await new Promise(r => setTimeout(r, 2000 * attempt));
       }
 
-      offset += pageSize;
-      if (quotes.length < pageSize) break;
-    }
+      const pageSize = 250;
+      const allQuotes: any[] = [];
+      let offset = 0;
+      const maxPages = 12;
 
-    console.log(`[yahoo] Custom screener fetched ${allQuotes.length} US equities ($1B+ market cap)`);
+      for (let page = 0; page < maxPages; page++) {
+        const quotes = await fetchCustomScreenerPage(offset, pageSize);
+        if (!quotes || quotes.length === 0) break;
 
-    if (allQuotes.length > 0) {
-      setCache(key, allQuotes, 1800);
+        for (const q of quotes) {
+          if (q.symbol && !q.symbol.includes('.')) {
+            allQuotes.push({
+              symbol: q.symbol,
+              price: q.regularMarketPrice ?? 0,
+              change: q.regularMarketChange ?? 0,
+              changePercent: q.regularMarketChangePercent ?? 0,
+              volume: q.regularMarketVolume ?? 0,
+              marketCap: q.marketCap ?? 0,
+              week52High: q.fiftyTwoWeekHigh ?? 0,
+              week52Low: q.fiftyTwoWeekLow ?? 0,
+              fiftyDayAverage: q.fiftyDayAverage ?? 0,
+              twoHundredDayAverage: q.twoHundredDayAverage ?? 0,
+              avgVolume: q.averageDailyVolume3Month ?? 0,
+            });
+          }
+        }
+
+        offset += pageSize;
+        if (quotes.length < pageSize) break;
+      }
+
+      console.log(`[yahoo] Custom screener fetched ${allQuotes.length} US equities ($1B+ market cap)`);
+
+      if (allQuotes.length > 0) {
+        setCache(key, allQuotes, 1800);
+        return allQuotes;
+      }
+
+      if (attempt < 2) continue;
+    } catch (e: any) {
+      console.error('Yahoo custom screener error:', e.message);
+      if (attempt < 2) continue;
     }
-    return allQuotes;
-  } catch (e: any) {
-    console.error('Yahoo custom screener error:', e.message);
-    return [];
   }
+  return [];
 }
 
 export async function getBroadMarketData(): Promise<{
