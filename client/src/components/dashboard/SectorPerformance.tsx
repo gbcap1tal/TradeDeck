@@ -48,7 +48,10 @@ export function SectorPerformance() {
     );
   }
 
-  const industries = Array.isArray(data?.industries) ? data.industries : [];
+  const allIndustries = Array.isArray(data?.industries) ? data.industries : [];
+  const industries = allIndustries.filter((ind: any) =>
+    ind.hasETF || ind.dailyChange !== 0 || ind.weeklyChange !== 0 || ind.monthlyChange !== 0
+  );
 
   const getChange = (ind: any, tf: Timeframe) => {
     if (tf === 'W') return ind.weeklyChange ?? 0;

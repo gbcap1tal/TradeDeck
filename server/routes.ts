@@ -128,7 +128,9 @@ async function computeIndustryPerformance(finvizData: FinvizSectorData | null = 
     };
   });
 
-  return { industries };
+  const hasNonEtfData = industries.some(ind => !ind.hasETF && (ind.dailyChange !== 0 || ind.weeklyChange !== 0 || ind.monthlyChange !== 0));
+  const fullyEnriched = !etfOnly && hasNonEtfData;
+  return { industries, fullyEnriched };
 }
 
 const RRG_SECTOR_ETFS = [
