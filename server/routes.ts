@@ -7,7 +7,7 @@ import * as yahoo from "./api/yahoo";
 import * as fmp from "./api/fmp";
 import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP, INDUSTRY_STOCKS } from "./data/sectors";
-import { getFinvizData, mergeStockLists, getFinvizNamesForIndustry, type FinvizSectorData } from "./api/finviz";
+import { getFinvizData, mergeStockLists, getStocksForIndustry, type FinvizSectorData } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData } from "./api/breadth";
 import * as fs from 'fs';
 import * as path from 'path';
@@ -35,32 +35,20 @@ function loadPersistedIndustryPerf(): any | null {
   return null;
 }
 
-function getEnrichedStocksSync(industryName: string, finvizData: FinvizSectorData | null): Array<{ symbol: string; name: string }> {
+function getEnrichedStocks(industryName: string): Array<{ symbol: string; name: string }> {
   const hardcoded = INDUSTRY_STOCKS[industryName] || [];
-  if (!finvizData) return hardcoded;
-
-  const finvizNames = getFinvizNamesForIndustry(industryName);
-  let allFinvizStocks: Array<{ symbol: string; name: string }> = [];
-
-  for (const sectorData of Object.values(finvizData)) {
-    for (const [finvizIndustry, stocks] of Object.entries(sectorData.stocks)) {
-      if (finvizNames.includes(finvizIndustry) || finvizIndustry === industryName) {
-        allFinvizStocks = allFinvizStocks.concat(stocks);
-      }
-    }
-  }
-
-  return mergeStockLists(hardcoded, allFinvizStocks);
+  const finvizStocks = getStocksForIndustry(industryName);
+  return mergeStockLists(hardcoded, finvizStocks.length > 0 ? finvizStocks : undefined);
 }
 
-async function computeSectorsData(finvizData: FinvizSectorData | null = null): Promise<any[]> {
+async function computeSectorsData(): Promise<any[]> {
   const data = await yahoo.getSectorETFs();
   if (!data || data.length === 0) return [];
 
   const withIndustries = data.map((sector: any) => {
     const config = SECTORS_DATA.find(s => s.name === sector.name);
     const industries = (config?.industries || []).map((ind: string) => {
-      const enriched = getEnrichedStocksSync(ind, finvizData);
+      const enriched = getEnrichedStocks(ind);
       return { name: ind, changePercent: 0, stockCount: enriched.length, rs: 0 };
     });
     return { ...sector, industries };
@@ -69,12 +57,12 @@ async function computeSectorsData(finvizData: FinvizSectorData | null = null): P
   return withIndustries;
 }
 
-async function computeIndustryPerformance(finvizData: FinvizSectorData | null = null, etfOnly: boolean = false): Promise<any> {
+async function computeIndustryPerformance(etfOnly: boolean = false): Promise<any> {
   const allIndustries: Array<{ name: string; sector: string; etf: string | null; fallbackSymbols: string[]; enrichedCount: number }> = [];
   for (const sector of SECTORS_DATA) {
     for (const ind of sector.industries) {
       const etf = INDUSTRY_ETF_MAP[ind] || null;
-      const enrichedStocks = getEnrichedStocksSync(ind, finvizData);
+      const enrichedStocks = getEnrichedStocks(ind);
       const fallbackSymbols = (etf || etfOnly) ? [] : enrichedStocks.slice(0, 10).map(s => s.symbol);
       allIndustries.push({
         name: ind,
@@ -325,7 +313,7 @@ function initBackgroundTasks() {
     const fastTasks = Promise.allSettled([
       (async () => {
         console.log('[bg] Pre-computing sectors data (without Finviz)...');
-        const sectors = await computeSectorsData(null);
+        const sectors = await computeSectorsData();
         setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
         console.log(`[bg] Sectors pre-computed: ${sectors.length} sectors in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
       })(),
@@ -336,7 +324,7 @@ function initBackgroundTasks() {
           console.log(`[bg] Industry performance loaded from file: ${persistedPerf.industries?.length} industries (instant)`);
         } else {
           console.log('[bg] Pre-computing industry performance (ETF-only fast mode)...');
-          const perfData = await computeIndustryPerformance(null, true);
+          const perfData = await computeIndustryPerformance(true);
           setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
           console.log(`[bg] Industry performance pre-computed: ${perfData.industries?.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
         }
@@ -373,8 +361,8 @@ function initBackgroundTasks() {
             console.log(`[bg] Finviz complete: ${Object.keys(finvizData).length} sectors, ${totalStocks} stocks in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
 
             const [sectors2, perfData2] = await Promise.all([
-              computeSectorsData(finvizData),
-              computeIndustryPerformance(finvizData),
+              computeSectorsData(),
+              computeIndustryPerformance(),
             ]);
             setCache('sectors_data', sectors2, CACHE_TTL.SECTORS);
             setCache('industry_perf_all', perfData2, CACHE_TTL.INDUSTRY_PERF);
@@ -400,13 +388,11 @@ function initBackgroundTasks() {
   }, 1000);
 
   setInterval(() => {
-    const cachedFinviz = getCached<FinvizSectorData>('finviz_sector_data') || null;
-    backgroundRefresh('sectors_data', () => computeSectorsData(cachedFinviz), CACHE_TTL.SECTORS);
+    backgroundRefresh('sectors_data', () => computeSectorsData(), CACHE_TTL.SECTORS);
   }, CACHE_TTL.SECTORS * 1000);
 
   setInterval(() => {
-    const cachedFinviz = getCached<FinvizSectorData>('finviz_sector_data') || null;
-    backgroundRefresh('industry_perf_all', () => computeIndustryPerformance(cachedFinviz), CACHE_TTL.INDUSTRY_PERF);
+    backgroundRefresh('industry_perf_all', () => computeIndustryPerformance(), CACHE_TTL.INDUSTRY_PERF);
   }, CACHE_TTL.INDUSTRY_PERF * 1000);
 
   setInterval(() => {
@@ -565,8 +551,6 @@ export async function registerRoutes(
       return res.status(404).json({ message: "Sector not found" });
     }
 
-    const finvizData = await getFinvizData().catch(() => null);
-
     let sectorQuote: any = null;
     try {
       sectorQuote = await yahoo.getQuote(sectorConfig.ticker);
@@ -586,7 +570,7 @@ export async function registerRoutes(
 
     const enrichedIndustryStocks: Record<string, Array<{ symbol: string; name: string }>> = {};
     for (const ind of sectorConfig.industries) {
-      enrichedIndustryStocks[ind] = getEnrichedStocksSync(ind, finvizData);
+      enrichedIndustryStocks[ind] = getEnrichedStocks(ind);
     }
 
     const etfSymbols: string[] = [];
@@ -649,8 +633,7 @@ export async function registerRoutes(
       return res.status(404).json({ message: "Industry not found" });
     }
 
-    const finvizData = await getFinvizData().catch(() => null);
-    const stockDefs = getEnrichedStocksSync(industryName, finvizData);
+    const stockDefs = getEnrichedStocks(industryName);
     const symbols = stockDefs.map(s => s.symbol);
 
     let quotes: any[] = [];

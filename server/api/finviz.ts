@@ -1,7 +1,10 @@
 import * as cheerio from 'cheerio';
 import { getCached, setCache } from './cache';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const FINVIZ_CACHE_TTL = 86400; // 24 hours
+const FINVIZ_PERSIST_PATH = path.join(process.cwd(), '.finviz-cache.json');
 const REQUEST_DELAY = 100; // ms between requests within a sector
 const CONCURRENT_SECTORS = 4; // number of sectors to scrape in parallel
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -28,6 +31,26 @@ export interface FinvizSectorData {
 }
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+function persistFinvizToFile(data: FinvizSectorData): void {
+  try {
+    fs.writeFileSync(FINVIZ_PERSIST_PATH, JSON.stringify({ data, savedAt: Date.now() }), 'utf-8');
+  } catch {}
+}
+
+function loadPersistedFinviz(): FinvizSectorData | null {
+  try {
+    if (!fs.existsSync(FINVIZ_PERSIST_PATH)) return null;
+    const raw = JSON.parse(fs.readFileSync(FINVIZ_PERSIST_PATH, 'utf-8'));
+    if (raw?.data && raw.savedAt) {
+      const ageHours = (Date.now() - raw.savedAt) / (1000 * 60 * 60);
+      if (ageHours < 48) {
+        return raw.data as FinvizSectorData;
+      }
+    }
+  } catch {}
+  return null;
+}
 
 async function fetchPage(url: string): Promise<string | null> {
   try {
@@ -196,6 +219,12 @@ export async function getFinvizData(): Promise<FinvizSectorData | null> {
   const cached = getCached<FinvizSectorData>(cacheKey);
   if (cached) return cached;
 
+  const persisted = loadPersistedFinviz();
+  if (persisted) {
+    setCache(cacheKey, persisted, FINVIZ_CACHE_TTL);
+    return persisted;
+  }
+
   if (scrapeInProgress && scrapePromise) {
     return scrapePromise;
   }
@@ -218,6 +247,7 @@ export async function getFinvizData(): Promise<FinvizSectorData | null> {
       
       console.log(`[finviz] Organized: ${sectorCount} sectors, ${industryCount} industries, ${stocks.length} stocks`);
       setCache(cacheKey, organized, FINVIZ_CACHE_TTL);
+      persistFinvizToFile(organized);
       return organized;
     } catch (err: any) {
       console.log(`[finviz] Scrape failed: ${err.message}`);
@@ -424,4 +454,36 @@ export function getIndustryNameMapping(finvizIndustry: string): string | null {
 export function getFinvizNamesForIndustry(ourIndustryName: string): string[] {
   const reverseMap = buildReverseMap();
   return reverseMap[ourIndustryName] || [];
+}
+
+export function getFinvizDataSync(): FinvizSectorData | null {
+  const cached = getCached<FinvizSectorData>('finviz_sector_data');
+  if (cached) return cached;
+  return loadPersistedFinviz();
+}
+
+export function getStocksForIndustry(ourIndustryName: string): Array<{ symbol: string; name: string }> {
+  const data = getFinvizDataSync();
+  if (!data) return [];
+
+  const finvizNames = getFinvizNamesForIndustry(ourIndustryName);
+  if (finvizNames.length === 0) return [];
+
+  const seen = new Set<string>();
+  const result: Array<{ symbol: string; name: string }> = [];
+
+  for (const sector of Object.values(data)) {
+    for (const finvizName of finvizNames) {
+      const stocks = sector.stocks[finvizName];
+      if (!stocks) continue;
+      for (const stock of stocks) {
+        if (!seen.has(stock.symbol)) {
+          seen.add(stock.symbol);
+          result.push(stock);
+        }
+      }
+    }
+  }
+
+  return result;
 }

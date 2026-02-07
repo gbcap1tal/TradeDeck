@@ -1,4 +1,3 @@
-import { SP500_TICKERS } from '../data/sp500';
 import * as yahoo from './yahoo';
 import { getCached, setCache, CACHE_TTL } from './cache';
 import * as fs from 'fs';
@@ -327,16 +326,9 @@ export async function computeQuarterlyBreadth(): Promise<{
   twentyFivePercent: { value: number; bulls: number; bears: number; score: number; max: number };
 }> {
   const broadData = await yahoo.getBroadMarketData();
-  const allSymbols = broadData.universe
+  const tickers = broadData.universe
     .filter((s: any) => s && s.symbol && s.marketCap >= 1e9)
     .map((s: any) => s.symbol);
-
-  const tickerSet = new Set<string>(allSymbols);
-  for (const t of SP500_TICKERS) {
-    tickerSet.add(t);
-  }
-
-  const tickers = Array.from(tickerSet);
   console.log(`[breadth] 25% quarterly: scanning ${tickers.length} stocks for history`);
 
   const batchSize = 50;
