@@ -42,6 +42,9 @@ export async function getQuote(symbol: string) {
       week52High: result.fiftyTwoWeekHigh ?? 0,
       week52Low: result.fiftyTwoWeekLow ?? 0,
       avgVolume: result.averageDailyVolume3Month ?? 0,
+      fiftyDayAverage: result.fiftyDayAverage ?? 0,
+      twoHundredDayAverage: result.twoHundredDayAverage ?? 0,
+      avgVolume10Day: (result as any).averageDailyVolume10Day ?? 0,
     };
 
     setCache(key, data, CACHE_TTL.QUOTE);

@@ -37,7 +37,7 @@ Preferred communication style: Simple, everyday language.
 - **Framework**: Express.js with TypeScript, run via `tsx`
 - **Entry point**: `server/index.ts` creates HTTP server, registers routes, serves static in production or Vite dev middleware in development
 - **API prefix**: All API routes start with `/api/`
-- **Data**: Live data from Yahoo Finance and FMP APIs via `server/api/yahoo.ts` and `server/api/fmp.ts`. Sectors and industries use hardcoded mappings in `server/routes.ts` enriched with real ETF quotes. Market breadth still uses simulated data.
+- **Data**: Live data from Yahoo Finance and FMP APIs via `server/api/yahoo.ts` and `server/api/fmp.ts`. Sectors and industries use hardcoded mappings in `server/routes.ts` enriched with real ETF quotes. Market Quality Score uses real S&P 500 breadth analysis via `server/api/breadth.ts`.
 - **Build**: Custom build script at `script/build.ts` using esbuild for server and Vite for client. Production output goes to `dist/`.
 
 ### API Route Structure
@@ -45,7 +45,7 @@ Preferred communication style: Simple, everyday language.
 - `GET /api/market/sectors` — Sector performance data
 - `GET /api/market/sectors/rotation` — RRG (Relative Rotation Graph) data: RS-Ratio & RS-Momentum for 11 sector ETFs vs SPY with 5-point weekly tails
 - `GET /api/market/industries/performance` — Top/bottom industry performance with D/W/M timeframes
-- `GET /api/market/breadth` — Market breadth indicators (simulated)
+- `GET /api/market/breadth` — Market Quality Score with 4-tier scoring (Trend 40pts, Momentum 25pts, Breadth 20pts, Strength 15pts), two-phase loading (trend-only fast → full S&P 500 scan)
 - `GET /api/market/status` — Market open/close status
 - `GET /api/market/sectors/:name` — Sector detail with industries
 - `GET /api/market/sectors/:name/industries/:industry` — Industry stocks
@@ -113,4 +113,4 @@ Preferred communication style: Simple, everyday language.
 - **Financial Modeling Prep** (via REST API, `FMP_KEY` secret): Quarterly income statements, cash flow statements, company profiles. Free tier limited to 250 req/day, max 5 records per query. Uses stable API (`/stable/` endpoints).
 - **Alpha Vantage** (`ALPHA_VANTAGE_KEY` secret): Reserved for future use. 25 req/day limit.
 - **Caching**: In-memory TTL cache in `server/api/cache.ts` with varying TTLs (quotes: 60s, history: 300s, fundamentals: 3600s, profile: 86400s).
-- **Market breadth data** is still simulated (no free API available for advance/decline data).
+- **Market breadth data** uses real S&P 500 scan via Yahoo Finance for all indicators (trend status, 4% movers, 25% quarterly, MA percentages, 52-week highs/lows, VIX). Two-phase loading: fast trend-only (~10s) then full 500-stock scan in background.

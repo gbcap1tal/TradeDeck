@@ -54,12 +54,17 @@ export function useSectorRotation() {
 export function useMarketBreadth() {
   return useQuery({
     queryKey: ['/api/market/breadth'],
-    queryFn: async () => {
-      const res = await fetch('/api/market/breadth', { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch breadth");
-      return res.json();
+    queryFn: () => fetchWithWarmingRetry('/api/market/breadth'),
+    refetchInterval: (query) => {
+      const data = query.state.data as any;
+      if (data && !data.fullyEnriched) return 10000;
+      return 120000;
     },
-    refetchInterval: 60000,
+    retry: (failureCount, error) => {
+      if (error?.message === "Data warming up") return failureCount < 60;
+      return false;
+    },
+    retryDelay: 5000,
   });
 }
 

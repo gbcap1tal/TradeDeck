@@ -8,6 +8,7 @@ import * as fmp from "./api/fmp";
 import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP, INDUSTRY_STOCKS } from "./data/sectors";
 import { getFinvizData, mergeStockLists, getFinvizNamesForIndustry, type FinvizSectorData } from "./api/finviz";
+import { computeMarketBreadth } from "./api/breadth";
 
 function getEnrichedStocksSync(industryName: string, finvizData: FinvizSectorData | null): Array<{ symbol: string; name: string }> {
   const hardcoded = INDUSTRY_STOCKS[industryName] || [];
@@ -311,34 +312,56 @@ function initBackgroundTasks() {
         setCache('rrg_rotation', rotData, CACHE_TTL.SECTORS);
         console.log(`[bg] Rotation pre-computed: ${rotData.sectors?.length} sectors in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
       })(),
+      (async () => {
+        console.log('[bg] Pre-computing breadth (trend-only fast mode)...');
+        const breadthFast = await computeMarketBreadth(false);
+        setCache('market_breadth', breadthFast, CACHE_TTL.BREADTH);
+        console.log(`[bg] Breadth trend-only pre-computed: score=${breadthFast.overallScore} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+      })(),
     ]);
 
     await fastTasks;
     console.log(`[bg] Fast data ready in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
 
-    try {
-      console.log('[bg] Pre-computing Finviz data (background enrichment)...');
-      const finvizData = await getFinvizData();
-      if (finvizData) {
-        let totalStocks = 0;
-        for (const s of Object.values(finvizData)) {
-          for (const stocks of Object.values(s.stocks)) {
-            totalStocks += stocks.length;
-          }
-        }
-        console.log(`[bg] Finviz complete: ${Object.keys(finvizData).length} sectors, ${totalStocks} stocks in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+    const enrichmentTasks = [
+      (async () => {
+        try {
+          console.log('[bg] Pre-computing Finviz data (background enrichment)...');
+          const finvizData = await getFinvizData();
+          if (finvizData) {
+            let totalStocks = 0;
+            for (const s of Object.values(finvizData)) {
+              for (const stocks of Object.values(s.stocks)) {
+                totalStocks += stocks.length;
+              }
+            }
+            console.log(`[bg] Finviz complete: ${Object.keys(finvizData).length} sectors, ${totalStocks} stocks in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
 
-        const [sectors2, perfData2] = await Promise.all([
-          computeSectorsData(finvizData),
-          computeIndustryPerformance(finvizData),
-        ]);
-        setCache('sectors_data', sectors2, CACHE_TTL.SECTORS);
-        setCache('industry_perf_all', perfData2, CACHE_TTL.INDUSTRY_PERF);
-        console.log(`[bg] Enriched data updated with Finviz in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
-      }
-    } catch (err: any) {
-      console.log(`[bg] Finviz enrichment error: ${err.message}`);
-    }
+            const [sectors2, perfData2] = await Promise.all([
+              computeSectorsData(finvizData),
+              computeIndustryPerformance(finvizData),
+            ]);
+            setCache('sectors_data', sectors2, CACHE_TTL.SECTORS);
+            setCache('industry_perf_all', perfData2, CACHE_TTL.INDUSTRY_PERF);
+            console.log(`[bg] Enriched data updated with Finviz in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+          }
+        } catch (err: any) {
+          console.log(`[bg] Finviz enrichment error: ${err.message}`);
+        }
+      })(),
+      (async () => {
+        try {
+          console.log('[bg] Computing full market breadth (S&P 500 scan)...');
+          const breadthFull = await computeMarketBreadth(true);
+          setCache('market_breadth', breadthFull, CACHE_TTL.BREADTH);
+          console.log(`[bg] Full breadth computed: score=${breadthFull.overallScore} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+        } catch (err: any) {
+          console.log(`[bg] Breadth full scan error: ${err.message}`);
+        }
+      })(),
+    ];
+
+    await Promise.allSettled(enrichmentTasks);
   }, 1000);
 
   setInterval(() => {
@@ -354,6 +377,10 @@ function initBackgroundTasks() {
   setInterval(() => {
     backgroundRefresh('rrg_rotation', computeRotationData, CACHE_TTL.SECTORS);
   }, CACHE_TTL.SECTORS * 1000);
+
+  setInterval(() => {
+    backgroundRefresh('market_breadth', () => computeMarketBreadth(true), CACHE_TTL.BREADTH);
+  }, CACHE_TTL.BREADTH * 1000);
 }
 
 function seededRandom(seed: string) {
@@ -433,17 +460,19 @@ export async function registerRoutes(
     res.status(202).json({ _warming: true, industries: [] });
   });
 
-  app.get('/api/market/breadth', (req, res) => {
-    const day = new Date().toISOString().split('T')[0];
-    res.json({
-      advanceDeclineRatio: Math.round((1 + seededRandom(day + 'ad') * 1.5) * 100) / 100,
-      newHighs: Math.floor(50 + seededRandom(day + 'nh') * 150),
-      newLows: Math.floor(10 + seededRandom(day + 'nl') * 60),
-      above50MA: Math.round((50 + seededRandom(day + '50ma') * 40) * 10) / 10,
-      above200MA: Math.round((40 + seededRandom(day + '200ma') * 45) * 10) / 10,
-      upVolume: Math.round((40 + seededRandom(day + 'uv') * 35) * 10) / 10,
-      downVolume: Math.round((20 + seededRandom(day + 'dv') * 30) * 10) / 10,
-    });
+  app.get('/api/market/breadth', async (req, res) => {
+    const cacheKey = 'market_breadth';
+    const cached = getCached<any>(cacheKey);
+    if (cached) return res.json(cached);
+
+    const stale = getStale<any>(cacheKey);
+    if (stale) {
+      backgroundRefresh(cacheKey, () => computeMarketBreadth(true), CACHE_TTL.BREADTH || 1800);
+      return res.json(stale);
+    }
+
+    backgroundRefresh(cacheKey, () => computeMarketBreadth(true), CACHE_TTL.BREADTH || 1800);
+    res.status(202).json({ _warming: true });
   });
 
   app.get('/api/market/status', (req, res) => {

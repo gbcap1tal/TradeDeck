@@ -1,0 +1,353 @@
+🎯 PROMPT DETTAGLIATO PER REPLIT - MARKET QUALITY SCORE DASHBOARD
+Basandomi sullo stile della tua app (dark theme, card compatte, colori green/red), ecco il prompt completo per Replit:
+
+📋 PROMPT PER REPLIT AGENT
+Create a Market Quality Score dashboard component for a financial web app with the following specifications:
+
+=== VISUAL STYLE ===
+- Dark theme (background: #0a0a0a to #1a1a1a)
+- Card-based layout with rounded corners and subtle borders
+- Color scheme:
+  * Green (#22c55e) for bullish/positive
+  * Red (#ef4444) for bearish/negative
+  * Yellow/Amber (#f59e0b) for neutral/warning
+  * Gray (#6b7280) for secondary text
+- Typography: Clean sans-serif, numbers should be prominent
+- Compact design to fit between "Market Indices" and "Market Heatmap" sections
+
+=== LAYOUT STRUCTURE ===
+
+The dashboard should have 3 main sections arranged horizontally:
+
+1. LEFT SECTION (30% width): Overall Score Card
+   - Large centered score number (0-100) with circular progress indicator
+   - Score interpretation text below (EXCELLENT/GOOD/FAIR/WEAK/POOR/CRITICAL)
+   - Color-coded based on score ranges
+   - Small trend indicator (↑↓→) showing 5-day change
+
+2. MIDDLE SECTION (40% width): Tier Breakdown - 4 horizontal bars
+   Each bar shows:
+   - Tier name and weight (e.g., "TREND STATUS 40%")
+   - Horizontal progress bar with current score
+   - Score fraction (e.g., "32.5/40")
+   - Percentage (e.g., "81%")
+   - Color gradient based on performance
+   
+   The 4 tiers are:
+   - Tier 1: Trend Status (40 points)
+   - Tier 2: Momentum Breadth (25 points)
+   - Tier 3: Intermediate Breadth (20 points)
+   - Tier 4: Strength Indicators (15 points)
+
+3. RIGHT SECTION (30% width): Component Grid
+   - 3x3 grid of mini-cards showing individual components
+   - Each card displays:
+     * Component name (small text)
+     * Current value (prominent)
+     * Status indicator (🟢🟡🔴 or T+/TS/T-)
+     * Mini score bar or percentage
+   
+   Components to display:
+   Row 1: SPY, QQQ, IWM (trend indicators)
+   Row 2: 4% Ratio, 25% Ratio, VIX
+   Row 3: >50MA%, >200MA%, 52w Highs
+
+=== DETAILED COMPONENT SPECIFICATIONS ===
+
+OVERALL SCORE CARD:
+- Circular progress ring (similar to Apple Watch style)
+- Score number: 48-60px font size, bold
+- Ring colors:
+  * 90-100: Bright green (#22c55e)
+  * 75-89: Green (#16a34a)
+  * 60-74: Yellow (#f59e0b)
+  * 45-59: Orange (#f97316)
+  * 30-44: Red (#ef4444)
+  * 0-29: Dark red (#dc2626)
+- Status text: 14px, uppercase, letter-spacing
+- Trend arrow with 5-day change: "+3 ↑" or "-2 ↓"
+
+TIER BREAKDOWN BARS:
+- Height: 50-60px each
+- Spacing: 12px between bars
+- Structure per bar:
+  * Top row: Tier name (left) + Score fraction (right)
+  * Bottom row: Horizontal progress bar (full width)
+  * Progress bar should have:
+    - Background: dark gray (#374151)
+    - Fill: gradient based on percentage
+    - Height: 8-10px
+    - Rounded corners
+    - Smooth animation on load
+
+COMPONENT MINI-CARDS:
+- Size: ~80-100px square
+- Padding: 12px
+- Border: 1px solid #374151
+- Hover effect: slight scale and border color change
+- Layout per card:
+  * Top: Component abbreviation (10px, gray)
+  * Middle: Value (18-20px, bold, colored)
+  * Bottom: Status indicator (emoji or badge)
+
+=== DATA STRUCTURE ===
+
+The component should accept a data object with this structure:
+
+{
+  "overall_score": 82,
+  "score_change_5d": 3,
+  "status": "GOOD",
+  "tiers": {
+    "trend": {
+      "score": 32.5,
+      "max": 40,
+      "percentage": 81,
+      "components": {
+        "SPY": {"status": "T+", "score": 10, "max": 10},
+        "QQQ": {"status": "T+", "score": 10, "max": 10},
+        "IWM": {"status": "TS", "score": 3.5, "max": 7},
+        "MDY": {"status": "T+", "score": 6, "max": 6},
+        "TLT": {"status": "T-", "score": 0, "max": 4},
+        "VIX": {"status": "T-", "score": 3, "max": 3}
+      }
+    },
+    "momentum": {
+      "score": 21,
+      "max": 25,
+      "percentage": 84,
+      "components": {
+        "4_percent_ratio": {"value": 2.95, "bulls": 127, "bears": 43, "score": 12, "max": 15},
+        "25_percent_ratio": {"value": 3.84, "bulls": 342, "bears": 89, "score": 9, "max": 10}
+      }
+    },
+    "breadth": {
+      "score": 16,
+      "max": 20,
+      "percentage": 80,
+      "components": {
+        "above_50ma": {"value": 62, "score": 8, "max": 10},
+        "above_200ma": {"value": 58, "score": 8, "max": 10}
+      }
+    },
+    "strength": {
+      "score": 12.5,
+      "max": 15,
+      "percentage": 83,
+      "components": {
+        "net_highs_52w": {"value": 87, "score": 6, "max": 8},
+        "vix_level": {"value": 16.5, "score": 6.5, "max": 7}
+      }
+    }
+  }
+}
+
+=== SCORING LOGIC ===
+
+Implement these scoring rules:
+
+TIER 1 - TREND STATUS (40 points):
+- SPY: 10 points (T+=100%, TS=50%, T-=0%)
+- QQQ: 10 points (T+=100%, TS=50%, T-=0%)
+- IWM: 7 points (T+=100%, TS=50%, T-=0%)
+- MDY: 6 points (T+=100%, TS=50%, T-=0%)
+- TLT: 4 points (T+=100%, TS=50%, T-=0%)
+- VIX: 3 points (T+=100%, TS=50%, T-=0%)
+
+Trend calculation:
+- T+ if: EMA5 > EMA9 AND EMA9 > SMA21
+- T- if: EMA5 < EMA9 AND EMA9 < SMA21
+- TS: all other cases
+
+TIER 2 - MOMENTUM BREADTH (25 points):
+4% Ratio (15 points):
+- ≥3.0: 15pts | 2.0-3.0: 12pts | 1.5-2.0: 9pts | 1.0-1.5: 7pts
+- 0.67-1.0: 5pts | 0.5-0.67: 3pts | 0.33-0.5: 1pt | <0.33: 0pts
+
+25% Ratio (10 points):
+- ≥4.0: 10pts | 3.0-4.0: 8pts | 2.0-3.0: 6pts | 1.0-2.0: 4pts
+- 0.5-1.0: 2pts | <0.5: 0pts
+
+TIER 3 - INTERMEDIATE BREADTH (20 points):
+% Above 50 SMA (10 points):
+- ≥70%: 10pts | 60-70%: 8pts | 50-60%: 6pts | 40-50%: 4pts
+- 30-40%: 2pts | <30%: 0pts
+
+% Above 200 SMA (10 points):
+- ≥65%: 10pts | 55-65%: 8pts | 45-55%: 5pts | 35-45%: 3pts
+- 25-35%: 1pt | <25%: 0pts
+
+TIER 4 - STRENGTH INDICATORS (15 points):
+52-Week Net Highs (8 points):
+- ≥+150: 8pts | +75 to +150: 6pts | +25 to +75: 4pts
+- -25 to +25: 2pts | -75 to -25: 1pt | <-75: 0pts
+
+VIX Level (7 points):
+- <15: 7pts | 15-20: 5pts | 20-25: 3pts | 25-30: 1pt | >30: 0pts
+
+=== DATA CALCULATION FUNCTIONS ===
+
+Create Python functions to calculate each metric using yfinance:
+
+1. calculate_trend_status(ticker) -> returns 'T+', 'TS', or 'T-'
+2. calculate_4_percent_movers() -> returns (bulls_count, bears_count, ratio)
+3. calculate_25_percent_quarterly() -> returns (bulls_count, bears_count, ratio)
+4. calculate_percent_above_sma(period) -> returns percentage (0-100)
+5. calculate_52week_net_highs() -> returns net_highs integer
+6. get_vix_level() -> returns VIX current value
+
+Use S&P 500 constituents for breadth calculations.
+Cache data for 30 minutes to avoid excessive API calls.
+Update during market hours: 9:30 AM - 4:00 PM ET.
+
+=== INTERACTIVE FEATURES ===
+
+1. Hover Effects:
+   - Mini-cards: show detailed tooltip with calculation breakdown
+   - Tier bars: show list of components contributing to score
+   - Overall score: show historical chart (last 30 days)
+
+2. Click Actions:
+   - Click on tier bar: expand to show detailed component breakdown
+   - Click on mini-card: show historical trend for that metric
+   - Click on overall score: toggle between score view and percentile view
+
+3. Animations:
+   - Progress bars: animate from 0 to current value on load (0.8s ease-out)
+   - Score ring: animate with spring effect
+   - Color transitions: smooth 0.3s transitions
+   - Number counters: count up animation for scores
+
+=== RESPONSIVE BEHAVIOR ===
+
+Desktop (>1200px): 3-column layout as described
+Tablet (768-1200px): Stack sections vertically, maintain card grid
+Mobile (<768px): Single column, simplified mini-cards (2x3 grid instead of 3x3)
+
+=== TECHNICAL REQUIREMENTS ===
+
+- Framework: React with TypeScript or Next.js
+- Styling: Tailwind CSS for consistency with existing app
+- Charts: Use recharts or lightweight SVG for circular progress
+- State Management: React hooks (useState, useEffect)
+- Data Fetching: Implement with SWR or React Query for caching
+- Backend: Python FastAPI endpoint that returns the data structure
+- Database: SQLite to store historical scores for trending
+
+=== API ENDPOINT STRUCTURE ===
+
+GET /api/market-quality-score
+Response:
+{
+  "timestamp": "2026-02-07T14:30:00Z",
+  "market_status": "open",
+  "data": { ... data structure as defined above ... },
+  "last_updated": "2026-02-07T14:29:45Z",
+  "next_update": "2026-02-07T15:00:00Z"
+}
+
+=== ACCESSIBILITY ===
+
+- ARIA labels for all interactive elements
+- Keyboard navigation support
+- Screen reader friendly descriptions
+- Color blind friendly (use patterns in addition to colors)
+- High contrast mode support
+
+=== PERFORMANCE ===
+
+- Lazy load historical data
+- Memoize expensive calculations
+- Debounce hover tooltips
+- Use CSS transforms for animations (GPU accelerated)
+- Code split this component if it's large
+
+=== ERROR HANDLING ===
+
+- Show graceful fallback if data fetch fails
+- Display "Market Closed" state outside trading hours
+- Show stale data indicator if cache is >1 hour old
+- Retry logic for failed API calls (3 attempts with exponential backoff)
+
+=== ADDITIONAL FEATURES ===
+
+1. Alert System:
+   - Show warning badge if score drops >10 points in 5 days
+   - Highlight components that are in extreme zones
+   - Optional: push notifications for critical score changes
+
+2. Export Function:
+   - Button to export current snapshot as image
+   - CSV export of historical scores
+
+3. Comparison Mode:
+   - Toggle to show "vs Yesterday" or "vs Last Week"
+   - Show delta values in green/red
+
+Please implement this component following the existing app's architecture and styling patterns. Ensure it integrates seamlessly between the Market Indices section and the Market Heatmap section.
+🎨 VISUAL MOCKUP DESCRIPTION
+Dato lo stile della tua app, ecco come dovrebbe apparire:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Market Quality Score                                                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌──────────────┐  ┌────────────────────────────────┐  ┌────────────────┐ │
+│  │              │  │ TREND STATUS 40%               │  │ SPY  QQQ  IWM  │ │
+│  │      82      │  │ ████████████████░░  32.5/40    │  │ T+   T+   TS   │ │
+│  │   ◯◯◯◯◯◯     │  │                          81%   │  │ 🟢   🟢   🟡   │ │
+│  │  ◯      ◯    │  │                                │  │                │ │
+│  │  ◯  82  ◯    │  │ MOMENTUM BREADTH 25%           │  │ 4%R  25%R VIX  │ │
+│  │  ◯      ◯    │  │ ████████████████░░  21/25      │  │ 2.95 3.84 16.5 │ │
+│  │   ◯◯◯◯◯◯     │  │                          84%   │  │ 🟢   🟢   🟢   │ │
+│  │              │  │                                │  │                │ │
+│  │     GOOD     │  │ INTERMEDIATE BREADTH 20%       │  │ >50  >200 52wH │ │
+│  │   +3 ↑       │  │ ████████████████░░  16/20      │  │ 62%  58%  +87  │ │
+│  │              │  │                          80%   │  │ 🟢   🟢   🟢   │ │
+│  └──────────────┘  │                                │  └────────────────┘ │
+│                    │ STRENGTH INDICATORS 15%        │                      │
+│                    │ ████████████████░░  12.5/15    │                      │
+│                    │                          83%   │                      │
+│                    └────────────────────────────────┘                      │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+🔧 ALTERNATIVE COMPACT LAYOUT
+Se lo spazio è limitato, proponi questa versione più compatta:
+
+┌─────────────────────────────────────────────────────────────────┐
+│  Market Quality Score                                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────┐  TREND 32.5/40 ████████████░░ 81%                │
+│  │   82    │  MOMENTUM 21/25 ████████████░░ 84%                │
+│  │  GOOD   │  BREADTH 16/20 ████████████░░ 80%                 │
+│  │  +3 ↑   │  STRENGTH 12.5/15 ████████░░ 83%                  │
+│  └─────────┘                                                    │
+│                                                                 │
+│  SPY🟢 QQQ🟢 IWM🟡 │ 4%:2.95🟢 25%:3.84🟢 │ >50:62%🟢 >200:58%🟢│
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+📊 ALTERNATIVE: CARD GRID STYLE (come i tuoi indici)
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│ MARKET SCORE │ │ TREND STATUS │ │ MOMENTUM     │ │ BREADTH      │
+│              │ │              │ │              │ │              │
+│      82      │ │   32.5/40    │ │    21/25     │ │    16/20     │
+│    +3.2%     │ │    +81%      │ │    +84%      │ │    +80%      │
+│              │ │              │ │              │ │              │
+│  🟢 GOOD     │ │ SPY🟢 QQQ🟢  │ │ 4%R: 2.95    │ │ >50MA: 62%   │
+│              │ │ IWM🟡 MDY🟢  │ │ 25%R: 3.84   │ │ >200MA: 58%  │
+└──────────────┘ └──────────────┘ └──────────────┘ └──────────────┘
+💡 RACCOMANDAZIONE FINALE
+Basandomi sul tuo screenshot, ti consiglio:
+
+LAYOUT PRINCIPALE:
+
+1 riga con 4 card (stile identico ai tuoi Market Indices)
+Overall Score (82/100 + status)
+Trend Tier (con mini-indicators SPY/QQQ/IWM)
+Momentum Tier (con 4% e 25% ratios)
+Breadth+Strength Tier (combinati)
+DETTAGLI ESPANDIBILI:
+
+Click su ogni card → mostra breakdown dettagliato in un drawer/modal
+Mantiene il layout compatto ma permette drill-down

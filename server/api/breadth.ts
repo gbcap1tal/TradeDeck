@@ -1,0 +1,403 @@
+import { SP500_TICKERS } from '../data/sp500';
+import * as yahoo from './yahoo';
+import { getCached, setCache, CACHE_TTL } from './cache';
+
+const TREND_SYMBOLS = [
+  { symbol: 'SPY', label: 'SPY', maxScore: 10 },
+  { symbol: 'QQQ', label: 'QQQ', maxScore: 10 },
+  { symbol: 'IWM', label: 'IWM', maxScore: 7 },
+  { symbol: 'MDY', label: 'MDY', maxScore: 6 },
+  { symbol: 'TLT', label: 'TLT', maxScore: 4 },
+  { symbol: '^VIX', label: 'VIX', maxScore: 3 },
+];
+
+function calculateEMA(closes: number[], period: number): number[] {
+  const ema: number[] = [];
+  const multiplier = 2 / (period + 1);
+  let seed = 0;
+  for (let i = 0; i < Math.min(period, closes.length); i++) {
+    seed += closes[i];
+  }
+  seed /= Math.min(period, closes.length);
+  ema.push(seed);
+
+  for (let i = period; i < closes.length; i++) {
+    const val = (closes[i] - ema[ema.length - 1]) * multiplier + ema[ema.length - 1];
+    ema.push(val);
+  }
+  return ema;
+}
+
+function calculateSMA(closes: number[], period: number): number[] {
+  const sma: number[] = [];
+  for (let i = period - 1; i < closes.length; i++) {
+    let sum = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      sum += closes[j];
+    }
+    sma.push(sum / period);
+  }
+  return sma;
+}
+
+export function getTrendStatus(closes: number[]): 'T+' | 'TS' | 'T-' {
+  if (closes.length < 21) return 'TS';
+
+  const ema5 = calculateEMA(closes, 5);
+  const ema9 = calculateEMA(closes, 9);
+  const sma21 = calculateSMA(closes, 21);
+
+  const latestEma5 = ema5[ema5.length - 1];
+  const latestEma9 = ema9[ema9.length - 1];
+  const latestSma21 = sma21[sma21.length - 1];
+
+  if (latestEma5 > latestEma9 && latestEma9 > latestSma21) return 'T+';
+  if (latestEma5 < latestEma9 && latestEma9 < latestSma21) return 'T-';
+  return 'TS';
+}
+
+function scoreTrend(status: 'T+' | 'TS' | 'T-', maxScore: number): number {
+  if (status === 'T+') return maxScore;
+  if (status === 'TS') return maxScore * 0.5;
+  return 0;
+}
+
+function score4PercentRatio(ratio: number): number {
+  if (ratio >= 3.0) return 15;
+  if (ratio >= 2.0) return 12;
+  if (ratio >= 1.5) return 9;
+  if (ratio >= 1.0) return 7;
+  if (ratio >= 0.67) return 5;
+  if (ratio >= 0.5) return 3;
+  if (ratio >= 0.33) return 1;
+  return 0;
+}
+
+function score25PercentRatio(ratio: number): number {
+  if (ratio >= 4.0) return 10;
+  if (ratio >= 3.0) return 8;
+  if (ratio >= 2.0) return 6;
+  if (ratio >= 1.0) return 4;
+  if (ratio >= 0.5) return 2;
+  return 0;
+}
+
+function scoreAbove50MA(pct: number): number {
+  if (pct >= 70) return 10;
+  if (pct >= 60) return 8;
+  if (pct >= 50) return 6;
+  if (pct >= 40) return 4;
+  if (pct >= 30) return 2;
+  return 0;
+}
+
+function scoreAbove200MA(pct: number): number {
+  if (pct >= 65) return 10;
+  if (pct >= 55) return 8;
+  if (pct >= 45) return 5;
+  if (pct >= 35) return 3;
+  if (pct >= 25) return 1;
+  return 0;
+}
+
+function scoreNetHighs(net: number): number {
+  if (net >= 150) return 8;
+  if (net >= 75) return 6;
+  if (net >= 25) return 4;
+  if (net >= -25) return 2;
+  if (net >= -75) return 1;
+  return 0;
+}
+
+function scoreVIX(level: number): number {
+  if (level < 15) return 7;
+  if (level <= 20) return 5;
+  if (level <= 25) return 3;
+  if (level <= 30) return 1;
+  return 0;
+}
+
+function getScoreStatus(score: number): string {
+  if (score >= 90) return 'EXCELLENT';
+  if (score >= 75) return 'GOOD';
+  if (score >= 60) return 'FAIR';
+  if (score >= 45) return 'WEAK';
+  if (score >= 30) return 'POOR';
+  return 'CRITICAL';
+}
+
+function getScoreColor(score: number): string {
+  if (score >= 90) return '#22c55e';
+  if (score >= 75) return '#16a34a';
+  if (score >= 60) return '#FBBB04';
+  if (score >= 45) return '#f97316';
+  if (score >= 30) return '#ef4444';
+  return '#dc2626';
+}
+
+export interface BreadthData {
+  overallScore: number;
+  scoreChange5d: number;
+  status: string;
+  statusColor: string;
+  fullyEnriched: boolean;
+  tiers: {
+    trend: {
+      score: number;
+      max: number;
+      percentage: number;
+      components: Record<string, { status: string; score: number; max: number }>;
+    };
+    momentum: {
+      score: number;
+      max: number;
+      percentage: number;
+      components: {
+        fourPercentRatio: { value: number; bulls: number; bears: number; score: number; max: number };
+        twentyFivePercentRatio: { value: number; bulls: number; bears: number; score: number; max: number };
+      };
+    };
+    breadth: {
+      score: number;
+      max: number;
+      percentage: number;
+      components: {
+        above50ma: { value: number; score: number; max: number };
+        above200ma: { value: number; score: number; max: number };
+      };
+    };
+    strength: {
+      score: number;
+      max: number;
+      percentage: number;
+      components: {
+        netHighs52w: { value: number; highs: number; lows: number; score: number; max: number };
+        vixLevel: { value: number; score: number; max: number };
+      };
+    };
+  };
+}
+
+export async function computeTrendTier(): Promise<BreadthData['tiers']['trend']> {
+  const components: Record<string, { status: string; score: number; max: number }> = {};
+  let totalScore = 0;
+
+  await Promise.allSettled(
+    TREND_SYMBOLS.map(async ({ symbol, label, maxScore }) => {
+      try {
+        const history = await yahoo.getHistory(symbol, '3M');
+        if (!history || history.length < 21) {
+          components[label] = { status: 'TS', score: maxScore * 0.5, max: maxScore };
+          totalScore += maxScore * 0.5;
+          return;
+        }
+        const closes = history.map((h: any) => h.close);
+        const status = getTrendStatus(closes);
+        const score = scoreTrend(status, maxScore);
+        components[label] = { status, score, max: maxScore };
+        totalScore += score;
+      } catch {
+        components[label] = { status: 'TS', score: maxScore * 0.5, max: maxScore };
+        totalScore += maxScore * 0.5;
+      }
+    })
+  );
+
+  return {
+    score: Math.round(totalScore * 10) / 10,
+    max: 40,
+    percentage: Math.round((totalScore / 40) * 100),
+    components,
+  };
+}
+
+export async function computeQuoteBreadth(): Promise<{
+  above50ma: { value: number; score: number; max: number };
+  above200ma: { value: number; score: number; max: number };
+  netHighs52w: { value: number; highs: number; lows: number; score: number; max: number };
+  fourPercent: { value: number; bulls: number; bears: number; score: number; max: number };
+  vixLevel: { value: number; score: number; max: number };
+}> {
+  const quotes = await yahoo.getMultipleQuotes(SP500_TICKERS);
+
+  let above50 = 0, above200 = 0, total50 = 0, total200 = 0;
+  let newHighs = 0, newLows = 0;
+  let bulls4 = 0, bears4 = 0;
+
+  for (const q of quotes) {
+    if (!q || !q.price) continue;
+
+    if (q.fiftyDayAverage > 0) {
+      total50++;
+      if (q.price > q.fiftyDayAverage) above50++;
+    }
+    if (q.twoHundredDayAverage > 0) {
+      total200++;
+      if (q.price > q.twoHundredDayAverage) above200++;
+    }
+
+    if (q.week52High > 0 && q.price >= q.week52High * 0.98) newHighs++;
+    if (q.week52Low > 0 && q.price <= q.week52Low * 1.02) newLows++;
+
+    const dailyChangePct = q.changePercent ?? 0;
+    const vol = q.volume ?? 0;
+    const avgVol = q.avgVolume10Day || q.avgVolume || 0;
+    if (dailyChangePct >= 4 && vol >= 100000 && vol > avgVol) bulls4++;
+    if (dailyChangePct <= -4 && vol >= 100000 && vol > avgVol) bears4++;
+  }
+
+  const pctAbove50 = total50 > 0 ? Math.round((above50 / total50) * 1000) / 10 : 50;
+  const pctAbove200 = total200 > 0 ? Math.round((above200 / total200) * 1000) / 10 : 50;
+  const netHighs = newHighs - newLows;
+  const ratio4 = bears4 > 0 ? Math.round((bulls4 / bears4) * 100) / 100 : (bulls4 > 0 ? 10 : 1);
+
+  let vixLevel = 20;
+  try {
+    const vixQuote = await yahoo.getQuote('^VIX');
+    if (vixQuote) vixLevel = Math.round(vixQuote.price * 100) / 100;
+  } catch {}
+
+  return {
+    above50ma: { value: pctAbove50, score: scoreAbove50MA(pctAbove50), max: 10 },
+    above200ma: { value: pctAbove200, score: scoreAbove200MA(pctAbove200), max: 10 },
+    netHighs52w: { value: netHighs, highs: newHighs, lows: newLows, score: scoreNetHighs(netHighs), max: 8 },
+    fourPercent: { value: ratio4, bulls: bulls4, bears: bears4, score: score4PercentRatio(ratio4), max: 15 },
+    vixLevel: { value: vixLevel, score: scoreVIX(vixLevel), max: 7 },
+  };
+}
+
+export async function computeQuarterlyBreadth(): Promise<{
+  twentyFivePercent: { value: number; bulls: number; bears: number; score: number; max: number };
+}> {
+  const histMap = await yahoo.getMultipleHistories(SP500_TICKERS, '3M');
+
+  let bulls25 = 0, bears25 = 0;
+
+  histMap.forEach((hist) => {
+    if (!hist || hist.length < 20) return;
+
+    const closes = hist.map((h: any) => h.close);
+    const volumes = hist.map((h: any) => {
+      const vol = h.volume;
+      if (vol && vol > 0) return vol;
+      return 0;
+    });
+
+    const last65 = closes.slice(-Math.min(65, closes.length));
+    const latestClose = closes[closes.length - 1];
+    const min65 = Math.min(...last65);
+    const max65 = Math.max(...last65);
+
+    const last20Closes = closes.slice(-20);
+    const last20Volumes = volumes.slice(-20);
+    const avgClose20 = last20Closes.reduce((a: number, b: number) => a + b, 0) / last20Closes.length;
+    const validVols = last20Volumes.filter((v: number) => v > 0);
+    const avgVol20 = validVols.length > 0 ? validVols.reduce((a: number, b: number) => a + b, 0) / validVols.length : 0;
+    const liquidity = avgClose20 * avgVol20;
+
+    if (liquidity < 250000) return;
+
+    const bullPct = min65 > 0 ? ((latestClose - min65) / min65) * 100 : 0;
+    const bearPct = max65 > 0 ? ((latestClose - max65) / max65) * 100 : 0;
+
+    if (bullPct >= 25) bulls25++;
+    if (bearPct <= -25) bears25++;
+  });
+
+  const ratio25 = bears25 > 0 ? Math.round((bulls25 / bears25) * 100) / 100 : (bulls25 > 0 ? 10 : 1);
+
+  return {
+    twentyFivePercent: { value: ratio25, bulls: bulls25, bears: bears25, score: score25PercentRatio(ratio25), max: 10 },
+  };
+}
+
+export async function computeMarketBreadth(fullScan: boolean = false): Promise<BreadthData> {
+  const trendTier = await computeTrendTier();
+
+  let momentumScore = 0;
+  let breadthScore = 0;
+  let strengthScore = 0;
+
+  let fourPercentData = { value: 1, bulls: 0, bears: 0, score: 7, max: 15 };
+  let twentyFivePercentData = { value: 1, bulls: 0, bears: 0, score: 4, max: 10 };
+  let above50maData = { value: 50, score: 6, max: 10 };
+  let above200maData = { value: 50, score: 5, max: 10 };
+  let netHighsData = { value: 0, highs: 0, lows: 0, score: 2, max: 8 };
+  let vixData = { value: 20, score: 5, max: 7 };
+
+  if (fullScan) {
+    const [quoteBreadth, quarterlyBreadth] = await Promise.all([
+      computeQuoteBreadth(),
+      computeQuarterlyBreadth(),
+    ]);
+
+    fourPercentData = quoteBreadth.fourPercent;
+    twentyFivePercentData = quarterlyBreadth.twentyFivePercent;
+    above50maData = quoteBreadth.above50ma;
+    above200maData = quoteBreadth.above200ma;
+    netHighsData = quoteBreadth.netHighs52w;
+    vixData = quoteBreadth.vixLevel;
+  } else {
+    try {
+      const vixQuote = await yahoo.getQuote('^VIX');
+      if (vixQuote) {
+        vixData = { value: Math.round(vixQuote.price * 100) / 100, score: scoreVIX(vixQuote.price), max: 7 };
+      }
+    } catch {}
+  }
+
+  momentumScore = fourPercentData.score + twentyFivePercentData.score;
+  breadthScore = above50maData.score + above200maData.score;
+  strengthScore = netHighsData.score + vixData.score;
+
+  const overallScore = Math.round(trendTier.score + momentumScore + breadthScore + strengthScore);
+
+  const previousScores = getCached<number[]>('breadth_score_history') || [];
+
+  if (fullScan) {
+    const updatedHistory = [...previousScores, overallScore].slice(-6);
+    setCache('breadth_score_history', updatedHistory, 86400);
+  }
+
+  const scoreChange5d = previousScores.length > 0
+    ? overallScore - previousScores[0]
+    : 0;
+
+  return {
+    overallScore,
+    scoreChange5d,
+    status: getScoreStatus(overallScore),
+    statusColor: getScoreColor(overallScore),
+    fullyEnriched: fullScan,
+    tiers: {
+      trend: trendTier,
+      momentum: {
+        score: Math.round(momentumScore * 10) / 10,
+        max: 25,
+        percentage: Math.round((momentumScore / 25) * 100),
+        components: {
+          fourPercentRatio: fourPercentData,
+          twentyFivePercentRatio: twentyFivePercentData,
+        },
+      },
+      breadth: {
+        score: Math.round(breadthScore * 10) / 10,
+        max: 20,
+        percentage: Math.round((breadthScore / 20) * 100),
+        components: {
+          above50ma: above50maData,
+          above200ma: above200maData,
+        },
+      },
+      strength: {
+        score: Math.round(strengthScore * 10) / 10,
+        max: 15,
+        percentage: Math.round((strengthScore / 15) * 100),
+        components: {
+          netHighs52w: netHighsData,
+          vixLevel: vixData,
+        },
+      },
+    },
+  };
+}
