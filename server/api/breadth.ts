@@ -155,13 +155,13 @@ function getScoreStatus(score: number): string {
 }
 
 function getScoreColor(score: number): string {
-  if (score >= 90) return '#5cb87a';
-  if (score >= 75) return '#5cb87a';
-  if (score >= 60) return '#c9a84c';
-  if (score >= 50) return '#6a9fc2';
-  if (score >= 45) return '#c0845a';
-  if (score >= 30) return '#b85c5c';
-  return '#b85c5c';
+  if (score >= 90) return '#2eb850';
+  if (score >= 75) return '#4aad6a';
+  if (score >= 60) return '#6a9a72';
+  if (score >= 50) return '#8a8a8a';
+  if (score >= 45) return '#b07070';
+  if (score >= 30) return '#c05050';
+  return '#7a2530';
 }
 
 function isUSMarketHours(): boolean {

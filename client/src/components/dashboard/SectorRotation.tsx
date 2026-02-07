@@ -4,17 +4,17 @@ import { useState, useRef, useCallback, useMemo } from "react";
 type QuadrantKey = 'leading' | 'improving' | 'lagging' | 'weakening';
 
 const QUADRANT_COLORS: Record<QuadrantKey, string> = {
-  leading: '#30d158',
-  improving: '#0a84ff',
-  lagging: '#ff453a',
-  weakening: '#ff9f0a',
+  leading: '#2eb850',
+  improving: '#5a8ab5',
+  lagging: '#c05050',
+  weakening: '#b08a50',
 };
 
 const QUADRANT_BG: Record<QuadrantKey, string> = {
-  leading: 'rgba(48,209,88,0.03)',
-  improving: 'rgba(10,132,255,0.03)',
-  lagging: 'rgba(255,69,58,0.03)',
-  weakening: 'rgba(255,159,10,0.03)',
+  leading: 'rgba(46,184,80,0.03)',
+  improving: 'rgba(90,138,181,0.03)',
+  lagging: 'rgba(192,80,80,0.03)',
+  weakening: 'rgba(176,138,80,0.03)',
 };
 
 const NEUTRAL_COLOR = 'rgba(255,255,255,0.25)';
@@ -333,13 +333,13 @@ export function SectorRotation() {
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
                 <div>
                   <div className="text-[9px] text-white/35 uppercase tracking-wider">RS-Ratio</div>
-                  <div className="text-[13px] font-mono-nums font-semibold" style={{ color: hoveredData.rsRatio >= 100 ? '#30d158' : '#ff453a' }}>
+                  <div className="text-[13px] font-mono-nums font-semibold" style={{ color: hoveredData.rsRatio >= 100 ? '#2eb850' : '#c05050' }}>
                     {hoveredData.rsRatio.toFixed(2)}
                   </div>
                 </div>
                 <div>
                   <div className="text-[9px] text-white/35 uppercase tracking-wider">RS-Momentum</div>
-                  <div className="text-[13px] font-mono-nums font-semibold" style={{ color: hoveredData.rsMomentum >= 0 ? '#30d158' : '#ff453a' }}>
+                  <div className="text-[13px] font-mono-nums font-semibold" style={{ color: hoveredData.rsMomentum >= 0 ? '#2eb850' : '#c05050' }}>
                     {hoveredData.rsMomentum >= 0 ? '+' : ''}{hoveredData.rsMomentum.toFixed(2)}%
                   </div>
                 </div>

@@ -69,8 +69,8 @@ export function MarketHeatmap() {
             const change = getChange(sector);
             const intensity = Math.min(Math.abs(change) / 3, 1);
             const bg = change >= 0
-              ? `rgba(48, 209, 88, ${0.1 + intensity * 0.45})`
-              : `rgba(255, 69, 58, ${0.1 + intensity * 0.45})`;
+              ? `rgba(46, 184, 80, ${0.1 + intensity * 0.45})`
+              : `rgba(192, 80, 80, ${0.1 + intensity * 0.45})`;
 
             return (
               <div

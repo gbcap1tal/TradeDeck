@@ -90,7 +90,7 @@ export function SectorPerformance() {
                 </div>
               </div>
               <div className="flex items-center gap-3 shrink-0">
-                <span className={cn("text-[13px] font-mono-nums font-semibold", isPositive ? "text-[#30d158]" : "text-[#ff453a]")}>
+                <span className="text-[13px] font-mono-nums font-semibold" style={{ color: isPositive ? '#2eb850' : '#c05050' }}>
                   {isPositive ? '+' : ''}{change.toFixed(2)}%
                 </span>
                 <ChevronRight className="w-3.5 h-3.5 text-white/20 group-hover:text-white/40 transition-colors" />

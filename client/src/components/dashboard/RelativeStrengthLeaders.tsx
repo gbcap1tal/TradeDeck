@@ -56,7 +56,7 @@ export function RelativeStrengthLeaders() {
       <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollSnapType: 'x mandatory' }}>
         {topSectors.map((sector: any) => {
           const MomentumIcon = sector.rsMomentum > 1 ? TrendingUp : sector.rsMomentum < -1 ? TrendingDown : Minus;
-          const momColor = sector.rsMomentum > 1 ? '#30d158' : sector.rsMomentum < -1 ? '#ff453a' : '#8e8e93';
+          const momColor = sector.rsMomentum > 1 ? '#2eb850' : sector.rsMomentum < -1 ? '#c05050' : '#8e8e93';
           const sparkData = generateRSSparkline(sector.rs);
 
           return (
@@ -79,7 +79,7 @@ export function RelativeStrengthLeaders() {
 
               <div className="mb-2">
                 <div className="label-text mb-0.5">RS Score</div>
-                <div className="text-2xl font-bold font-mono-nums text-[#30d158]">
+                <div className="text-2xl font-bold font-mono-nums" style={{ color: '#2eb850' }}>
                   {sector.rs.toFixed(0)}
                 </div>
               </div>
@@ -91,7 +91,7 @@ export function RelativeStrengthLeaders() {
                     {sector.rsMomentum > 0 ? '+' : ''}{sector.rsMomentum.toFixed(2)}%
                   </span>
                 </div>
-                <MiniSparkline data={sparkData} color="#30d158" width={60} height={18} />
+                <MiniSparkline data={sparkData} color="#2eb850" width={60} height={18} />
               </div>
             </div>
           );
