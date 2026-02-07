@@ -7,7 +7,7 @@ import * as yahoo from "./api/yahoo";
 import * as fmp from "./api/fmp";
 import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
-import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, searchStocks, getFinvizNews } from "./api/finviz";
+import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData } from "./api/breadth";
 import * as fs from 'fs';
 import * as path from 'path';
@@ -67,49 +67,36 @@ async function computeSectorsData(): Promise<any[]> {
 }
 
 async function computeIndustryPerformance(etfOnly: boolean = false): Promise<any> {
-  const allIndustries: Array<{ name: string; sector: string; etf: string | null; fallbackSymbols: string[]; stockCount: number }> = [];
+  const allIndustries: Array<{ name: string; sector: string; etf: string | null; stockCount: number }> = [];
 
   for (const sector of SECTORS_DATA) {
     const industries = getIndustriesForSector(sector.name);
     for (const ind of industries) {
       const etf = INDUSTRY_ETF_MAP[ind] || null;
       const stocks = getStocksForIndustry(ind);
-      const fallbackSymbols = (etf || etfOnly) ? [] : stocks.slice(0, 2).map(s => s.symbol);
       allIndustries.push({
         name: ind,
         sector: sector.name,
         etf,
-        fallbackSymbols,
         stockCount: stocks.length,
       });
     }
   }
 
   const etfSymbols = allIndustries.map(i => i.etf).filter(Boolean) as string[];
-  const fallbackSymbols = allIndustries.flatMap(i => i.fallbackSymbols);
   const uniqueETFs = Array.from(new Set(etfSymbols));
-  const uniqueFallbacks = Array.from(new Set(fallbackSymbols));
-  const allQuoteSymbols = Array.from(new Set([...uniqueETFs, ...uniqueFallbacks]));
 
-  const [quotes, etfHistResults] = await Promise.all([
-    yahoo.getMultipleQuotes(allQuoteSymbols),
-    yahoo.getMultipleHistories(uniqueETFs, '1M'),
-  ]);
-  const quoteMap = new Map<string, any>();
-  for (const q of quotes) {
-    if (q) quoteMap.set(q.symbol, q);
-  }
+  const etfHistResults = uniqueETFs.length > 0
+    ? await yahoo.getMultipleHistories(uniqueETFs, '1M')
+    : new Map<string, any>();
 
   const industries = allIndustries.map(ind => {
-    let dailyChange = 0;
+    const dailyChange = getIndustryAvgChange(ind.name);
+
     let weeklyChange = 0;
     let monthlyChange = 0;
 
     if (ind.etf) {
-      const etfQuote = quoteMap.get(ind.etf);
-      if (etfQuote) {
-        dailyChange = Math.round((etfQuote.changePercent ?? 0) * 100) / 100;
-      }
       const hist = etfHistResults.get(ind.etf);
       if (hist && hist.length >= 2) {
         const latest = hist[hist.length - 1];
@@ -120,11 +107,6 @@ async function computeIndustryPerformance(etfOnly: boolean = false): Promise<any
         const monthAgo = hist[0];
         monthlyChange = Math.round(((latest.close - monthAgo.close) / monthAgo.close) * 10000) / 100;
       }
-    } else {
-      const indQuotes = ind.fallbackSymbols.map(s => quoteMap.get(s)).filter(Boolean);
-      dailyChange = indQuotes.length > 0
-        ? Math.round(indQuotes.reduce((sum: number, q: any) => sum + (q.changePercent ?? 0), 0) / indQuotes.length * 100) / 100
-        : 0;
     }
 
     return {
@@ -305,7 +287,7 @@ function initBackgroundTasks() {
     console.log('[bg] Starting background data pre-computation...');
     const bgStart = Date.now();
 
-    console.log('[bg] Pre-computing Finviz data first (needed for sectors/industries)...');
+    console.log('[bg] Loading Finviz data (needed for sectors/industries/performance)...');
     const finvizData = await getFinvizData();
     if (finvizData) {
       let totalStocks = 0;
@@ -321,25 +303,23 @@ function initBackgroundTasks() {
       console.log('[bg] Finviz data not available yet, sectors will show without industries initially');
     }
 
-    const fastTasks = Promise.allSettled([
-      (async () => {
-        console.log('[bg] Pre-computing sectors data...');
-        const sectors = await computeSectorsData();
-        setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
-        console.log(`[bg] Sectors pre-computed: ${sectors.length} sectors in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
-      })(),
-      (async () => {
-        const persistedPerf = loadPersistedIndustryPerf();
-        if (persistedPerf) {
-          setCache('industry_perf_all', persistedPerf, CACHE_TTL.INDUSTRY_PERF);
-          console.log(`[bg] Industry performance loaded from file: ${persistedPerf.industries?.length} industries (instant)`);
-        } else {
-          console.log('[bg] Pre-computing industry performance (ETF-only fast mode)...');
-          const perfData = await computeIndustryPerformance(true);
-          setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
-          console.log(`[bg] Industry performance pre-computed: ${perfData.industries?.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
-        }
-      })(),
+    console.log('[bg] Computing industry performance from Finviz data...');
+    let perfData = await computeIndustryPerformance();
+    if (!perfData.fullyEnriched) {
+      const persisted = loadPersistedIndustryPerf();
+      if (persisted) {
+        perfData = persisted;
+        console.log(`[bg] Using persisted industry performance (Finviz data not ready): ${perfData.industries?.length} industries`);
+      }
+    }
+    setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
+    console.log(`[bg] Industry performance computed: ${perfData.industries?.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+
+    const sectors = await computeSectorsData();
+    setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
+    console.log(`[bg] Sectors computed: ${sectors.length} sectors in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+
+    await Promise.allSettled([
       (async () => {
         console.log('[bg] Pre-computing rotation data...');
         const rotData = await computeRotationData();
@@ -354,46 +334,16 @@ function initBackgroundTasks() {
       })(),
     ]);
 
-    await fastTasks;
     console.log(`[bg] Fast data ready in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
 
-    if (finvizData) {
-      console.log('[bg] Refreshing sectors with Finviz industry data...');
-      const sectors2 = await computeSectorsData();
-      setCache('sectors_data', sectors2, CACHE_TTL.SECTORS);
-      const indCounts = sectors2.map((s: any) => `${s.name}: ${s.industries?.length || 0}`);
-      console.log(`[bg] Sectors refreshed with industries: ${indCounts.join(', ')}`);
+    try {
+      console.log('[bg] Computing full market breadth...');
+      const breadthFull = await computeMarketBreadth(true);
+      setCache('market_breadth', breadthFull, CACHE_TTL.BREADTH);
+      console.log(`[bg] Full breadth computed: score=${breadthFull.overallScore} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+    } catch (err: any) {
+      console.log(`[bg] Breadth full scan error: ${err.message}`);
     }
-
-    const enrichmentTasks = [
-      (async () => {
-        try {
-          console.log('[bg] Computing full industry performance...');
-          const perfData2 = await computeIndustryPerformance();
-          setCache('industry_perf_all', perfData2, CACHE_TTL.INDUSTRY_PERF);
-          console.log(`[bg] Full industry performance complete: ${perfData2.industries?.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
-
-          console.log('[bg] Refreshing sectors with industry performance data...');
-          const sectorsRefreshed = await computeSectorsData();
-          setCache('sectors_data', sectorsRefreshed, CACHE_TTL.SECTORS);
-          console.log(`[bg] Sectors refreshed with perf data in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
-        } catch (err: any) {
-          console.log(`[bg] Industry perf enrichment error: ${err.message}`);
-        }
-      })(),
-      (async () => {
-        try {
-          console.log('[bg] Computing full market breadth...');
-          const breadthFull = await computeMarketBreadth(true);
-          setCache('market_breadth', breadthFull, CACHE_TTL.BREADTH);
-          console.log(`[bg] Full breadth computed: score=${breadthFull.overallScore} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
-        } catch (err: any) {
-          console.log(`[bg] Breadth full scan error: ${err.message}`);
-        }
-      })(),
-    ];
-
-    await Promise.allSettled(enrichmentTasks);
   }, 1000);
 
   let lastScheduledWindow = '';
@@ -403,8 +353,8 @@ function initBackgroundTasks() {
     console.log(`[scheduler] === Starting full data refresh: ${windowLabel} ===`);
 
     try {
-      console.log(`[scheduler] Refreshing Finviz data...`);
-      const finvizData = await getFinvizData();
+      console.log(`[scheduler] Force-refreshing Finviz data (fresh change% for all stocks)...`);
+      const finvizData = await getFinvizData(true);
       if (finvizData) {
         let totalStocks = 0;
         for (const s of Object.values(finvizData)) {
@@ -416,21 +366,22 @@ function initBackgroundTasks() {
       console.error(`[scheduler] Finviz refresh error: ${err.message}`);
     }
 
+    let perfData = await computeIndustryPerformance();
+    if (!perfData.fullyEnriched) {
+      const persisted = loadPersistedIndustryPerf();
+      if (persisted) {
+        perfData = persisted;
+        console.log(`[scheduler] Falling back to persisted industry performance`);
+      }
+    }
+    setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
+    console.log(`[scheduler] Industry performance refreshed: ${perfData.industries?.length} industries`);
+
+    const sectors = await computeSectorsData();
+    setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
+    console.log(`[scheduler] Sectors refreshed: ${sectors.length} sectors`);
+
     await Promise.allSettled([
-      (async () => {
-        try {
-          const sectors = await computeSectorsData();
-          setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
-          console.log(`[scheduler] Sectors refreshed: ${sectors.length} sectors`);
-        } catch (err: any) { console.error(`[scheduler] Sectors error: ${err.message}`); }
-      })(),
-      (async () => {
-        try {
-          const perfData = await computeIndustryPerformance();
-          setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
-          console.log(`[scheduler] Industry performance refreshed: ${perfData.industries?.length} industries`);
-        } catch (err: any) { console.error(`[scheduler] Industry perf error: ${err.message}`); }
-      })(),
       (async () => {
         try {
           const rotData = await computeRotationData();
@@ -618,46 +569,10 @@ export async function registerRoutes(
 
     const industryNames = getIndustriesForSector(sectorConfig.name);
 
-    const etfSymbols: string[] = [];
-    const fallbackSymbols: string[] = [];
-    const industryStocksMap: Record<string, Array<{ symbol: string; name: string }>> = {};
-
-    for (const ind of industryNames) {
-      const stocks = getStocksForIndustry(ind);
-      industryStocksMap[ind] = stocks;
-      const etf = INDUSTRY_ETF_MAP[ind];
-      if (etf) {
-        if (!etfSymbols.includes(etf)) etfSymbols.push(etf);
-      } else {
-        stocks.slice(0, 2).forEach(s => { if (!fallbackSymbols.includes(s.symbol)) fallbackSymbols.push(s.symbol); });
-      }
-    }
-
-    const allSymbols = [...etfSymbols, ...fallbackSymbols];
-    let allQuotes: any[] = [];
-    try {
-      allQuotes = await yahoo.getMultipleQuotes(allSymbols);
-    } catch {}
-    const quoteMap = new Map<string, any>();
-    for (const q of allQuotes) {
-      if (q) quoteMap.set(q.symbol, q);
-    }
-
     const industries = industryNames.map(ind => {
-      const stocks = industryStocksMap[ind] || [];
+      const stocks = getStocksForIndustry(ind);
       const etf = INDUSTRY_ETF_MAP[ind];
-      let avgChange = 0;
-
-      if (etf) {
-        const etfQuote = quoteMap.get(etf);
-        avgChange = etfQuote ? Math.round((etfQuote.changePercent ?? 0) * 100) / 100 : 0;
-      } else {
-        const top2 = stocks.slice(0, 2);
-        const industryQuotes = top2.map(s => quoteMap.get(s.symbol)).filter(Boolean);
-        avgChange = industryQuotes.length > 0
-          ? Math.round(industryQuotes.reduce((sum: number, q: any) => sum + (q.changePercent ?? 0), 0) / industryQuotes.length * 100) / 100
-          : 0;
-      }
+      const avgChange = getIndustryAvgChange(ind);
 
       return {
         name: ind,
@@ -721,7 +636,7 @@ export async function registerRoutes(
       industry: {
         name: industryName,
         sector: sectorName,
-        changePercent: 0,
+        changePercent: getIndustryAvgChange(industryName),
         rs: 0,
         totalStocks: stockDefs.length,
       },

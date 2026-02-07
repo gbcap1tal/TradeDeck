@@ -17,10 +17,17 @@ export interface FinvizStock {
   name: string;
   sector: string;
   industry: string;
+  changePercent?: number;
+}
+
+export interface FinvizStockEntry {
+  symbol: string;
+  name: string;
+  changePercent: number;
 }
 
 export interface FinvizIndustryData {
-  [industry: string]: Array<{ symbol: string; name: string }>;
+  [industry: string]: FinvizStockEntry[];
 }
 
 export interface FinvizSectorData {
@@ -99,9 +106,11 @@ function parseScreenerPage(html: string): { stocks: FinvizStock[]; totalRows: nu
     const company = cells.eq(2).text().trim();
     const sector = cells.eq(3).text().trim();
     const industry = cells.eq(4).text().trim();
+    const changeStr = cells.eq(9).text().trim().replace('%', '');
+    const changePercent = parseFloat(changeStr) || 0;
 
     if (ticker && sector && industry) {
-      stocks.push({ symbol: ticker, name: company, sector, industry });
+      stocks.push({ symbol: ticker, name: company, sector, industry, changePercent });
     }
   });
 
@@ -222,6 +231,7 @@ function organizeByIndustry(stocks: FinvizStock[]): FinvizSectorData {
     sd.stocks[stock.industry].push({
       symbol: stock.symbol,
       name: stock.name,
+      changePercent: stock.changePercent ?? 0,
     });
   }
 
@@ -238,15 +248,18 @@ function organizeByIndustry(stocks: FinvizStock[]): FinvizSectorData {
 let scrapeInProgress = false;
 let scrapePromise: Promise<FinvizSectorData | null> | null = null;
 
-export async function getFinvizData(): Promise<FinvizSectorData | null> {
+export async function getFinvizData(forceRefresh: boolean = false): Promise<FinvizSectorData | null> {
   const cacheKey = 'finviz_sector_data';
-  const cached = getCached<FinvizSectorData>(cacheKey);
-  if (cached) return cached;
 
-  const persisted = loadPersistedFinviz();
-  if (persisted) {
-    setCache(cacheKey, persisted, FINVIZ_CACHE_TTL);
-    return persisted;
+  if (!forceRefresh) {
+    const cached = getCached<FinvizSectorData>(cacheKey);
+    if (cached) return cached;
+
+    const persisted = loadPersistedFinviz();
+    if (persisted) {
+      setCache(cacheKey, persisted, FINVIZ_CACHE_TTL);
+      return persisted;
+    }
   }
 
   if (scrapeInProgress && scrapePromise) {
@@ -312,7 +325,7 @@ export function getIndustriesForSector(sectorName: string): string[] {
   return data[sectorName].industries;
 }
 
-export function getStocksForIndustry(industryName: string): Array<{ symbol: string; name: string }> {
+export function getStocksForIndustry(industryName: string): FinvizStockEntry[] {
   const data = getFinvizDataSync();
   if (!data) return [];
 
@@ -324,6 +337,13 @@ export function getStocksForIndustry(industryName: string): Array<{ symbol: stri
   }
 
   return [];
+}
+
+export function getIndustryAvgChange(industryName: string): number {
+  const stocks = getStocksForIndustry(industryName);
+  if (stocks.length === 0) return 0;
+  const sum = stocks.reduce((acc, s) => acc + (s.changePercent || 0), 0);
+  return Math.round((sum / stocks.length) * 100) / 100;
 }
 
 export function searchStocks(query: string, limit: number = 10): Array<{ symbol: string; name: string; sector: string; industry: string }> {
