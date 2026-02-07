@@ -44,13 +44,36 @@ async function getResendClient() {
 }
 
 const lastAlertTimes = new Map<string, number>();
-const COOLDOWN_MS = 30 * 60 * 1000;
+const COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+const failureCounts = new Map<string, number>();
+const MAX_RETRIES_BEFORE_ALERT = 3;
+
+export function recordFailure(category: string): boolean {
+  const count = (failureCounts.get(category) || 0) + 1;
+  failureCounts.set(category, count);
+  console.log(`[alert] Failure #${count} for "${category}" (alert after ${MAX_RETRIES_BEFORE_ALERT})`);
+  return count >= MAX_RETRIES_BEFORE_ALERT;
+}
+
+export function clearFailures(category: string): void {
+  if (failureCounts.has(category)) {
+    failureCounts.delete(category);
+  }
+}
 
 export async function sendAlert(subject: string, details: string, category: string = 'general'): Promise<void> {
+  const shouldAlert = recordFailure(category);
+  if (!shouldAlert) {
+    console.log(`[alert] Not alerting yet for "${category}" — auto-recovery attempts remaining`);
+    return;
+  }
+
   const now = Date.now();
   const lastSent = lastAlertTimes.get(category) || 0;
   if (now - lastSent < COOLDOWN_MS) {
-    console.log(`[alert] Skipping "${category}" alert (cooldown: ${Math.round((COOLDOWN_MS - (now - lastSent)) / 60000)}min remaining)`);
+    const hoursLeft = Math.round((COOLDOWN_MS - (now - lastSent)) / 3600000);
+    console.log(`[alert] Skipping "${category}" alert (daily cooldown: ${hoursLeft}h remaining)`);
     return;
   }
 
@@ -58,6 +81,7 @@ export async function sendAlert(subject: string, details: string, category: stri
     const { client, fromEmail } = await getResendClient();
 
     const timestamp = new Date().toLocaleString('en-US', { timeZone: 'America/New_York' });
+    const failCount = failureCounts.get(category) || 0;
 
     await client.emails.send({
       from: fromEmail,
@@ -73,12 +97,13 @@ export async function sendAlert(subject: string, details: string, category: stri
             <h3 style="margin: 0 0 8px; color: #ffffff; font-size: 15px;">${subject}</h3>
             <pre style="margin: 0; white-space: pre-wrap; word-break: break-word; color: #ccc; font-size: 13px; font-family: 'JetBrains Mono', monospace;">${details}</pre>
           </div>
-          <p style="margin: 16px 0 0; color: #666; font-size: 11px;">Category: ${category} | Cooldown: 30 min per category</p>
+          <p style="margin: 16px 0 0; color: #666; font-size: 11px;">Category: ${category} | Consecutive failures: ${failCount} | Max 1 alert per day per category</p>
         </div>
       `,
     });
 
     lastAlertTimes.set(category, now);
+    failureCounts.delete(category);
     console.log(`[alert] Email sent: "${subject}" to ${ALERT_EMAIL}`);
   } catch (err: any) {
     console.error(`[alert] Failed to send email: ${err.message}`);

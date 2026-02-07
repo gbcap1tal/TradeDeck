@@ -9,7 +9,11 @@ import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefre
 import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
 import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData } from "./api/breadth";
-import { sendAlert } from "./api/alerts";
+import { sendAlert, clearFailures } from "./api/alerts";
+import { getUncachableStripeClient, getStripePublishableKey } from "./stripe/stripeClient";
+import { db } from "./db";
+import { users } from "@shared/models/auth";
+import { eq, sql } from "drizzle-orm";
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -300,6 +304,7 @@ function initBackgroundTasks() {
         }
       }
       console.log(`[bg] Finviz complete: ${Object.keys(finvizData).length} sectors, ${totalIndustries} industries, ${totalStocks} stocks in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+      clearFailures('finviz_scrape');
     } else {
       console.log('[bg] Finviz data not available yet, sectors will show without industries initially');
       sendAlert('Finviz Scrape Failed on Startup', 'Finviz data could not be loaded during server boot. Industry performance will use persisted cache if available.', 'finviz_scrape');
@@ -343,6 +348,7 @@ function initBackgroundTasks() {
       const breadthFull = await computeMarketBreadth(true);
       setCache('market_breadth', breadthFull, CACHE_TTL.BREADTH);
       console.log(`[bg] Full breadth computed: score=${breadthFull.overallScore} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+      clearFailures('breadth_scan');
     } catch (err: any) {
       console.log(`[bg] Breadth full scan error: ${err.message}`);
       sendAlert('Market Breadth Scan Failed', `Full breadth scan failed during startup.\n\nError: ${err.message}`, 'breadth_scan');
@@ -364,6 +370,7 @@ function initBackgroundTasks() {
           for (const stocks of Object.values(s.stocks)) totalStocks += stocks.length;
         }
         console.log(`[scheduler] Finviz: ${Object.keys(finvizData).length} sectors, ${totalStocks} stocks`);
+        clearFailures('finviz_scrape');
       } else {
         sendAlert('Scheduled Finviz Refresh Returned No Data', `Finviz scrape during ${windowLabel} returned null (possible block, timeout, or too few stocks).`, 'finviz_scrape');
       }
@@ -382,6 +389,7 @@ function initBackgroundTasks() {
       sendAlert('Industry Performance Incomplete', `Industry performance not fully enriched during ${windowLabel}. Using ${persisted ? 'persisted cache' : 'empty data'} as fallback.`, 'industry_perf');
     }
     setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
+    if (perfData.fullyEnriched) clearFailures('industry_perf');
     console.log(`[scheduler] Industry performance refreshed: ${perfData.industries?.length} industries`);
 
     const sectors = await computeSectorsData();
@@ -394,6 +402,7 @@ function initBackgroundTasks() {
           const rotData = await computeRotationData();
           setCache('rrg_rotation', rotData, CACHE_TTL.SECTORS);
           console.log(`[scheduler] Rotation data refreshed`);
+          clearFailures('rotation');
         } catch (err: any) {
           console.error(`[scheduler] Rotation error: ${err.message}`);
           sendAlert('Rotation Data Refresh Failed', `RRG rotation data failed during ${windowLabel}.\n\nError: ${err.message}`, 'rotation');
@@ -404,6 +413,7 @@ function initBackgroundTasks() {
           const breadth = await computeMarketBreadth(true);
           setCache('market_breadth', breadth, CACHE_TTL.BREADTH);
           console.log(`[scheduler] Market Quality refreshed: score=${breadth.overallScore}`);
+          clearFailures('breadth_scan');
         } catch (err: any) {
           console.error(`[scheduler] Breadth error: ${err.message}`);
           sendAlert('Market Breadth Scan Failed', `Breadth scan failed during ${windowLabel} refresh.\n\nError: ${err.message}`, 'breadth_scan');
@@ -987,6 +997,101 @@ export async function registerRoutes(
         finviz: !!getCached('finviz_sector_data'),
       },
     });
+  });
+
+  app.get('/api/stripe/publishable-key', async (req, res) => {
+    try {
+      const key = await getStripePublishableKey();
+      res.json({ publishableKey: key });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Stripe not configured' });
+    }
+  });
+
+  app.get('/api/payment/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      if (!user) return res.json({ hasPaid: false });
+      res.json({ hasPaid: user.hasPaid === 'true' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/checkout', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const [user] = await db.select().from(users).where(eq(users.id, userId));
+      if (!user) return res.status(404).json({ error: 'User not found' });
+
+      if (user.hasPaid === 'true') {
+        return res.json({ alreadyPaid: true });
+      }
+
+      const stripe = await getUncachableStripeClient();
+
+      let customerId = user.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email || undefined,
+          metadata: { userId },
+        });
+        customerId = customer.id;
+        await db.update(users).set({ stripeCustomerId: customerId, updatedAt: new Date() }).where(eq(users.id, userId));
+      }
+
+      const pricesResult = await db.execute(
+        sql`SELECT pr.id FROM stripe.prices pr JOIN stripe.products p ON pr.product = p.id WHERE p.active = true AND pr.active = true AND pr.currency = 'eur' LIMIT 1`
+      );
+
+      let priceId: string;
+      if (pricesResult.rows.length > 0) {
+        priceId = pricesResult.rows[0].id as string;
+      } else {
+        const prices = await stripe.prices.list({ active: true, currency: 'eur', limit: 1 });
+        if (prices.data.length === 0) {
+          return res.status(500).json({ error: 'No price configured' });
+        }
+        priceId = prices.data[0].id;
+      }
+
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        line_items: [{ price: priceId, quantity: 1 }],
+        mode: 'payment',
+        success_url: `${baseUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/payment/cancel`,
+      });
+
+      res.json({ url: session.url });
+    } catch (err: any) {
+      console.error('[stripe] Checkout error:', err.message);
+      res.status(500).json({ error: 'Failed to create checkout session' });
+    }
+  });
+
+  app.get('/api/payment/verify', isAuthenticated, async (req: any, res) => {
+    try {
+      const sessionId = req.query.session_id as string;
+      if (!sessionId) return res.status(400).json({ error: 'Missing session_id' });
+
+      const stripe = await getUncachableStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+      if (session.payment_status === 'paid') {
+        const userId = req.user.claims.sub;
+        await db.update(users).set({ hasPaid: 'true', updatedAt: new Date() }).where(eq(users.id, userId));
+        return res.json({ success: true });
+      }
+
+      res.json({ success: false, status: session.payment_status });
+    } catch (err: any) {
+      console.error('[stripe] Verify error:', err.message);
+      res.status(500).json({ error: 'Verification failed' });
+    }
   });
 
   return httpServer;
