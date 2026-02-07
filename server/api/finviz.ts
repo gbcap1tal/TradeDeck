@@ -108,6 +108,11 @@ function parseScreenerPage(html: string): { stocks: FinvizStock[]; totalRows: nu
   return { stocks, totalRows: totalRows || stocks.length };
 }
 
+const EXCLUDED_INDUSTRIES = new Set([
+  'Exchange Traded Fund',
+  'Shell Companies',
+]);
+
 async function scrapeAllStocks(): Promise<FinvizStock[]> {
   const allStocks: FinvizStock[] = [];
   const seenSymbols = new Set<string>();
@@ -116,12 +121,13 @@ async function scrapeAllStocks(): Promise<FinvizStock[]> {
   let consecutiveFailures = 0;
   let pageCount = 0;
   const maxPages = 600;
+  let skippedCount = 0;
 
-  console.log('[finviz] Starting single-pass scrape of all US stocks...');
+  console.log('[finviz] Starting single-pass scrape of all US-exchange stocks (NYSE+NASDAQ+AMEX)...');
   const startTime = Date.now();
 
   while (pageCount < maxPages) {
-    const url = `https://finviz.com/screener.ashx?v=111&f=geo_usa&r=${offset}`;
+    const url = `https://finviz.com/screener.ashx?v=111&f=ind_stocksonly&r=${offset}`;
 
     let html: string | null = null;
     let succeeded = false;
@@ -168,10 +174,13 @@ async function scrapeAllStocks(): Promise<FinvizStock[]> {
     }
 
     for (const stock of stocks) {
-      if (!seenSymbols.has(stock.symbol)) {
-        seenSymbols.add(stock.symbol);
-        allStocks.push(stock);
+      if (seenSymbols.has(stock.symbol)) continue;
+      if (EXCLUDED_INDUSTRIES.has(stock.industry)) {
+        skippedCount++;
+        continue;
       }
+      seenSymbols.add(stock.symbol);
+      allStocks.push(stock);
     }
 
     pageCount++;
@@ -190,7 +199,7 @@ async function scrapeAllStocks(): Promise<FinvizStock[]> {
   }
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  console.log(`[finviz] Scrape complete: ${allStocks.length} unique stocks in ${elapsed}s (${pageCount} pages)`);
+  console.log(`[finviz] Scrape complete: ${allStocks.length} unique stocks in ${elapsed}s (${pageCount} pages, ${skippedCount} ETFs/shells excluded)`);
   return allStocks;
 }
 
