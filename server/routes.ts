@@ -49,7 +49,7 @@ async function computeIndustryPerformance(finvizData: FinvizSectorData | null = 
     for (const ind of sector.industries) {
       const etf = INDUSTRY_ETF_MAP[ind] || null;
       const enrichedStocks = getEnrichedStocksSync(ind, finvizData);
-      const fallbackSymbols = (etf || etfOnly) ? [] : enrichedStocks.slice(0, 5).map(s => s.symbol);
+      const fallbackSymbols = (etf || etfOnly) ? [] : enrichedStocks.slice(0, 10).map(s => s.symbol);
       allIndustries.push({
         name: ind,
         sector: sector.name,
