@@ -149,19 +149,19 @@ function getScoreStatus(score: number): string {
   if (score >= 75) return 'GOOD';
   if (score >= 60) return 'FAIR';
   if (score >= 50) return 'NEUTRAL';
-  if (score >= 45) return 'WEAK';
+  if (score >= 40) return 'WEAK';
   if (score >= 30) return 'POOR';
   return 'CRITICAL';
 }
 
 function getScoreColor(score: number): string {
   if (score >= 90) return '#2eb850';
-  if (score >= 75) return '#4aad6a';
-  if (score >= 60) return '#6a9a72';
-  if (score >= 50) return '#8a8a8a';
-  if (score >= 45) return '#b07070';
-  if (score >= 30) return '#c05050';
-  return '#7a2530';
+  if (score >= 75) return '#3d8a4e';
+  if (score >= 60) return '#2a4a32';
+  if (score >= 50) return '#aaaaaa';
+  if (score >= 40) return '#6a2a35';
+  if (score >= 30) return '#b85555';
+  return '#d04545';
 }
 
 function isUSMarketHours(): boolean {

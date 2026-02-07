@@ -3,12 +3,12 @@ import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 const MQ = {
   excellent: '#2eb850',
-  good: '#4aad6a',
-  fair: '#6a9a72',
-  neutral: '#8a8a8a',
-  weak: '#b07070',
-  poor: '#c05050',
-  critical: '#7a2530',
+  good: '#3d8a4e',
+  fair: '#2a4a32',
+  neutral: '#aaaaaa',
+  weak: '#6a2a35',
+  poor: '#b85555',
+  critical: '#d04545',
   bullish: '#2eb850',
   bearish: '#c05050',
 };
@@ -18,7 +18,8 @@ function mqColor(pct: number) {
   if (pct >= 65) return MQ.good;
   if (pct >= 50) return MQ.fair;
   if (pct >= 40) return MQ.neutral;
-  if (pct >= 25) return MQ.poor;
+  if (pct >= 30) return MQ.weak;
+  if (pct >= 20) return MQ.poor;
   return MQ.critical;
 }
 
@@ -126,7 +127,7 @@ export function MarketBreadth() {
   }
 
   const overall = breadth.overallScore ?? 0;
-  const condition = breadth.status || (overall >= 75 ? 'GOOD' : overall >= 60 ? 'FAIR' : overall >= 50 ? 'NEUTRAL' : overall >= 45 ? 'WEAK' : overall >= 30 ? 'POOR' : 'CRITICAL');
+  const condition = breadth.status || (overall >= 90 ? 'EXCELLENT' : overall >= 75 ? 'GOOD' : overall >= 60 ? 'FAIR' : overall >= 50 ? 'NEUTRAL' : overall >= 40 ? 'WEAK' : overall >= 30 ? 'POOR' : 'CRITICAL');
 
   const t = breadth.tiers || {};
   const tiers = [
