@@ -8,7 +8,7 @@ import * as fmp from "./api/fmp";
 import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP, INDUSTRY_STOCKS } from "./data/sectors";
 import { getFinvizData, mergeStockLists, getFinvizNamesForIndustry, type FinvizSectorData } from "./api/finviz";
-import { computeMarketBreadth } from "./api/breadth";
+import { computeMarketBreadth, loadPersistedBreadthData } from "./api/breadth";
 
 function getEnrichedStocksSync(industryName: string, finvizData: FinvizSectorData | null): Array<{ symbol: string; name: string }> {
   const hardcoded = INDUSTRY_STOCKS[industryName] || [];
@@ -480,6 +480,13 @@ export async function registerRoutes(
     if (stale) {
       backgroundRefresh(cacheKey, () => computeMarketBreadth(true), CACHE_TTL.BREADTH);
       return res.json(stale);
+    }
+
+    const persisted = loadPersistedBreadthData();
+    if (persisted) {
+      setCache(cacheKey, persisted, CACHE_TTL.BREADTH);
+      backgroundRefresh(cacheKey, () => computeMarketBreadth(true), CACHE_TTL.BREADTH);
+      return res.json(persisted);
     }
 
     backgroundRefresh(cacheKey, () => computeMarketBreadth(true), CACHE_TTL.BREADTH);

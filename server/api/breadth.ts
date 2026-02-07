@@ -1,6 +1,35 @@
 import { SP500_TICKERS } from '../data/sp500';
 import * as yahoo from './yahoo';
 import { getCached, setCache, CACHE_TTL } from './cache';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const BREADTH_PERSIST_PATH = path.join(process.cwd(), '.breadth-cache.json');
+
+function persistBreadthToFile(data: BreadthData): void {
+  try {
+    fs.writeFileSync(BREADTH_PERSIST_PATH, JSON.stringify({ data, savedAt: Date.now() }), 'utf-8');
+  } catch {}
+}
+
+export function loadPersistedBreadthData(): BreadthData | null {
+  return loadPersistedBreadth();
+}
+
+function loadPersistedBreadth(): BreadthData | null {
+  try {
+    if (!fs.existsSync(BREADTH_PERSIST_PATH)) return null;
+    const raw = JSON.parse(fs.readFileSync(BREADTH_PERSIST_PATH, 'utf-8'));
+    if (raw?.data && raw.savedAt) {
+      const ageHours = (Date.now() - raw.savedAt) / (1000 * 60 * 60);
+      const d = raw.data as BreadthData;
+      if (ageHours < 24 && d.fullyEnriched && d.universeSize > 0 && d.tiers) {
+        return d;
+      }
+    }
+  } catch {}
+  return null;
+}
 
 const TREND_SYMBOLS = [
   { symbol: 'SPY', label: 'SPY', maxScore: 10 },
@@ -278,7 +307,7 @@ export async function computeQuoteBreadth(): Promise<{
   }
 
   let newHighs = 0, newLows = 0;
-  for (const s of mergedUniverse.values()) {
+  for (const s of Array.from(mergedUniverse.values())) {
     if (!s || !s.price) continue;
     if (s.week52High > 0 && s.price >= s.week52High * 0.98) newHighs++;
     if (s.week52Low > 0 && s.price <= s.week52Low * 1.02) newLows++;
@@ -345,6 +374,14 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
   const cachedFull = getCached<BreadthData>('breadth_full_result');
   if (cachedFull && !fullScan) {
     return cachedFull;
+  }
+
+  if (!fullScan) {
+    const persisted = loadPersistedBreadth();
+    if (persisted) {
+      setCache('breadth_full_result', persisted, 1800);
+      return persisted;
+    }
   }
 
   const trendTier = await computeTrendTier();
@@ -443,6 +480,7 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
 
   if (fullScan) {
     setCache('breadth_full_result', result, 1800);
+    persistBreadthToFile(result);
   }
 
   return result;

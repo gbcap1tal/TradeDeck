@@ -134,7 +134,7 @@ export async function getIndices() {
   const cached = getCached<any[]>(key);
   if (cached) return cached;
 
-  const symbols = ['SPY', 'QQQ', 'IWM', 'TLT'];
+  const symbols = ['SPY', 'QQQ', 'MDY', 'IWM', 'TLT'];
 
   try {
     const quotes = await Promise.allSettled(symbols.map(s => yf.quote(s)));
@@ -158,7 +158,7 @@ export async function getIndices() {
     try {
       const vixResult = await yf.quote('^VIX');
       if (vixResult) {
-        results.splice(3, 0, {
+        results.splice(4, 0, {
           symbol: 'VIX',
           name: 'Volatility Index',
           price: Math.round((vixResult.regularMarketPrice ?? 0) * 100) / 100,
