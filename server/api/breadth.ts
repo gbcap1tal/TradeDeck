@@ -32,11 +32,11 @@ function loadPersistedBreadth(): BreadthData | null {
 }
 
 const TREND_SYMBOLS = [
-  { symbol: 'SPY', label: 'SPY', maxScore: 10 },
-  { symbol: 'QQQ', label: 'QQQ', maxScore: 10 },
-  { symbol: 'IWM', label: 'IWM', maxScore: 7 },
-  { symbol: 'MDY', label: 'MDY', maxScore: 6 },
-  { symbol: 'TLT', label: 'TLT', maxScore: 4 },
+  { symbol: 'SPY', label: 'SPY', maxScore: 9 },
+  { symbol: 'QQQ', label: 'QQQ', maxScore: 9 },
+  { symbol: 'IWM', label: 'IWM', maxScore: 6 },
+  { symbol: 'MDY', label: 'MDY', maxScore: 5 },
+  { symbol: 'TLT', label: 'TLT', maxScore: 3 },
   { symbol: '^VIX', label: 'VIX', maxScore: 3 },
 ];
 
@@ -92,9 +92,9 @@ function scoreTrend(status: 'T+' | 'TS' | 'T-', maxScore: number): number {
 }
 
 function score4PercentRatio(ratio: number): number {
-  if (ratio >= 3.0) return 15;
-  if (ratio >= 2.0) return 12;
-  if (ratio >= 1.5) return 9;
+  if (ratio >= 3.0) return 16;
+  if (ratio >= 2.0) return 13;
+  if (ratio >= 1.5) return 10;
   if (ratio >= 1.0) return 7;
   if (ratio >= 0.67) return 5;
   if (ratio >= 0.5) return 3;
@@ -103,34 +103,34 @@ function score4PercentRatio(ratio: number): number {
 }
 
 function score25PercentRatio(ratio: number): number {
-  if (ratio >= 4.0) return 10;
-  if (ratio >= 3.0) return 8;
-  if (ratio >= 2.0) return 6;
+  if (ratio >= 4.0) return 11;
+  if (ratio >= 3.0) return 9;
+  if (ratio >= 2.0) return 7;
   if (ratio >= 1.0) return 4;
   if (ratio >= 0.5) return 2;
   return 0;
 }
 
 function scoreAbove50MA(pct: number): number {
-  if (pct >= 70) return 10;
-  if (pct >= 60) return 7;
+  if (pct >= 70) return 11;
+  if (pct >= 60) return 8;
   if (pct >= 45) return 5;
   if (pct >= 30) return 3;
   return 0;
 }
 
 function scoreAbove200MA(pct: number): number {
-  if (pct >= 70) return 10;
-  if (pct >= 60) return 7;
+  if (pct >= 70) return 11;
+  if (pct >= 60) return 8;
   if (pct >= 45) return 4;
   if (pct >= 30) return 1;
   return 0;
 }
 
 function scoreNetHighs(net: number): number {
-  if (net >= 150) return 8;
-  if (net >= 75) return 6;
-  if (net >= 25) return 4;
+  if (net >= 150) return 9;
+  if (net >= 75) return 7;
+  if (net >= 25) return 5;
   if (net >= -25) return 2;
   if (net >= -75) return 1;
   return 0;
@@ -148,18 +148,20 @@ function getScoreStatus(score: number): string {
   if (score >= 90) return 'EXCELLENT';
   if (score >= 75) return 'GOOD';
   if (score >= 60) return 'FAIR';
+  if (score >= 50) return 'NEUTRAL';
   if (score >= 45) return 'WEAK';
   if (score >= 30) return 'POOR';
   return 'CRITICAL';
 }
 
 function getScoreColor(score: number): string {
-  if (score >= 90) return '#22c55e';
-  if (score >= 75) return '#16a34a';
-  if (score >= 60) return '#FBBB04';
-  if (score >= 45) return '#f97316';
-  if (score >= 30) return '#ef4444';
-  return '#dc2626';
+  if (score >= 90) return '#5cb87a';
+  if (score >= 75) return '#5cb87a';
+  if (score >= 60) return '#c9a84c';
+  if (score >= 50) return '#6a9fc2';
+  if (score >= 45) return '#c0845a';
+  if (score >= 30) return '#b85c5c';
+  return '#b85c5c';
 }
 
 function isUSMarketHours(): boolean {
@@ -258,8 +260,8 @@ export async function computeTrendTier(): Promise<BreadthData['tiers']['trend']>
 
   return {
     score: Math.round(totalScore * 10) / 10,
-    max: 40,
-    percentage: Math.round((totalScore / 40) * 100),
+    max: 35,
+    percentage: Math.round((totalScore / 35) * 100),
     components,
   };
 }
@@ -328,10 +330,10 @@ export async function computeQuoteBreadth(): Promise<{
   } catch {}
 
   return {
-    above50ma: { value: pctAbove50, score: scoreAbove50MA(pctAbove50), max: 10 },
-    above200ma: { value: pctAbove200, score: scoreAbove200MA(pctAbove200), max: 10 },
-    netHighs52w: { value: netHighs, highs: newHighs, lows: newLows, score: scoreNetHighs(netHighs), max: 8 },
-    fourPercent: { value: ratio4, bulls: bulls4, bears: bears4, score: score4PercentRatio(ratio4), max: 15 },
+    above50ma: { value: pctAbove50, score: scoreAbove50MA(pctAbove50), max: 11 },
+    above200ma: { value: pctAbove200, score: scoreAbove200MA(pctAbove200), max: 11 },
+    netHighs52w: { value: netHighs, highs: newHighs, lows: newLows, score: scoreNetHighs(netHighs), max: 9 },
+    fourPercent: { value: ratio4, bulls: bulls4, bears: bears4, score: score4PercentRatio(ratio4), max: 16 },
     vixLevel: { value: vixLevel, score: scoreVIX(vixLevel), max: 7 },
     universeSize: mergedUniverse.size,
   };
@@ -364,7 +366,7 @@ export async function computeQuarterlyBreadth(): Promise<{
   const ratio25 = bears25 > 0 ? Math.round((bulls25 / bears25) * 100) / 100 : (bulls25 > 0 ? 10 : 1);
 
   return {
-    twentyFivePercent: { value: ratio25, bulls: bulls25, bears: bears25, score: score25PercentRatio(ratio25), max: 10 },
+    twentyFivePercent: { value: ratio25, bulls: bulls25, bears: bears25, score: score25PercentRatio(ratio25), max: 11 },
   };
 }
 
@@ -391,11 +393,11 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
   let strengthScore = 0;
   let universeSize = 0;
 
-  let fourPercentData = { value: 1, bulls: 0, bears: 0, score: 7, max: 15 };
-  let twentyFivePercentData = { value: 1, bulls: 0, bears: 0, score: 4, max: 10 };
-  let above50maData = { value: 50, score: 5, max: 10 };
-  let above200maData = { value: 50, score: 4, max: 10 };
-  let netHighsData = { value: 0, highs: 0, lows: 0, score: 2, max: 8 };
+  let fourPercentData = { value: 1, bulls: 0, bears: 0, score: 7, max: 16 };
+  let twentyFivePercentData = { value: 1, bulls: 0, bears: 0, score: 4, max: 11 };
+  let above50maData = { value: 50, score: 5, max: 11 };
+  let above200maData = { value: 50, score: 4, max: 11 };
+  let netHighsData = { value: 0, highs: 0, lows: 0, score: 2, max: 9 };
   let vixData = { value: 20, score: 5, max: 7 };
 
   if (fullScan) {
@@ -449,8 +451,8 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
       trend: trendTier,
       momentum: {
         score: Math.round(momentumScore * 10) / 10,
-        max: 25,
-        percentage: Math.round((momentumScore / 25) * 100),
+        max: 27,
+        percentage: Math.round((momentumScore / 27) * 100),
         components: {
           fourPercentRatio: fourPercentData,
           twentyFivePercentRatio: twentyFivePercentData,
@@ -458,8 +460,8 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
       },
       breadth: {
         score: Math.round(breadthScore * 10) / 10,
-        max: 20,
-        percentage: Math.round((breadthScore / 20) * 100),
+        max: 22,
+        percentage: Math.round((breadthScore / 22) * 100),
         components: {
           above50ma: above50maData,
           above200ma: above200maData,
@@ -467,8 +469,8 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
       },
       strength: {
         score: Math.round(strengthScore * 10) / 10,
-        max: 15,
-        percentage: Math.round((strengthScore / 15) * 100),
+        max: 16,
+        percentage: Math.round((strengthScore / 16) * 100),
         components: {
           netHighs52w: netHighsData,
           vixLevel: vixData,

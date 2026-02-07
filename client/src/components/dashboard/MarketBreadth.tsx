@@ -1,12 +1,28 @@
 import { useMarketBreadth } from "@/hooks/use-market";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
+const MUTED = {
+  green: '#5cb87a',
+  yellow: '#c9a84c',
+  orange: '#c0845a',
+  red: '#b85c5c',
+  blue: '#6a9fc2',
+};
+
+function mqColor(pct: number) {
+  if (pct >= 70) return MUTED.green;
+  if (pct >= 50) return MUTED.blue;
+  if (pct >= 35) return MUTED.yellow;
+  if (pct >= 20) return MUTED.orange;
+  return MUTED.red;
+}
+
 function ScoreRing({ score, label }: { score: number; label: string }) {
   const radius = 40;
   const stroke = 4;
   const circumference = 2 * Math.PI * radius;
   const progress = (score / 100) * circumference;
-  const color = score >= 70 ? '#30d158' : score >= 45 ? '#ffd60a' : score >= 25 ? '#ff9f0a' : '#ff453a';
+  const color = mqColor(score);
 
   return (
     <div className="flex flex-col items-center justify-center" data-testid="score-ring">
@@ -37,7 +53,7 @@ function ScoreRing({ score, label }: { score: number; label: string }) {
 
 function TierBar({ name, score, max }: { name: string; score: number; max: number }) {
   const pct = max > 0 ? Math.min((score / max) * 100, 100) : 0;
-  const color = pct >= 70 ? '#30d158' : pct >= 45 ? '#ffd60a' : pct >= 25 ? '#ff9f0a' : '#ff453a';
+  const color = mqColor(pct);
 
   return (
     <div data-testid={`tier-${name.toLowerCase()}`}>
@@ -59,9 +75,9 @@ function TierBar({ name, score, max }: { name: string; score: number; max: numbe
 
 function TrendBadge({ status }: { status: string }) {
   const config: Record<string, { color: string; icon: any; label: string }> = {
-    'T+': { color: '#30d158', icon: TrendingUp, label: 'UPTREND' },
-    'TS': { color: '#ffd60a', icon: Minus, label: 'SIDEWAYS' },
-    'T-': { color: '#ff453a', icon: TrendingDown, label: 'DOWNTREND' },
+    'T+': { color: MUTED.green, icon: TrendingUp, label: 'UPTREND' },
+    'TS': { color: MUTED.yellow, icon: Minus, label: 'SIDEWAYS' },
+    'T-': { color: MUTED.red, icon: TrendingDown, label: 'DOWNTREND' },
   };
   const c = config[status] || config['TS'];
   const BadgeIcon = c.icon;
@@ -105,14 +121,14 @@ export function MarketBreadth() {
   }
 
   const overall = breadth.overallScore ?? 0;
-  const condition = breadth.status || (overall >= 70 ? 'BULLISH' : overall >= 45 ? 'NEUTRAL' : overall >= 25 ? 'CAUTIOUS' : 'BEARISH');
+  const condition = breadth.status || (overall >= 75 ? 'GOOD' : overall >= 60 ? 'FAIR' : overall >= 50 ? 'NEUTRAL' : overall >= 45 ? 'WEAK' : overall >= 30 ? 'POOR' : 'CRITICAL');
 
   const t = breadth.tiers || {};
   const tiers = [
-    { name: 'Trend', score: t.trend?.score ?? 0, max: t.trend?.max ?? 40 },
-    { name: 'Momentum', score: t.momentum?.score ?? 0, max: t.momentum?.max ?? 25 },
-    { name: 'Breadth', score: t.breadth?.score ?? 0, max: t.breadth?.max ?? 20 },
-    { name: 'Strength', score: t.strength?.score ?? 0, max: t.strength?.max ?? 15 },
+    { name: 'Trend', score: t.trend?.score ?? 0, max: t.trend?.max ?? 35 },
+    { name: 'Momentum', score: t.momentum?.score ?? 0, max: t.momentum?.max ?? 27 },
+    { name: 'Breadth', score: t.breadth?.score ?? 0, max: t.breadth?.max ?? 22 },
+    { name: 'Strength', score: t.strength?.score ?? 0, max: t.strength?.max ?? 16 },
   ];
 
   const vixVal = t.strength?.components?.vixLevel?.value ?? 0;
@@ -125,8 +141,8 @@ export function MarketBreadth() {
   const bears25 = t.momentum?.components?.twentyFivePercentRatio?.bears ?? 0;
   const spyTrend = getSPYTrend(t);
 
-  const pctColor = (val: number, threshold = 50) => val >= threshold ? '#30d158' : val >= threshold * 0.6 ? '#ffd60a' : '#ff453a';
-  const ratioColor = (val: number) => val > 0 ? '#30d158' : val < 0 ? '#ff453a' : '#ffd60a';
+  const pctColor = (val: number, threshold = 50) => val >= threshold ? MUTED.green : val >= threshold * 0.6 ? MUTED.yellow : MUTED.red;
+  const ratioColor = (val: number) => val > 0 ? MUTED.green : val < 0 ? MUTED.red : MUTED.yellow;
 
   return (
     <div className="mb-6">
@@ -159,7 +175,7 @@ export function MarketBreadth() {
             <MetricCell
               label="VIX"
               value={vixVal > 0 ? vixVal.toFixed(1) : '\u2014'}
-              color={vixVal <= 15 ? '#30d158' : vixVal <= 25 ? '#ffd60a' : '#ff453a'}
+              color={vixVal <= 15 ? MUTED.green : vixVal <= 25 ? MUTED.yellow : MUTED.red}
             />
             <MetricCell
               label="> 50 MA"
@@ -174,12 +190,12 @@ export function MarketBreadth() {
             <MetricCell
               label="4% Bull"
               value={String(bulls4)}
-              color="#30d158"
+              color={MUTED.green}
             />
             <MetricCell
               label="4% Bear"
               value={String(bears4)}
-              color="#ff453a"
+              color={MUTED.red}
             />
             <MetricCell
               label="Net H/L"
@@ -189,12 +205,12 @@ export function MarketBreadth() {
             <MetricCell
               label="25% Up"
               value={String(bulls25)}
-              color="#30d158"
+              color={MUTED.green}
             />
             <MetricCell
               label="25% Dn"
               value={String(bears25)}
-              color="#ff453a"
+              color={MUTED.red}
             />
             <MetricCell
               label="Net 4%"

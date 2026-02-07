@@ -45,7 +45,7 @@ Preferred communication style: Simple, everyday language.
 - `GET /api/market/sectors` — Sector performance data
 - `GET /api/market/sectors/rotation` — RRG (Relative Rotation Graph) data: RS-Ratio & RS-Momentum for 11 sector ETFs vs SPY with 5-point weekly tails
 - `GET /api/market/industries/performance` — Top/bottom industry performance with D/W/M timeframes
-- `GET /api/market/breadth` — Market Quality Score with 4-tier scoring (Trend 40pts, Momentum 25pts, Breadth 20pts, Strength 15pts), two-phase loading (trend-only fast → full S&P 500 scan)
+- `GET /api/market/breadth` — Market Quality Score with 4-tier scoring (Trend 35pts, Momentum 27pts, Breadth 22pts, Strength 16pts), status tiers: EXCELLENT/GOOD/FAIR/NEUTRAL/WEAK/POOR/CRITICAL, two-phase loading (trend-only fast → full S&P 500 scan). File-persisted to `.breadth-cache.json`.
 - `GET /api/market/status` — Market open/close status
 - `GET /api/market/sectors/:name` — Sector detail with industries
 - `GET /api/market/sectors/:name/industries/:industry` — Industry stocks
