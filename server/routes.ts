@@ -7,7 +7,7 @@ import * as yahoo from "./api/yahoo";
 import * as fmp from "./api/fmp";
 import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
-import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, searchStocks } from "./api/finviz";
+import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, searchStocks, getFinvizNews } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData } from "./api/breadth";
 import * as fs from 'fs';
 import * as path from 'path';
@@ -866,6 +866,9 @@ export async function registerRoutes(
           instOwnership: sum?.institutionPercentHeld ?? 0,
           numInstitutions: sum?.numberOfInstitutions ?? 0,
           avgVolume50d: sum?.avgVolume50d ?? q?.avgVolume ?? 0,
+          shortInterest: sum?.shortInterest ?? 0,
+          shortRatio: sum?.shortRatio ?? 0,
+          shortPercentOfFloat: sum?.shortPercentOfFloat ?? 0,
           nextEarningsDate,
           daysToEarnings,
         },
@@ -896,7 +899,7 @@ export async function registerRoutes(
     } catch (e: any) {
       console.error(`Quality error for ${symbol}:`, e.message);
       return res.json({
-        details: { marketCap: 0, floatShares: 0, rsVsSpy: 0, rsTimeframe: 'current', adr: 0, instOwnership: 0, numInstitutions: 0, avgVolume50d: 0, nextEarningsDate: '', daysToEarnings: 0 },
+        details: { marketCap: 0, floatShares: 0, rsVsSpy: 0, rsTimeframe: 'current', adr: 0, instOwnership: 0, numInstitutions: 0, avgVolume50d: 0, shortInterest: 0, shortRatio: 0, shortPercentOfFloat: 0, nextEarningsDate: '', daysToEarnings: 0 },
         fundamentals: { epsQoQ: 0, salesQoQ: 0, epsYoY: 0, salesYoY: 0, earningsAcceleration: false, salesGrowth1Y: 0 },
         profitability: { epsTTM: 0, fcfTTM: 0 },
         trend: { weinsteinStage: 1, aboveEma10: false, aboveEma20: false, aboveSma50: false, aboveSma200: false, maAlignment: false, distFromSma50: 0, overextensionFlag: '<4', atrMultiple: 0 },
@@ -919,13 +922,22 @@ export async function registerRoutes(
 
   app.get('/api/stocks/:symbol/news', async (req, res) => {
     const { symbol } = req.params;
+    const sym = symbol.toUpperCase();
     try {
-      const data = await fmp.getStockNews(symbol.toUpperCase());
+      const finvizNews = await getFinvizNews(sym);
+      if (finvizNews && finvizNews.length > 0) {
+        return res.json(finvizNews);
+      }
+    } catch (e: any) {
+      console.error(`Finviz news error for ${sym}:`, e.message);
+    }
+    try {
+      const data = await fmp.getStockNews(sym);
       if (data && data.length > 0) {
         return res.json(data);
       }
     } catch (e: any) {
-      console.error(`News error for ${symbol}:`, e.message);
+      console.error(`FMP news error for ${sym}:`, e.message);
     }
     return res.json([]);
   });

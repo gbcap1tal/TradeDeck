@@ -89,6 +89,13 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
           <QualityRow label="Inst. Own" value={`${quality.details.instOwnership}%`} />
           <QualityRow label="# Inst." value={quality.details.numInstitutions.toLocaleString()} />
           <QualityRow label="Avg Vol 50D" value={formatVolume(quality.details.avgVolume50d)} />
+          {quality.details.shortInterest > 0 && (
+            <QualityRow
+              label="Short Interest"
+              value={`${formatVolume(quality.details.shortInterest)} (${quality.details.shortPercentOfFloat}%)`}
+              color={quality.details.shortPercentOfFloat >= 20 ? "text-[#ff453a]" : quality.details.shortPercentOfFloat >= 10 ? "text-[#ffd60a]" : "text-white/80"}
+            />
+          )}
           <div className="mt-1 pt-1 border-t border-white/[0.06]">
             <div className="flex items-center justify-between py-[3px]">
               <div className="flex items-center gap-1.5">
@@ -153,7 +160,7 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
             </div>
           ) : (
             <div className="space-y-1.5">
-              {news?.slice(0, 2).map((item: any) => (
+              {news?.slice(0, 5).map((item: any) => (
                 <a
                   key={item.id}
                   href={item.url}

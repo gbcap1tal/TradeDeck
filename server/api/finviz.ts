@@ -355,6 +355,73 @@ export function searchStocks(query: string, limit: number = 10): Array<{ symbol:
   return [...symbolExact, ...symbolPrefix.sort((a, b) => a.symbol.length - b.symbol.length), ...nameMatch].slice(0, limit);
 }
 
+export async function getFinvizNews(symbol: string): Promise<Array<{ id: string; headline: string; summary: string; source: string; url: string; timestamp: number; relatedSymbols: string[] }> | null> {
+  const key = `finviz_news_${symbol}`;
+  const cached = getCached<any[]>(key);
+  if (cached) return cached;
+
+  try {
+    const url = `https://finviz.com/quote.ashx?t=${encodeURIComponent(symbol)}&ty=c&ta=1&p=d`;
+    const result = await fetchPage(url);
+    if (!result.html) return null;
+
+    const $ = cheerio.load(result.html);
+    const newsItems: Array<{ id: string; headline: string; summary: string; source: string; url: string; timestamp: number; relatedSymbols: string[] }> = [];
+
+    const newsTable = $('table.fullview-news-outer');
+    if (!newsTable.length) return null;
+
+    let lastDate = '';
+    newsTable.find('tr').each((i, row) => {
+      if (i >= 10) return false;
+      const cells = $(row).find('td');
+      if (cells.length < 2) return;
+
+      const dateCell = cells.eq(0).text().trim();
+      const newsCell = cells.eq(1);
+      const link = newsCell.find('a.tab-link-news');
+      if (!link.length) return;
+
+      const headline = link.text().trim();
+      const newsUrl = link.attr('href') || '';
+      const sourceEl = newsCell.find('span');
+      const source = sourceEl.text().trim().replace(/[()]/g, '') || 'Finviz';
+
+      if (dateCell.includes('-')) {
+        lastDate = dateCell;
+      }
+      const dateStr = dateCell.includes('-') ? dateCell : `${lastDate} ${dateCell}`;
+
+      let timestamp = Date.now();
+      try {
+        const parsed = new Date(dateStr);
+        if (!isNaN(parsed.getTime())) timestamp = parsed.getTime();
+      } catch {}
+
+      if (headline && newsUrl) {
+        newsItems.push({
+          id: String(i + 1),
+          headline,
+          summary: '',
+          source,
+          url: newsUrl,
+          timestamp,
+          relatedSymbols: [symbol],
+        });
+      }
+    });
+
+    if (newsItems.length > 0) {
+      setCache(key, newsItems, 900);
+      return newsItems;
+    }
+    return null;
+  } catch (e: any) {
+    console.error(`[finviz] News scrape error for ${symbol}:`, e.message);
+    return null;
+  }
+}
+
 export function getAllIndustriesWithStockCount(): Array<{ name: string; sector: string; stockCount: number }> {
   const data = getFinvizDataSync();
   if (!data) return [];

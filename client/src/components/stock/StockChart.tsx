@@ -89,7 +89,7 @@ export function StockChart({ symbol, currentPrice, compact }: StockChartProps) {
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
               <XAxis
                 dataKey="time"
-                tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.18)' }}
+                tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.35)' }}
                 tickLine={false}
                 axisLine={false}
                 minTickGap={50}
@@ -101,12 +101,13 @@ export function StockChart({ symbol, currentPrice, compact }: StockChartProps) {
                 }}
               />
               <YAxis
+                orientation="right"
                 domain={yDomain as any}
-                tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.18)' }}
+                tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.35)' }}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(val) => `$${val.toFixed(0)}`}
-                width={40}
+                width={50}
               />
               <Tooltip
                 content={({ active, payload, label }) => {
@@ -141,7 +142,7 @@ export function StockChart({ symbol, currentPrice, compact }: StockChartProps) {
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
               <XAxis
                 dataKey="time"
-                tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.18)' }}
+                tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.35)' }}
                 tickLine={false}
                 axisLine={false}
                 minTickGap={50}
@@ -154,12 +155,13 @@ export function StockChart({ symbol, currentPrice, compact }: StockChartProps) {
               />
               <YAxis
                 yAxisId="candle"
+                orientation="right"
                 domain={yDomain as any}
-                tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.18)' }}
+                tick={{ fontSize: 11, fill: 'rgba(255,255,255,0.35)' }}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(val) => `$${val.toFixed(0)}`}
-                width={40}
+                width={50}
               />
               <Tooltip
                 content={({ active, payload, label }) => {
