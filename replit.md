@@ -95,6 +95,7 @@ Preferred communication style: Simple, everyday language.
 ### Required Services
 - **PostgreSQL Database**: Required. Connection via `DATABASE_URL` environment variable. Used for user sessions, user accounts, and watchlists.
 - **Replit Auth (OpenID Connect)**: Authentication provider. Requires `REPL_ID`, `ISSUER_URL`, and `SESSION_SECRET` environment variables.
+- **Resend** (email alerts via Replit connector): Sends alert emails to invest@gb.capital when critical system failures occur. Alert module at `server/api/alerts.ts` with 30-minute cooldown per category. Categories: `finviz_scrape`, `breadth_scan`, `rotation`, `industry_perf`, `general`. Alerts fire on: Finviz scrape failures (blocked, incomplete, exception), Market Quality breadth scan failures, rotation data failures, industry performance fallbacks. Uses Resend connector for API key management.
 
 ### Key NPM Packages
 - **drizzle-orm** + **drizzle-kit**: Database ORM and migration tooling

@@ -9,6 +9,7 @@ import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefre
 import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
 import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData } from "./api/breadth";
+import { sendAlert } from "./api/alerts";
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -301,6 +302,7 @@ function initBackgroundTasks() {
       console.log(`[bg] Finviz complete: ${Object.keys(finvizData).length} sectors, ${totalIndustries} industries, ${totalStocks} stocks in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
     } else {
       console.log('[bg] Finviz data not available yet, sectors will show without industries initially');
+      sendAlert('Finviz Scrape Failed on Startup', 'Finviz data could not be loaded during server boot. Industry performance will use persisted cache if available.', 'finviz_scrape');
     }
 
     console.log('[bg] Computing industry performance from Finviz data...');
@@ -343,6 +345,7 @@ function initBackgroundTasks() {
       console.log(`[bg] Full breadth computed: score=${breadthFull.overallScore} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
     } catch (err: any) {
       console.log(`[bg] Breadth full scan error: ${err.message}`);
+      sendAlert('Market Breadth Scan Failed', `Full breadth scan failed during startup.\n\nError: ${err.message}`, 'breadth_scan');
     }
   }, 1000);
 
@@ -361,9 +364,12 @@ function initBackgroundTasks() {
           for (const stocks of Object.values(s.stocks)) totalStocks += stocks.length;
         }
         console.log(`[scheduler] Finviz: ${Object.keys(finvizData).length} sectors, ${totalStocks} stocks`);
+      } else {
+        sendAlert('Scheduled Finviz Refresh Returned No Data', `Finviz scrape during ${windowLabel} returned null (possible block, timeout, or too few stocks).`, 'finviz_scrape');
       }
     } catch (err: any) {
       console.error(`[scheduler] Finviz refresh error: ${err.message}`);
+      sendAlert('Scheduled Finviz Refresh Failed', `Finviz scrape failed during ${windowLabel} refresh.\n\nError: ${err.message}`, 'finviz_scrape');
     }
 
     let perfData = await computeIndustryPerformance();
@@ -373,6 +379,7 @@ function initBackgroundTasks() {
         perfData = persisted;
         console.log(`[scheduler] Falling back to persisted industry performance`);
       }
+      sendAlert('Industry Performance Incomplete', `Industry performance not fully enriched during ${windowLabel}. Using ${persisted ? 'persisted cache' : 'empty data'} as fallback.`, 'industry_perf');
     }
     setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
     console.log(`[scheduler] Industry performance refreshed: ${perfData.industries?.length} industries`);
@@ -387,14 +394,20 @@ function initBackgroundTasks() {
           const rotData = await computeRotationData();
           setCache('rrg_rotation', rotData, CACHE_TTL.SECTORS);
           console.log(`[scheduler] Rotation data refreshed`);
-        } catch (err: any) { console.error(`[scheduler] Rotation error: ${err.message}`); }
+        } catch (err: any) {
+          console.error(`[scheduler] Rotation error: ${err.message}`);
+          sendAlert('Rotation Data Refresh Failed', `RRG rotation data failed during ${windowLabel}.\n\nError: ${err.message}`, 'rotation');
+        }
       })(),
       (async () => {
         try {
           const breadth = await computeMarketBreadth(true);
           setCache('market_breadth', breadth, CACHE_TTL.BREADTH);
           console.log(`[scheduler] Market Quality refreshed: score=${breadth.overallScore}`);
-        } catch (err: any) { console.error(`[scheduler] Breadth error: ${err.message}`); }
+        } catch (err: any) {
+          console.error(`[scheduler] Breadth error: ${err.message}`);
+          sendAlert('Market Breadth Scan Failed', `Breadth scan failed during ${windowLabel} refresh.\n\nError: ${err.message}`, 'breadth_scan');
+        }
       })(),
     ]);
 

@@ -162,6 +162,10 @@ async function scrapeAllStocks(): Promise<FinvizStock[]> {
       consecutiveFailures++;
       if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
         console.log(`[finviz] Stopping at offset ${offset} after ${MAX_CONSECUTIVE_FAILURES} consecutive failures`);
+        try {
+          const { sendAlert } = await import('./alerts');
+          sendAlert('Finviz Scrape Aborted', `Scrape stopped early at offset ${offset} after ${MAX_CONSECUTIVE_FAILURES} consecutive page failures.\n\nStocks scraped so far: ${allStocks.length}`, 'finviz_scrape');
+        } catch {}
         break;
       }
       offset += 20;
@@ -272,6 +276,10 @@ export async function getFinvizData(forceRefresh: boolean = false): Promise<Finv
       const stocks = await scrapeAllStocks();
       if (stocks.length < 500) {
         console.log(`[finviz] Too few stocks scraped (${stocks.length}), likely blocked. Skipping.`);
+        try {
+          const { sendAlert } = await import('./alerts');
+          sendAlert('Finviz Scrape Incomplete', `Only ${stocks.length} stocks scraped (expected 5000+). Finviz may be blocking requests.`, 'finviz_scrape');
+        } catch {}
         return null;
       }
 
@@ -295,6 +303,10 @@ export async function getFinvizData(forceRefresh: boolean = false): Promise<Finv
 
       if (sectorCount < 8) {
         console.log(`[finviz] Only ${sectorCount} sectors, likely incomplete scrape. Not persisting.`);
+        try {
+          const { sendAlert } = await import('./alerts');
+          sendAlert('Finviz Scrape Incomplete Sectors', `Only ${sectorCount} sectors found (expected 11). Scrape may be incomplete.\n\nStocks: ${stockCount}, Industries: ${industryCount}`, 'finviz_scrape');
+        } catch {}
         return null;
       }
 
@@ -303,6 +315,10 @@ export async function getFinvizData(forceRefresh: boolean = false): Promise<Finv
       return organized;
     } catch (err: any) {
       console.log(`[finviz] Scrape failed: ${err.message}`);
+      try {
+        const { sendAlert } = await import('./alerts');
+        sendAlert('Finviz Scrape Exception', `Finviz scrape threw an error.\n\nError: ${err.message}`, 'finviz_scrape');
+      } catch {}
       return null;
     } finally {
       scrapeInProgress = false;
