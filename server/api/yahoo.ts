@@ -3,6 +3,39 @@ import { getCached, setCache, CACHE_TTL } from './cache';
 
 const yf: any = new (YahooFinance as any)();
 
+const MAX_CONCURRENT = 3;
+const MIN_DELAY_MS = 300;
+let activeRequests = 0;
+const requestQueue: Array<{ resolve: () => void }> = [];
+
+async function acquireSlot(): Promise<void> {
+  if (activeRequests < MAX_CONCURRENT) {
+    activeRequests++;
+    return;
+  }
+  return new Promise(resolve => {
+    requestQueue.push({ resolve });
+  });
+}
+
+function releaseSlot(): void {
+  activeRequests--;
+  if (requestQueue.length > 0 && activeRequests < MAX_CONCURRENT) {
+    activeRequests++;
+    const next = requestQueue.shift()!;
+    setTimeout(() => next.resolve(), MIN_DELAY_MS);
+  }
+}
+
+async function throttledYahooCall(fn: () => Promise<any>): Promise<any> {
+  await acquireSlot();
+  try {
+    return await fn();
+  } finally {
+    releaseSlot();
+  }
+}
+
 const INDEX_NAMES: Record<string, string> = {
   SPY: 'S&P 500',
   QQQ: 'Nasdaq 100',
@@ -14,59 +47,86 @@ const INDEX_NAMES: Record<string, string> = {
   VIX: 'Volatility Index',
 };
 
+export class RateLimitError extends Error {
+  constructor(symbol: string) {
+    super(`Rate limited fetching ${symbol}`);
+    this.name = 'RateLimitError';
+  }
+}
+
+function isRateLimitError(e: any): boolean {
+  const msg = (e?.message || '').toLowerCase();
+  return msg.includes('too many requests') || msg.includes('rate limit') || msg.includes('429');
+}
+
 export async function getQuote(symbol: string) {
   const key = `yf_quote_${symbol}`;
   const cached = getCached<any>(key);
   if (cached) return cached;
 
-  try {
-    const result = await yf.quote(symbol);
-    if (!result) return null;
+  const maxRetries = 3;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await throttledYahooCall(() => yf.quote(symbol));
+      if (!result) return null;
 
-    const data = {
-      symbol: result.symbol,
-      name: result.longName || result.shortName || symbol,
-      price: result.regularMarketPrice ?? 0,
-      change: result.regularMarketChange ?? 0,
-      changePercent: result.regularMarketChangePercent ?? 0,
-      volume: result.regularMarketVolume ?? 0,
-      high: result.regularMarketDayHigh ?? 0,
-      low: result.regularMarketDayLow ?? 0,
-      open: result.regularMarketOpen ?? 0,
-      prevClose: result.regularMarketPreviousClose ?? 0,
-      marketCap: result.marketCap ?? 0,
-      peRatio: result.trailingPE ?? 0,
-      dividendYield: (result.dividendYield ?? 0),
-      sector: (result as any).sector || '',
-      industry: (result as any).industry || '',
-      week52High: result.fiftyTwoWeekHigh ?? 0,
-      week52Low: result.fiftyTwoWeekLow ?? 0,
-      avgVolume: result.averageDailyVolume3Month ?? 0,
-      fiftyDayAverage: result.fiftyDayAverage ?? 0,
-      twoHundredDayAverage: result.twoHundredDayAverage ?? 0,
-      avgVolume10Day: (result as any).averageDailyVolume10Day ?? 0,
-    };
+      const data = {
+        symbol: result.symbol,
+        name: result.longName || result.shortName || symbol,
+        price: result.regularMarketPrice ?? 0,
+        change: result.regularMarketChange ?? 0,
+        changePercent: result.regularMarketChangePercent ?? 0,
+        volume: result.regularMarketVolume ?? 0,
+        high: result.regularMarketDayHigh ?? 0,
+        low: result.regularMarketDayLow ?? 0,
+        open: result.regularMarketOpen ?? 0,
+        prevClose: result.regularMarketPreviousClose ?? 0,
+        marketCap: result.marketCap ?? 0,
+        peRatio: result.trailingPE ?? 0,
+        dividendYield: (result.dividendYield ?? 0),
+        sector: (result as any).sector || '',
+        industry: (result as any).industry || '',
+        week52High: result.fiftyTwoWeekHigh ?? 0,
+        week52Low: result.fiftyTwoWeekLow ?? 0,
+        avgVolume: result.averageDailyVolume3Month ?? 0,
+        fiftyDayAverage: result.fiftyDayAverage ?? 0,
+        twoHundredDayAverage: result.twoHundredDayAverage ?? 0,
+        avgVolume10Day: (result as any).averageDailyVolume10Day ?? 0,
+      };
 
-    setCache(key, data, CACHE_TTL.QUOTE);
-    return data;
-  } catch (e: any) {
-    console.error(`Yahoo quote error for ${symbol}:`, e.message);
-    return null;
+      setCache(key, data, CACHE_TTL.QUOTE);
+      return data;
+    } catch (e: any) {
+      if (isRateLimitError(e)) {
+        if (attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 1000 + Math.random() * 500;
+          await new Promise(r => setTimeout(r, delay));
+          continue;
+        }
+        throw new RateLimitError(symbol);
+      }
+      console.error(`Yahoo quote error for ${symbol}:`, e.message);
+      return null;
+    }
   }
+  return null;
 }
 
-async function batchConcurrent<T>(items: T[], fn: (item: T) => Promise<any>, concurrency: number = 10): Promise<any[]> {
+async function batchConcurrent<T>(items: T[], fn: (item: T) => Promise<any>, concurrency: number = 5): Promise<any[]> {
   const results: any[] = [];
   for (let i = 0; i < items.length; i += concurrency) {
     const batch = items.slice(i, i + concurrency);
     const batchResults = await Promise.allSettled(batch.map(fn));
     results.push(...batchResults.map(r => r.status === 'fulfilled' ? r.value : null));
+    if (i + concurrency < items.length) {
+      await new Promise(r => setTimeout(r, 200));
+    }
   }
   return results;
 }
 
 export async function getMultipleQuotes(symbols: string[]) {
-  const results = await batchConcurrent(symbols, s => getQuote(s), 25);
+  const results = await batchConcurrent(symbols, s => getQuote(s), 5);
   return results.filter(Boolean);
 }
 
@@ -80,7 +140,7 @@ export async function getMultipleHistories(symbols: string[], range: string = '1
       }
     } catch {}
     return null;
-  }, 20);
+  }, 5);
   return results;
 }
 
@@ -89,44 +149,53 @@ export async function getHistory(symbol: string, range: string = '1M') {
   const cached = getCached<any[]>(key);
   if (cached) return cached;
 
-  try {
-    const periodMap: Record<string, { period1: Date; interval: '1d' | '1wk' | '1mo' | '5m' | '15m' | '1h' }> = {
-      '1D': { period1: new Date(Date.now() - 2 * 86400000), interval: '5m' },
-      '1W': { period1: new Date(Date.now() - 8 * 86400000), interval: '15m' },
-      '1M': { period1: new Date(Date.now() - 32 * 86400000), interval: '1d' },
-      '3M': { period1: new Date(Date.now() - 95 * 86400000), interval: '1d' },
-      '1Y': { period1: new Date(Date.now() - 370 * 86400000), interval: '1d' },
-      '5Y': { period1: new Date(Date.now() - 1830 * 86400000), interval: '1wk' },
-    };
+  const periodMap: Record<string, { period1: Date; interval: '1d' | '1wk' | '1mo' | '5m' | '15m' | '1h' }> = {
+    '1D': { period1: new Date(Date.now() - 2 * 86400000), interval: '5m' },
+    '1W': { period1: new Date(Date.now() - 8 * 86400000), interval: '15m' },
+    '1M': { period1: new Date(Date.now() - 32 * 86400000), interval: '1d' },
+    '3M': { period1: new Date(Date.now() - 95 * 86400000), interval: '1d' },
+    '1Y': { period1: new Date(Date.now() - 370 * 86400000), interval: '1d' },
+    '5Y': { period1: new Date(Date.now() - 1830 * 86400000), interval: '1wk' },
+  };
 
-    const config = periodMap[range] || periodMap['1M'];
+  const config = periodMap[range] || periodMap['1M'];
+  const maxRetries = 3;
 
-    const result = await yf.chart(symbol, {
-      period1: config.period1,
-      interval: config.interval,
-    });
-
-    if (!result || !result.quotes || result.quotes.length === 0) return [];
-
-    const data = result.quotes
-      .filter((q: any) => q.close != null)
-      .map((q: any) => ({
-        time: range === '1D' || range === '1W'
-          ? new Date(q.date).toISOString()
-          : new Date(q.date).toISOString().split('T')[0],
-        value: Math.round((q.close ?? 0) * 100) / 100,
-        open: Math.round((q.open ?? 0) * 100) / 100,
-        high: Math.round((q.high ?? 0) * 100) / 100,
-        low: Math.round((q.low ?? 0) * 100) / 100,
-        close: Math.round((q.close ?? 0) * 100) / 100,
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await throttledYahooCall(() => yf.chart(symbol, {
+        period1: config.period1,
+        interval: config.interval,
       }));
 
-    setCache(key, data, CACHE_TTL.HISTORY);
-    return data;
-  } catch (e: any) {
-    console.error(`Yahoo history error for ${symbol}:`, e.message);
-    return [];
+      if (!result || !result.quotes || result.quotes.length === 0) return [];
+
+      const data = result.quotes
+        .filter((q: any) => q.close != null)
+        .map((q: any) => ({
+          time: range === '1D' || range === '1W'
+            ? new Date(q.date).toISOString()
+            : new Date(q.date).toISOString().split('T')[0],
+          value: Math.round((q.close ?? 0) * 100) / 100,
+          open: Math.round((q.open ?? 0) * 100) / 100,
+          high: Math.round((q.high ?? 0) * 100) / 100,
+          low: Math.round((q.low ?? 0) * 100) / 100,
+          close: Math.round((q.close ?? 0) * 100) / 100,
+        }));
+
+      setCache(key, data, CACHE_TTL.HISTORY);
+      return data;
+    } catch (e: any) {
+      if (isRateLimitError(e) && attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 1000 + Math.random() * 500;
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      console.error(`Yahoo history error for ${symbol}:`, e.message);
+      return [];
+    }
   }
+  return [];
 }
 
 export async function getIndices() {
@@ -137,7 +206,7 @@ export async function getIndices() {
   const symbols = ['SPY', 'QQQ', 'MDY', 'IWM', 'TLT'];
 
   try {
-    const quotes = await Promise.allSettled(symbols.map(s => yf.quote(s)));
+    const quotes = await Promise.allSettled(symbols.map(s => throttledYahooCall(() => yf.quote(s))));
     const results: any[] = [];
 
     for (let i = 0; i < symbols.length; i++) {
@@ -156,7 +225,7 @@ export async function getIndices() {
     }
 
     try {
-      const vixResult = await yf.quote('^VIX');
+      const vixResult = await throttledYahooCall(() => yf.quote('^VIX'));
       if (vixResult) {
         results.splice(4, 0, {
           symbol: 'VIX',
@@ -200,7 +269,7 @@ export async function getSectorETFs() {
 
   try {
     const quotes = await Promise.allSettled(
-      SECTOR_ETFS.map(s => yf.quote(s.ticker))
+      SECTOR_ETFS.map(s => throttledYahooCall(() => yf.quote(s.ticker)))
     );
 
     const results = SECTOR_ETFS.map((sector, i) => {
@@ -236,45 +305,54 @@ export async function getStockSummary(symbol: string) {
   const cached = getCached<any>(key);
   if (cached) return cached;
 
-  try {
-    const [quoteResult, summaryResult] = await Promise.allSettled([
-      yf.quote(symbol),
-      yf.quoteSummary(symbol, {
-        modules: ['defaultKeyStatistics', 'financialData', 'calendarEvents'],
-      }),
-    ]);
+  const maxRetries = 3;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const [quoteResult, summaryResult] = await Promise.allSettled([
+        throttledYahooCall(() => yf.quote(symbol)),
+        throttledYahooCall(() => yf.quoteSummary(symbol, {
+          modules: ['defaultKeyStatistics', 'financialData', 'calendarEvents'],
+        })),
+      ]);
 
-    const quote = quoteResult.status === 'fulfilled' ? quoteResult.value : null;
-    const summary = summaryResult.status === 'fulfilled' ? summaryResult.value : null;
+      const quote = quoteResult.status === 'fulfilled' ? quoteResult.value : null;
+      const summary = summaryResult.status === 'fulfilled' ? summaryResult.value : null;
 
-    const keyStats = summary?.defaultKeyStatistics;
-    const financialData = summary?.financialData;
-    const calendar = summary?.calendarEvents;
+      const keyStats = summary?.defaultKeyStatistics;
+      const financialData = summary?.financialData;
+      const calendar = summary?.calendarEvents;
 
-    const data = {
-      floatShares: keyStats?.floatShares ?? 0,
-      sharesOutstanding: keyStats?.sharesOutstanding ?? 0,
-      institutionPercentHeld: Math.round((keyStats?.heldPercentInstitutions ?? 0) * 100 * 10) / 10,
-      numberOfInstitutions: 0,
-      avgVolume50d: quote?.averageDailyVolume3Month ?? 0,
-      trailingEps: financialData?.currentPrice ? (keyStats?.trailingEps ?? 0) : 0,
-      forwardEps: keyStats?.forwardEps ?? 0,
-      freeCashflow: financialData?.freeCashflow ?? 0,
-      earningsDate: null as string | null,
-      revenueGrowth: Math.round((financialData?.revenueGrowth ?? 0) * 100 * 10) / 10,
-      earningsGrowth: Math.round((financialData?.earningsGrowth ?? 0) * 100 * 10) / 10,
-    };
+      const data = {
+        floatShares: keyStats?.floatShares ?? 0,
+        sharesOutstanding: keyStats?.sharesOutstanding ?? 0,
+        institutionPercentHeld: Math.round((keyStats?.heldPercentInstitutions ?? 0) * 100 * 10) / 10,
+        numberOfInstitutions: 0,
+        avgVolume50d: quote?.averageDailyVolume3Month ?? 0,
+        trailingEps: financialData?.currentPrice ? (keyStats?.trailingEps ?? 0) : 0,
+        forwardEps: keyStats?.forwardEps ?? 0,
+        freeCashflow: financialData?.freeCashflow ?? 0,
+        earningsDate: null as string | null,
+        revenueGrowth: Math.round((financialData?.revenueGrowth ?? 0) * 100 * 10) / 10,
+        earningsGrowth: Math.round((financialData?.earningsGrowth ?? 0) * 100 * 10) / 10,
+      };
 
-    if (calendar?.earnings?.earningsDate && calendar.earnings.earningsDate.length > 0) {
-      data.earningsDate = new Date(calendar.earnings.earningsDate[0]).toISOString().split('T')[0];
+      if (calendar?.earnings?.earningsDate && calendar.earnings.earningsDate.length > 0) {
+        data.earningsDate = new Date(calendar.earnings.earningsDate[0]).toISOString().split('T')[0];
+      }
+
+      setCache(key, data, CACHE_TTL.FUNDAMENTALS);
+      return data;
+    } catch (e: any) {
+      if (isRateLimitError(e) && attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 1000 + Math.random() * 500;
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      console.error(`Yahoo summary error for ${symbol}:`, e.message);
+      return null;
     }
-
-    setCache(key, data, CACHE_TTL.FUNDAMENTALS);
-    return data;
-  } catch (e: any) {
-    console.error(`Yahoo summary error for ${symbol}:`, e.message);
-    return null;
   }
+  return null;
 }
 
 let cachedYahooAuth: { crumb: string; cookie: string } | null = null;

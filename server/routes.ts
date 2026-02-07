@@ -731,6 +731,9 @@ export async function registerRoutes(
         });
       }
     } catch (e: any) {
+      if (e instanceof yahoo.RateLimitError || e.name === 'RateLimitError') {
+        return res.status(503).json({ message: "Temporarily unavailable, please retry" });
+      }
       console.error(`Quote error for ${symbol}:`, e.message);
     }
     return res.status(404).json({ message: "Stock not found" });

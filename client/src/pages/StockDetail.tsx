@@ -333,7 +333,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
 export default function StockDetail() {
   const [, params] = useRoute("/stocks/:symbol");
   const symbol = params?.symbol?.toUpperCase() || "";
-  const { data: quote, isLoading: isQuoteLoading } = useStockQuote(symbol);
+  const { data: quote, isLoading: isQuoteLoading, isFetching: isQuoteFetching, isError: isQuoteError } = useStockQuote(symbol);
   const { mutate: addToWatchlist } = useAddToWatchlist();
   const { data: watchlists } = useWatchlists();
   const { user } = useAuth();
@@ -349,7 +349,7 @@ export default function StockDetail() {
       <Navbar />
       <main className="flex-1 min-h-0 flex flex-col">
         <div className="max-w-[1440px] w-full mx-auto px-4 py-2 flex-1 min-h-0 flex flex-col gap-2">
-          {isQuoteLoading ? (
+          {(isQuoteLoading || (isQuoteFetching && !quote)) ? (
             <div className="flex-1 flex flex-col gap-2">
               <div className="shimmer h-10 rounded-xl" />
               <div className="flex-1 shimmer rounded-xl" />

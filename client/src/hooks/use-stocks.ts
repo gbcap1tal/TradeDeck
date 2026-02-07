@@ -13,6 +13,8 @@ export function useStockQuote(symbol: string) {
     },
     enabled: !!symbol,
     refetchInterval: 15000,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 8000),
   });
 }
 
