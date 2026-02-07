@@ -389,16 +389,8 @@ export async function registerRoutes(
       return res.json(stale);
     }
 
-    try {
-      const data = await computeSectorsData();
-      if (data.length > 0) {
-        setCache(cacheKey, data, CACHE_TTL.SECTORS);
-        return res.json(data);
-      }
-    } catch (e: any) {
-      console.error('Sectors API error:', e.message);
-    }
-    res.json([]);
+    backgroundRefresh(cacheKey, computeSectorsData, CACHE_TTL.SECTORS);
+    res.status(202).json({ _warming: true, data: [] });
   });
 
   app.get('/api/market/sectors/rotation', async (req, res) => {
@@ -412,14 +404,8 @@ export async function registerRoutes(
       return res.json(stale);
     }
 
-    try {
-      const result = await computeRotationData();
-      setCache(cacheKey, result, CACHE_TTL.SECTORS);
-      return res.json(result);
-    } catch (e: any) {
-      console.error('RRG rotation error:', e.message);
-      return res.json({ sectors: [] });
-    }
+    backgroundRefresh(cacheKey, computeRotationData, CACHE_TTL.SECTORS);
+    res.status(202).json({ _warming: true, sectors: [] });
   });
 
   app.get('/api/market/industries/performance', async (req, res) => {
@@ -433,14 +419,8 @@ export async function registerRoutes(
       return res.json(stale);
     }
 
-    try {
-      const result = await computeIndustryPerformance();
-      setCache(cacheKey, result, CACHE_TTL.INDUSTRY_PERF);
-      res.json(result);
-    } catch (e: any) {
-      console.error('Industry performance error:', e.message);
-      res.json({ industries: [] });
-    }
+    backgroundRefresh(cacheKey, computeIndustryPerformance, CACHE_TTL.INDUSTRY_PERF);
+    res.status(202).json({ _warming: true, industries: [] });
   });
 
   app.get('/api/market/breadth', (req, res) => {

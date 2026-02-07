@@ -48,7 +48,7 @@ export function SectorPerformance() {
     );
   }
 
-  const industries = data?.industries || [];
+  const industries = Array.isArray(data?.industries) ? data.industries : [];
 
   const getChange = (ind: any, tf: Timeframe) => {
     if (tf === 'W') return ind.weeklyChange ?? 0;

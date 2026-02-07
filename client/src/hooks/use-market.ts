@@ -1,5 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 
+async function fetchWithWarmingRetry(url: string) {
+  const res = await fetch(url, { credentials: "include" });
+  if (!res.ok) throw new Error(`Failed to fetch ${url}`);
+  const data = await res.json();
+  if (data?._warming) {
+    throw new Error("Data warming up");
+  }
+  return data;
+}
+
 export function useMarketIndices() {
   return useQuery({
     queryKey: ['/api/market/indices'],
@@ -15,12 +25,13 @@ export function useMarketIndices() {
 export function useSectorPerformance() {
   return useQuery({
     queryKey: ['/api/market/sectors'],
-    queryFn: async () => {
-      const res = await fetch('/api/market/sectors', { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch sectors");
-      return res.json();
-    },
+    queryFn: () => fetchWithWarmingRetry('/api/market/sectors'),
     refetchInterval: 30000,
+    retry: (failureCount, error) => {
+      if (error?.message === "Data warming up") return failureCount < 60;
+      return false;
+    },
+    retryDelay: 5000,
   });
 }
 
@@ -28,12 +39,15 @@ export function useSectorRotation() {
   return useQuery({
     queryKey: ['/api/market/sectors/rotation'],
     queryFn: async () => {
-      const res = await fetch('/api/market/sectors/rotation', { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch rotation data");
-      const data = await res.json();
+      const data = await fetchWithWarmingRetry('/api/market/sectors/rotation');
       return data.sectors || [];
     },
     refetchInterval: 300000,
+    retry: (failureCount, error) => {
+      if (error?.message === "Data warming up") return failureCount < 60;
+      return false;
+    },
+    retryDelay: 5000,
   });
 }
 
@@ -63,12 +77,13 @@ export function useMarketStatus() {
 export function useIndustryPerformance() {
   return useQuery({
     queryKey: ['/api/market/industries/performance'],
-    queryFn: async () => {
-      const res = await fetch('/api/market/industries/performance', { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch industry performance");
-      return res.json();
-    },
+    queryFn: () => fetchWithWarmingRetry('/api/market/industries/performance'),
     refetchInterval: 120000,
+    retry: (failureCount, error) => {
+      if (error?.message === "Data warming up") return failureCount < 60;
+      return false;
+    },
+    retryDelay: 5000,
   });
 }
 

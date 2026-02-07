@@ -54,7 +54,8 @@ export function MarketHeatmap() {
     return sector.changePercent;
   };
 
-  const sorted = [...(sectors || [])].sort((a: any, b: any) => getChange(b) - getChange(a));
+  const sectorList = Array.isArray(sectors) ? sectors : [];
+  const sorted = [...sectorList].sort((a: any, b: any) => getChange(b) - getChange(a));
 
   return (
     <div>
