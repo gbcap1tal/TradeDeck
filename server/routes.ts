@@ -9,6 +9,31 @@ import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefre
 import { SECTORS_DATA, INDUSTRY_ETF_MAP, INDUSTRY_STOCKS } from "./data/sectors";
 import { getFinvizData, mergeStockLists, getFinvizNamesForIndustry, type FinvizSectorData } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData } from "./api/breadth";
+import * as fs from 'fs';
+import * as path from 'path';
+
+const INDUSTRY_PERF_PERSIST_PATH = path.join(process.cwd(), '.industry-perf-cache.json');
+
+function persistIndustryPerfToFile(data: any): void {
+  try {
+    fs.writeFileSync(INDUSTRY_PERF_PERSIST_PATH, JSON.stringify({ data, savedAt: Date.now() }), 'utf-8');
+  } catch {}
+}
+
+function loadPersistedIndustryPerf(): any | null {
+  try {
+    if (!fs.existsSync(INDUSTRY_PERF_PERSIST_PATH)) return null;
+    const raw = JSON.parse(fs.readFileSync(INDUSTRY_PERF_PERSIST_PATH, 'utf-8'));
+    if (raw?.data && raw.savedAt) {
+      const ageHours = (Date.now() - raw.savedAt) / (1000 * 60 * 60);
+      const d = raw.data;
+      if (ageHours < 24 && d.fullyEnriched && Array.isArray(d.industries) && d.industries.length > 0) {
+        return d;
+      }
+    }
+  } catch {}
+  return null;
+}
 
 function getEnrichedStocksSync(industryName: string, finvizData: FinvizSectorData | null): Array<{ symbol: string; name: string }> {
   const hardcoded = INDUSTRY_STOCKS[industryName] || [];
@@ -131,7 +156,11 @@ async function computeIndustryPerformance(finvizData: FinvizSectorData | null = 
 
   const hasNonEtfData = industries.some(ind => !ind.hasETF && (ind.dailyChange !== 0 || ind.weeklyChange !== 0 || ind.monthlyChange !== 0));
   const fullyEnriched = !etfOnly && hasNonEtfData;
-  return { industries, fullyEnriched };
+  const result = { industries, fullyEnriched };
+  if (fullyEnriched) {
+    persistIndustryPerfToFile(result);
+  }
+  return result;
 }
 
 const RRG_SECTOR_ETFS = [
@@ -301,10 +330,16 @@ function initBackgroundTasks() {
         console.log(`[bg] Sectors pre-computed: ${sectors.length} sectors in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
       })(),
       (async () => {
-        console.log('[bg] Pre-computing industry performance (ETF-only fast mode)...');
-        const perfData = await computeIndustryPerformance(null, true);
-        setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
-        console.log(`[bg] Industry performance pre-computed: ${perfData.industries?.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+        const persistedPerf = loadPersistedIndustryPerf();
+        if (persistedPerf) {
+          setCache('industry_perf_all', persistedPerf, CACHE_TTL.INDUSTRY_PERF);
+          console.log(`[bg] Industry performance loaded from file: ${persistedPerf.industries?.length} industries (instant)`);
+        } else {
+          console.log('[bg] Pre-computing industry performance (ETF-only fast mode)...');
+          const perfData = await computeIndustryPerformance(null, true);
+          setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
+          console.log(`[bg] Industry performance pre-computed: ${perfData.industries?.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+        }
       })(),
       (async () => {
         console.log('[bg] Pre-computing rotation data...');
@@ -465,6 +500,13 @@ export async function registerRoutes(
     if (stale) {
       backgroundRefresh(cacheKey, computeIndustryPerformance, CACHE_TTL.INDUSTRY_PERF);
       return res.json(stale);
+    }
+
+    const persisted = loadPersistedIndustryPerf();
+    if (persisted) {
+      setCache(cacheKey, persisted, CACHE_TTL.INDUSTRY_PERF);
+      backgroundRefresh(cacheKey, computeIndustryPerformance, CACHE_TTL.INDUSTRY_PERF);
+      return res.json(persisted);
     }
 
     backgroundRefresh(cacheKey, computeIndustryPerformance, CACHE_TTL.INDUSTRY_PERF);
