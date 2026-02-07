@@ -14,12 +14,12 @@ const MQ = {
 };
 
 function mqColor(pct: number) {
-  if (pct >= 80) return MQ.excellent;
-  if (pct >= 65) return MQ.good;
-  if (pct >= 50) return MQ.fair;
-  if (pct >= 40) return MQ.neutral;
-  if (pct >= 30) return MQ.weak;
-  if (pct >= 20) return MQ.poor;
+  if (pct >= 90) return MQ.excellent;
+  if (pct >= 75) return MQ.good;
+  if (pct >= 60) return MQ.fair;
+  if (pct >= 50) return MQ.neutral;
+  if (pct >= 40) return MQ.weak;
+  if (pct >= 30) return MQ.poor;
   return MQ.critical;
 }
 

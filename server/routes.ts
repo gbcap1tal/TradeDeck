@@ -413,6 +413,8 @@ function initBackgroundTasks() {
     backgroundRefresh('rrg_rotation', computeRotationData, CACHE_TTL.SECTORS);
   }, CACHE_TTL.SECTORS * 1000);
 
+  let lastBreadthWindow = '';
+
   setInterval(() => {
     const now = new Date();
     const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
@@ -421,12 +423,21 @@ function initBackgroundTasks() {
     const hours = et.getHours();
     const minutes = et.getMinutes();
     const timeMinutes = hours * 60 + minutes;
-    const nearOpen = timeMinutes >= 565 && timeMinutes <= 600;
-    const nearClose = timeMinutes >= 955 && timeMinutes <= 1020;
-    if (nearOpen || nearClose) {
+    const dateStr = `${et.getFullYear()}-${et.getMonth()}-${et.getDate()}`;
+
+    const inOpenWindow = timeMinutes >= 570 && timeMinutes <= 600;
+    const inCloseWindow = timeMinutes >= 955 && timeMinutes <= 1020;
+
+    let windowKey = '';
+    if (inOpenWindow) windowKey = `${dateStr}-open`;
+    else if (inCloseWindow) windowKey = `${dateStr}-close`;
+
+    if (windowKey && windowKey !== lastBreadthWindow) {
+      lastBreadthWindow = windowKey;
+      console.log(`[scheduler] Triggering Market Quality full scan: ${windowKey}`);
       backgroundRefresh('market_breadth', () => computeMarketBreadth(true), CACHE_TTL.BREADTH);
     }
-  }, 300000);
+  }, 60000);
 }
 
 function seededRandom(seed: string) {

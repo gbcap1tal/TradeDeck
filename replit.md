@@ -37,7 +37,7 @@ Preferred communication style: Simple, everyday language.
 - **Framework**: Express.js with TypeScript, run via `tsx`
 - **Entry point**: `server/index.ts` creates HTTP server, registers routes, serves static in production or Vite dev middleware in development
 - **API prefix**: All API routes start with `/api/`
-- **Data**: Live data from Yahoo Finance and FMP APIs via `server/api/yahoo.ts` and `server/api/fmp.ts`. Sectors and industries use hardcoded mappings in `server/routes.ts` enriched with real ETF quotes. Market Quality Score uses S&P 500 + Yahoo screener broad universe (~600 stocks) via `server/api/breadth.ts`. 4% movers sourced from Yahoo screener (all exchanges, $1B+ market cap). Net H/L from merged S&P 500 + screener universe. 25% quarterly compares current price vs 65 trading days ago. Refreshes at market open/close only.
+- **Data**: Live data from Yahoo Finance and FMP APIs via `server/api/yahoo.ts` and `server/api/fmp.ts`. Sectors and industries use hardcoded mappings in `server/routes.ts` enriched with real ETF quotes. Market Quality Score uses ALL NYSE/NASDAQ/AMEX stocks with $1B+ market cap (~3000 stocks) via `server/api/breadth.ts` and custom Yahoo Finance v1 screener API (`getAllUSEquities()`). Auth via `getYahooAuth()` which fetches crumb+cookie pair. All breadth indicators (MA%, H/L, 4% movers, 25% quarterly) computed across full universe. Scheduled twice daily: market open window (9:30-10:00 AM ET) and close window (3:55-5:00 PM ET), tracked by `lastBreadthWindow` to prevent duplicate runs. File-persisted to `.breadth-cache.json`.
 - **Build**: Custom build script at `script/build.ts` using esbuild for server and Vite for client. Production output goes to `dist/`.
 
 ### API Route Structure
@@ -45,7 +45,7 @@ Preferred communication style: Simple, everyday language.
 - `GET /api/market/sectors` — Sector performance data
 - `GET /api/market/sectors/rotation` — RRG (Relative Rotation Graph) data: RS-Ratio & RS-Momentum for 11 sector ETFs vs SPY with 5-point weekly tails
 - `GET /api/market/industries/performance` — Top/bottom industry performance with D/W/M timeframes
-- `GET /api/market/breadth` — Market Quality Score with 4-tier scoring (Trend 35pts, Momentum 27pts, Breadth 22pts, Strength 16pts), status tiers: EXCELLENT/GOOD/FAIR/NEUTRAL/WEAK/POOR/CRITICAL, two-phase loading (trend-only fast → full S&P 500 scan). File-persisted to `.breadth-cache.json`.
+- `GET /api/market/breadth` — Market Quality Score with 4-tier scoring (Trend 35pts, Momentum 27pts, Breadth 22pts, Strength 16pts), status tiers: EXCELLENT/GOOD/FAIR/NEUTRAL/WEAK/POOR/CRITICAL, two-phase loading (trend-only fast → full ~3000 stock scan). File-persisted to `.breadth-cache.json`.
 - `GET /api/market/status` — Market open/close status
 - `GET /api/market/sectors/:name` — Sector detail with industries
 - `GET /api/market/sectors/:name/industries/:industry` — Industry stocks
@@ -114,3 +114,4 @@ Preferred communication style: Simple, everyday language.
 - **Alpha Vantage** (`ALPHA_VANTAGE_KEY` secret): Reserved for future use. 25 req/day limit.
 - **Caching**: In-memory TTL cache in `server/api/cache.ts` with varying TTLs (quotes: 60s, history: 300s, fundamentals: 3600s, profile: 86400s).
 - **Market breadth data** uses real S&P 500 scan via Yahoo Finance for all indicators (trend status, 4% movers, 25% quarterly, MA percentages, 52-week highs/lows, VIX). Two-phase loading: fast trend-only (~10s) then full 500-stock scan in background.
+- **Market Quality Score** expanded to ALL NYSE/NASDAQ/AMEX stocks with $1B+ market cap (~3000 stocks) via custom Yahoo Finance v1 screener API with crumb+cookie auth. Scheduled twice daily: market open (9:30-10:00 AM ET) and close (3:55-5:00 PM ET). Score color thresholds: EXCELLENT (90+) #2eb850, GOOD (75-89) #3d8a4e, FAIR (60-74) #2a4a32, NEUTRAL (50-59) #aaaaaa, WEAK (40-49) #6a2a35, POOR (30-39) #b85555, CRITICAL (<30) #d04545.

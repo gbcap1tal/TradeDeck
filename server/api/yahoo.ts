@@ -308,6 +308,137 @@ export async function getScreenerResults(screenerId: string, count: number = 250
   }
 }
 
+let cachedYahooAuth: { crumb: string; cookie: string } | null = null;
+
+async function getYahooAuth(): Promise<{ crumb: string; cookie: string } | null> {
+  if (cachedYahooAuth) return cachedYahooAuth;
+
+  try {
+    const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+    const consentResp = await fetch('https://fc.yahoo.com/cuac', {
+      headers: { 'User-Agent': ua },
+      redirect: 'manual',
+    });
+    const setCookies = consentResp.headers.getSetCookie?.() || [];
+    const cookies = setCookies.map(c => c.split(';')[0]).join('; ');
+
+    const crumbResp = await fetch('https://query2.finance.yahoo.com/v1/test/getcrumb', {
+      headers: { 'User-Agent': ua, 'Cookie': cookies },
+    });
+    if (!crumbResp.ok) return null;
+    const crumb = await crumbResp.text();
+
+    if (crumb && crumb.length > 0 && !crumb.includes('<')) {
+      cachedYahooAuth = { crumb, cookie: cookies };
+      setTimeout(() => { cachedYahooAuth = null; }, 3600000);
+      return cachedYahooAuth;
+    }
+  } catch (e: any) {
+    console.error('[yahoo] Auth error:', e.message);
+  }
+  return null;
+}
+
+async function fetchCustomScreenerPage(offset: number, size: number): Promise<any[]> {
+  const auth = await getYahooAuth();
+  if (!auth) return [];
+
+  const payload = {
+    offset,
+    size,
+    sortField: 'intradaymarketcap',
+    sortType: 'DESC',
+    quoteType: 'EQUITY',
+    query: {
+      operator: 'AND',
+      operands: [
+        { operator: 'eq', operands: ['region', 'us'] },
+        { operator: 'gt', operands: ['intradaymarketcap', 1_000_000_000] },
+      ],
+    },
+    userId: '',
+    userIdType: 'guid',
+  };
+
+  const headers: Record<string, string> = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Content-Type': 'application/json',
+    'Cookie': auth.cookie,
+  };
+
+  const url = `https://query2.finance.yahoo.com/v1/finance/screener?crumb=${encodeURIComponent(auth.crumb)}`;
+
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) {
+      console.error(`[yahoo] Custom screener HTTP ${resp.status} at offset ${offset}`);
+      return [];
+    }
+    const json = await resp.json() as any;
+    const quotes = json?.finance?.result?.[0]?.quotes;
+    if (Array.isArray(quotes)) return quotes;
+  } catch (e: any) {
+    console.error(`[yahoo] Custom screener error at offset ${offset}:`, e.message);
+  }
+
+  return [];
+}
+
+export async function getAllUSEquities(): Promise<any[]> {
+  const key = 'yf_all_us_equities';
+  const cached = getCached<any[]>(key);
+  if (cached) return cached;
+
+  try {
+    const pageSize = 250;
+    const allQuotes: any[] = [];
+    let offset = 0;
+    const maxPages = 12;
+
+    for (let page = 0; page < maxPages; page++) {
+      const quotes = await fetchCustomScreenerPage(offset, pageSize);
+      if (!quotes || quotes.length === 0) break;
+
+      for (const q of quotes) {
+        if (q.symbol && !q.symbol.includes('.')) {
+          allQuotes.push({
+            symbol: q.symbol,
+            price: q.regularMarketPrice ?? 0,
+            change: q.regularMarketChange ?? 0,
+            changePercent: q.regularMarketChangePercent ?? 0,
+            volume: q.regularMarketVolume ?? 0,
+            marketCap: q.marketCap ?? 0,
+            week52High: q.fiftyTwoWeekHigh ?? 0,
+            week52Low: q.fiftyTwoWeekLow ?? 0,
+            fiftyDayAverage: q.fiftyDayAverage ?? 0,
+            twoHundredDayAverage: q.twoHundredDayAverage ?? 0,
+            avgVolume: q.averageDailyVolume3Month ?? 0,
+          });
+        }
+      }
+
+      offset += pageSize;
+      if (quotes.length < pageSize) break;
+    }
+
+    console.log(`[yahoo] Custom screener fetched ${allQuotes.length} US equities ($1B+ market cap)`);
+
+    if (allQuotes.length > 0) {
+      setCache(key, allQuotes, 1800);
+    }
+    return allQuotes;
+  } catch (e: any) {
+    console.error('Yahoo custom screener error:', e.message);
+    return [];
+  }
+}
+
 export async function getBroadMarketData(): Promise<{
   movers: { bulls4: any[]; bears4: any[] };
   universe: any[];
@@ -317,7 +448,8 @@ export async function getBroadMarketData(): Promise<{
   if (cached) return cached;
 
   try {
-    const [gainers, losers, actives, anchors, largeValue, growthTech] = await Promise.allSettled([
+    const [customEquities, gainers, losers, actives, anchors, largeValue, growthTech] = await Promise.allSettled([
+      getAllUSEquities(),
       getScreenerResults('day_gainers', 250),
       getScreenerResults('day_losers', 250),
       getScreenerResults('most_actives', 250),
@@ -328,13 +460,6 @@ export async function getBroadMarketData(): Promise<{
 
     const extract = (r: PromiseSettledResult<any[]>) => r.status === 'fulfilled' ? r.value : [];
 
-    const allGainers = extract(gainers);
-    const allLosers = extract(losers);
-    const allActives = extract(actives);
-    const allAnchors = extract(anchors);
-    const allLargeValue = extract(largeValue);
-    const allGrowthTech = extract(growthTech);
-
     const universeMap = new Map<string, any>();
     const addToUniverse = (stocks: any[]) => {
       for (const s of stocks) {
@@ -344,14 +469,15 @@ export async function getBroadMarketData(): Promise<{
       }
     };
 
-    addToUniverse(allGainers);
-    addToUniverse(allLosers);
-    addToUniverse(allActives);
-    addToUniverse(allAnchors);
-    addToUniverse(allLargeValue);
-    addToUniverse(allGrowthTech);
+    addToUniverse(extract(customEquities));
+    addToUniverse(extract(gainers));
+    addToUniverse(extract(losers));
+    addToUniverse(extract(actives));
+    addToUniverse(extract(anchors));
+    addToUniverse(extract(largeValue));
+    addToUniverse(extract(growthTech));
 
-    const universe = [...universeMap.values()];
+    const universe = Array.from(universeMap.values());
 
     const bulls4 = universe.filter(s => s.changePercent >= 4);
     const bears4 = universe.filter(s => s.changePercent <= -4);
@@ -361,6 +487,7 @@ export async function getBroadMarketData(): Promise<{
       universe,
     };
 
+    console.log(`[yahoo] Broad market universe: ${universe.length} stocks`);
     setCache(key, data, 1800);
     return data;
   } catch (e: any) {

@@ -274,49 +274,31 @@ export async function computeQuoteBreadth(): Promise<{
   vixLevel: { value: number; score: number; max: number };
   universeSize: number;
 }> {
-  const [sp500Quotes, broadData] = await Promise.all([
-    yahoo.getMultipleQuotes(SP500_TICKERS),
-    yahoo.getBroadMarketData(),
-  ]);
+  const broadData = await yahoo.getBroadMarketData();
 
+  const universe = broadData.universe;
   let above50 = 0, above200 = 0, total50 = 0, total200 = 0;
-
-  for (const q of sp500Quotes) {
-    if (!q || !q.price) continue;
-
-    if (q.fiftyDayAverage > 0) {
-      total50++;
-      if (q.price > q.fiftyDayAverage) above50++;
-    }
-    if (q.twoHundredDayAverage > 0) {
-      total200++;
-      if (q.price > q.twoHundredDayAverage) above200++;
-    }
-  }
-
-  const mergedUniverse = new Map<string, any>();
-  for (const q of sp500Quotes) {
-    if (q && q.symbol && q.price) {
-      mergedUniverse.set(q.symbol, q);
-    }
-  }
-  for (const s of broadData.universe) {
-    if (s && s.symbol && s.price && s.marketCap >= 1e9) {
-      if (!mergedUniverse.has(s.symbol)) {
-        mergedUniverse.set(s.symbol, s);
-      }
-    }
-  }
-
   let newHighs = 0, newLows = 0;
-  for (const s of Array.from(mergedUniverse.values())) {
+  let bulls4 = 0, bears4 = 0;
+
+  for (const s of universe) {
     if (!s || !s.price) continue;
+
+    if (s.fiftyDayAverage > 0) {
+      total50++;
+      if (s.price > s.fiftyDayAverage) above50++;
+    }
+    if (s.twoHundredDayAverage > 0) {
+      total200++;
+      if (s.price > s.twoHundredDayAverage) above200++;
+    }
+
     if (s.week52High > 0 && s.price >= s.week52High * 0.98) newHighs++;
     if (s.week52Low > 0 && s.price <= s.week52Low * 1.02) newLows++;
-  }
 
-  const bulls4 = broadData.movers.bulls4.length;
-  const bears4 = broadData.movers.bears4.length;
+    if (s.changePercent >= 4) bulls4++;
+    if (s.changePercent <= -4) bears4++;
+  }
 
   const pctAbove50 = total50 > 0 ? Math.round((above50 / total50) * 1000) / 10 : 50;
   const pctAbove200 = total200 > 0 ? Math.round((above200 / total200) * 1000) / 10 : 50;
@@ -329,39 +311,60 @@ export async function computeQuoteBreadth(): Promise<{
     if (vixQuote) vixLevel = Math.round(vixQuote.price * 100) / 100;
   } catch {}
 
+  console.log(`[breadth] Universe: ${universe.length} stocks, >50MA: ${above50}/${total50}, >200MA: ${above200}/${total200}, H/L: ${newHighs}/${newLows}, 4%: ${bulls4}/${bears4}`);
+
   return {
     above50ma: { value: pctAbove50, score: scoreAbove50MA(pctAbove50), max: 11 },
     above200ma: { value: pctAbove200, score: scoreAbove200MA(pctAbove200), max: 11 },
     netHighs52w: { value: netHighs, highs: newHighs, lows: newLows, score: scoreNetHighs(netHighs), max: 9 },
     fourPercent: { value: ratio4, bulls: bulls4, bears: bears4, score: score4PercentRatio(ratio4), max: 16 },
     vixLevel: { value: vixLevel, score: scoreVIX(vixLevel), max: 7 },
-    universeSize: mergedUniverse.size,
+    universeSize: universe.length,
   };
 }
 
 export async function computeQuarterlyBreadth(): Promise<{
   twentyFivePercent: { value: number; bulls: number; bears: number; score: number; max: number };
 }> {
-  const histMap = await yahoo.getMultipleHistories(SP500_TICKERS, '3M');
+  const broadData = await yahoo.getBroadMarketData();
+  const allSymbols = broadData.universe
+    .filter((s: any) => s && s.symbol && s.marketCap >= 1e9)
+    .map((s: any) => s.symbol);
 
+  const tickerSet = new Set<string>(allSymbols);
+  for (const t of SP500_TICKERS) {
+    tickerSet.add(t);
+  }
+
+  const tickers = Array.from(tickerSet);
+  console.log(`[breadth] 25% quarterly: scanning ${tickers.length} stocks for history`);
+
+  const batchSize = 50;
   let bulls25 = 0, bears25 = 0;
 
-  histMap.forEach((hist) => {
-    if (!hist || hist.length < 20) return;
+  for (let i = 0; i < tickers.length; i += batchSize) {
+    const batch = tickers.slice(i, i + batchSize);
+    const histMap = await yahoo.getMultipleHistories(batch, '3M');
 
-    const closes = hist.map((h: any) => h.close);
-    const latestClose = closes[closes.length - 1];
+    histMap.forEach((hist) => {
+      if (!hist || hist.length < 20) return;
 
-    const lookbackIndex = Math.max(0, closes.length - 65);
-    const price65dAgo = closes[lookbackIndex];
+      const closes = hist.map((h: any) => h.close);
+      const latestClose = closes[closes.length - 1];
 
-    if (!price65dAgo || price65dAgo <= 0) return;
+      const lookbackIndex = Math.max(0, closes.length - 65);
+      const price65dAgo = closes[lookbackIndex];
 
-    const changePct = ((latestClose - price65dAgo) / price65dAgo) * 100;
+      if (!price65dAgo || price65dAgo <= 0) return;
 
-    if (changePct >= 25) bulls25++;
-    if (changePct <= -25) bears25++;
-  });
+      const changePct = ((latestClose - price65dAgo) / price65dAgo) * 100;
+
+      if (changePct >= 25) bulls25++;
+      if (changePct <= -25) bears25++;
+    });
+  }
+
+  console.log(`[breadth] 25% quarterly results: bulls=${bulls25}, bears=${bears25} from ${tickers.length} stocks`);
 
   const ratio25 = bears25 > 0 ? Math.round((bulls25 / bears25) * 100) / 100 : (bulls25 > 0 ? 10 : 1);
 
