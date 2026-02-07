@@ -10,8 +10,6 @@ import SectorDetail from "@/pages/SectorDetail";
 import IndustryDetail from "@/pages/IndustryDetail";
 import Login from "@/pages/Login";
 import Market from "@/pages/Market";
-import News from "@/pages/News";
-
 function Router() {
   return (
     <Switch>
@@ -21,7 +19,6 @@ function Router() {
       <Route path="/sectors/:sectorName/industries/:industryName" component={IndustryDetail} />
       <Route path="/sectors/:sectorName" component={SectorDetail} />
       <Route path="/markets" component={Market} />
-      <Route path="/news" component={News} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -25,8 +25,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Key Frontend Pages
 - `/` — Dashboard with indices, heatmap, breadth, sector rotation, RS leaders, sector performance
-- `/markets` — Extended market view
-- `/news` — Market news feed
+- `/markets` — Themes view (extended market overview with indices, heatmap, breadth, sector performance)
 - `/sectors/:sectorName` — Sector detail with industry breakdown
 - `/sectors/:sectorName/industries/:industryName` — Industry detail with stock list
 - `/stocks/:symbol` — Individual stock detail with chart, CANSLIM scorecard, earnings, news
@@ -49,6 +48,7 @@ Preferred communication style: Simple, everyday language.
 - `GET /api/market/status` — Market open/close status
 - `GET /api/market/sectors/:name` — Sector detail with industries
 - `GET /api/market/sectors/:name/industries/:industry` — Industry stocks
+- `GET /api/stocks/search?q=query` — Live stock search autocomplete (searches Finviz cache by symbol prefix and name)
 - `GET /api/stocks/:symbol/quote` — Stock quote
 - `GET /api/stocks/:symbol/history` — Stock price history
 - `GET /api/stocks/:symbol/canslim` — CANSLIM analysis (legacy, not used in current UI)
@@ -57,6 +57,7 @@ Preferred communication style: Simple, everyday language.
 - `GET /api/stocks/:symbol/news` — Stock news
 - `GET /api/watchlists` — User watchlists (authenticated)
 - `POST /api/watchlists` — Create watchlist (authenticated)
+- `GET /api/diagnostics/speed` — Performance speed test measuring response times for all API endpoints and cache status
 - Auth routes at `/api/login`, `/api/logout`, `/api/auth/user`
 
 ### Database (PostgreSQL + Drizzle ORM)
@@ -116,3 +117,4 @@ Preferred communication style: Simple, everyday language.
 - **Finviz** (via HTML scraping, `server/api/finviz.ts`): Single-pass scraper fetches ALL US stocks (~9,600) using `geo_usa` filter with 600ms page delay, 5 retries with exponential backoff, and 5 consecutive failure threshold. Organizes stocks by native Finviz sector/industry (11 sectors, 148 industries). File-persisted to `.finviz-cache.json` (48h TTL, ~559KB). Provides `getStocksForIndustry()` and `getFinvizSectors()` for dynamic sector/industry mapping. No name translation needed - uses Finviz native classifications directly.
 - **Market breadth data** uses ALL NYSE/NASDAQ/AMEX stocks with $1B+ market cap (~3000 stocks) via Yahoo Finance custom v1 screener API with crumb+cookie auth (`getAllUSEquities()`). `getBroadMarketData()` uses single `getAllUSEquities()` call as sole data source. All breadth indicators (trend status, 4% movers, 25% quarterly, MA percentages, 52-week highs/lows, VIX) computed across full universe. Two-phase loading: fast trend-only then full scan in background.
 - **Market Quality Score** scheduled twice daily: market open (9:30-10:00 AM ET) and close (3:55-5:00 PM ET). Score color thresholds: EXCELLENT (90+) #2eb850, GOOD (75-89) #3d8a4e, FAIR (60-74) #2a4a32, NEUTRAL (50-59) #aaaaaa, WEAK (40-49) #6a2a35, POOR (30-39) #b85555, CRITICAL (<30) #d04545.
+- **Unified Twice-Daily Scheduler**: ALL data (Finviz, sectors, industry performance, rotation, breadth/Market Quality) refreshes in two windows: market open (9:30-10:00 AM ET) and close (3:45-4:15 PM ET, 15 min before and after close). Between windows, data is served from cache (12h TTL) or file persistence. Initial startup pre-computation runs on server boot.

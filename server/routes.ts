@@ -7,7 +7,7 @@ import * as yahoo from "./api/yahoo";
 import * as fmp from "./api/fmp";
 import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
-import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry } from "./api/finviz";
+import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, searchStocks } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData } from "./api/breadth";
 import * as fs from 'fs';
 import * as path from 'path';
@@ -377,19 +377,59 @@ function initBackgroundTasks() {
     await Promise.allSettled(enrichmentTasks);
   }, 1000);
 
-  setInterval(() => {
-    backgroundRefresh('sectors_data', () => computeSectorsData(), CACHE_TTL.SECTORS);
-  }, CACHE_TTL.SECTORS * 1000);
+  let lastScheduledWindow = '';
 
-  setInterval(() => {
-    backgroundRefresh('industry_perf_all', () => computeIndustryPerformance(), CACHE_TTL.INDUSTRY_PERF);
-  }, CACHE_TTL.INDUSTRY_PERF * 1000);
+  async function runFullDataRefresh(windowLabel: string) {
+    const start = Date.now();
+    console.log(`[scheduler] === Starting full data refresh: ${windowLabel} ===`);
 
-  setInterval(() => {
-    backgroundRefresh('rrg_rotation', computeRotationData, CACHE_TTL.SECTORS);
-  }, CACHE_TTL.SECTORS * 1000);
+    try {
+      console.log(`[scheduler] Refreshing Finviz data...`);
+      const finvizData = await getFinvizData();
+      if (finvizData) {
+        let totalStocks = 0;
+        for (const s of Object.values(finvizData)) {
+          for (const stocks of Object.values(s.stocks)) totalStocks += stocks.length;
+        }
+        console.log(`[scheduler] Finviz: ${Object.keys(finvizData).length} sectors, ${totalStocks} stocks`);
+      }
+    } catch (err: any) {
+      console.error(`[scheduler] Finviz refresh error: ${err.message}`);
+    }
 
-  let lastBreadthWindow = '';
+    await Promise.allSettled([
+      (async () => {
+        try {
+          const sectors = await computeSectorsData();
+          setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
+          console.log(`[scheduler] Sectors refreshed: ${sectors.length} sectors`);
+        } catch (err: any) { console.error(`[scheduler] Sectors error: ${err.message}`); }
+      })(),
+      (async () => {
+        try {
+          const perfData = await computeIndustryPerformance();
+          setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
+          console.log(`[scheduler] Industry performance refreshed: ${perfData.industries?.length} industries`);
+        } catch (err: any) { console.error(`[scheduler] Industry perf error: ${err.message}`); }
+      })(),
+      (async () => {
+        try {
+          const rotData = await computeRotationData();
+          setCache('rrg_rotation', rotData, CACHE_TTL.SECTORS);
+          console.log(`[scheduler] Rotation data refreshed`);
+        } catch (err: any) { console.error(`[scheduler] Rotation error: ${err.message}`); }
+      })(),
+      (async () => {
+        try {
+          const breadth = await computeMarketBreadth(true);
+          setCache('market_breadth', breadth, CACHE_TTL.BREADTH);
+          console.log(`[scheduler] Market Quality refreshed: score=${breadth.overallScore}`);
+        } catch (err: any) { console.error(`[scheduler] Breadth error: ${err.message}`); }
+      })(),
+    ]);
+
+    console.log(`[scheduler] === Full data refresh complete: ${windowLabel} in ${((Date.now() - start) / 1000).toFixed(1)}s ===`);
+  }
 
   setInterval(() => {
     const now = new Date();
@@ -402,16 +442,15 @@ function initBackgroundTasks() {
     const dateStr = `${et.getFullYear()}-${et.getMonth()}-${et.getDate()}`;
 
     const inOpenWindow = timeMinutes >= 570 && timeMinutes <= 600;
-    const inCloseWindow = timeMinutes >= 955 && timeMinutes <= 1020;
+    const inCloseWindow = timeMinutes >= 945 && timeMinutes <= 1035;
 
     let windowKey = '';
     if (inOpenWindow) windowKey = `${dateStr}-open`;
     else if (inCloseWindow) windowKey = `${dateStr}-close`;
 
-    if (windowKey && windowKey !== lastBreadthWindow) {
-      lastBreadthWindow = windowKey;
-      console.log(`[scheduler] Triggering Market Quality full scan: ${windowKey}`);
-      backgroundRefresh('market_breadth', () => computeMarketBreadth(true), CACHE_TTL.BREADTH);
+    if (windowKey && windowKey !== lastScheduledWindow) {
+      lastScheduledWindow = windowKey;
+      runFullDataRefresh(windowKey);
     }
   }, 60000);
 }
@@ -669,6 +708,13 @@ export async function registerRoutes(
       },
       stocks,
     });
+  });
+
+  app.get('/api/stocks/search', (req, res) => {
+    const q = (req.query.q as string || '').trim();
+    if (!q || q.length < 1) return res.json([]);
+    const results = searchStocks(q, 8);
+    res.json(results);
   });
 
   app.get('/api/stocks/:symbol/quote', async (req, res) => {
@@ -938,6 +984,47 @@ export async function registerRoutes(
     if (watchlist.userId !== req.user.claims.sub) return res.status(401).json({ message: "Unauthorized" });
     await storage.removeWatchlistItem(id, symbol);
     res.status(204).send();
+  });
+
+  app.get('/api/diagnostics/speed', async (req, res) => {
+    const timings: Record<string, number> = {};
+
+    const measure = async (label: string, fn: () => Promise<any>) => {
+      const start = Date.now();
+      try {
+        await fn();
+        timings[label] = Date.now() - start;
+      } catch {
+        timings[label] = -(Date.now() - start);
+      }
+    };
+
+    await Promise.all([
+      measure('indices', () => yahoo.getIndices()),
+      measure('sectors_cache', async () => getCached('sectors_data') || await computeSectorsData()),
+      measure('industry_perf_cache', async () => getCached('industry_perf_all') || { industries: [] }),
+      measure('breadth_cache', async () => getCached('market_breadth') || { overallScore: 0 }),
+      measure('rotation_cache', async () => getCached('rrg_rotation') || { sectors: [] }),
+      measure('single_quote', () => yahoo.getQuote('AAPL')),
+      measure('search_stocks', async () => { const { searchStocks } = await import('./api/finviz'); return searchStocks('APP', 8); }),
+      measure('finviz_cache_check', async () => { const { getFinvizDataSync } = await import('./api/finviz'); return getFinvizDataSync(); }),
+    ]);
+
+    const totalTime = Object.values(timings).reduce((sum, t) => sum + Math.abs(t), 0);
+
+    res.json({
+      timings,
+      totalParallelMs: Math.max(...Object.values(timings).map(Math.abs)),
+      totalSequentialMs: totalTime,
+      timestamp: new Date().toISOString(),
+      cacheStatus: {
+        sectors: !!getCached('sectors_data'),
+        industryPerf: !!getCached('industry_perf_all'),
+        breadth: !!getCached('market_breadth'),
+        rotation: !!getCached('rrg_rotation'),
+        finviz: !!getCached('finviz_sector_data'),
+      },
+    });
   });
 
   return httpServer;

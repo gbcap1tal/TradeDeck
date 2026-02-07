@@ -16,7 +16,7 @@ export default function Market() {
       <main className="flex-1">
         <div className="max-w-[1400px] mx-auto px-6 py-8">
           <div className="flex items-center justify-between mb-8">
-            <h1 className="text-2xl font-bold tracking-tight text-white">Markets</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-white">Themes</h1>
             <div className="glass-card rounded-lg px-4 py-2 flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${status?.isOpen ? 'bg-[#30d158] animate-pulse' : 'bg-[#ff453a]'}`} />
@@ -25,7 +25,7 @@ export default function Market() {
               <div className="h-3 w-px bg-white/10" />
               <div className="flex items-center gap-1.5 text-white/30 text-[12px]">
                 <Clock className="w-3 h-3" />
-                <span>Next: {status ? format(new Date(status.nextOpen), "MMM d, h:mm a") : '-'}</span>
+                <span>Next: {status?.nextOpen ? (() => { try { return format(new Date(status.nextOpen), "MMM d, h:mm a"); } catch { return '-'; } })() : '-'}</span>
               </div>
             </div>
           </div>

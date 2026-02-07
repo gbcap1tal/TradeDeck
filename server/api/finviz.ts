@@ -317,6 +317,35 @@ export function getStocksForIndustry(industryName: string): Array<{ symbol: stri
   return [];
 }
 
+export function searchStocks(query: string, limit: number = 10): Array<{ symbol: string; name: string; sector: string; industry: string }> {
+  const data = getFinvizDataSync();
+  if (!data || !query) return [];
+
+  const q = query.toUpperCase();
+  const results: Array<{ symbol: string; name: string; sector: string; industry: string }> = [];
+  const symbolExact: typeof results = [];
+  const symbolPrefix: typeof results = [];
+  const nameMatch: typeof results = [];
+
+  for (const [sector, sectorData] of Object.entries(data)) {
+    for (const [industry, stocks] of Object.entries(sectorData.stocks)) {
+      for (const stock of stocks) {
+        const sym = stock.symbol.toUpperCase();
+        const nm = stock.name.toUpperCase();
+        if (sym === q) {
+          symbolExact.push({ symbol: stock.symbol, name: stock.name, sector, industry });
+        } else if (sym.startsWith(q)) {
+          symbolPrefix.push({ symbol: stock.symbol, name: stock.name, sector, industry });
+        } else if (nm.includes(q)) {
+          nameMatch.push({ symbol: stock.symbol, name: stock.name, sector, industry });
+        }
+      }
+    }
+  }
+
+  return [...symbolExact, ...symbolPrefix.sort((a, b) => a.symbol.length - b.symbol.length), ...nameMatch].slice(0, limit);
+}
+
 export function getAllIndustriesWithStockCount(): Array<{ name: string; sector: string; stockCount: number }> {
   const data = getFinvizDataSync();
   if (!data) return [];
