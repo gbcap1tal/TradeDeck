@@ -62,7 +62,7 @@ export default function IndustryDetail() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
                     <h1 className="text-2xl font-bold tracking-tight text-white mb-1" data-testid="text-industry-name">{data.industry.name}</h1>
-                    <span className="text-sm text-white/40">{data.industry.sector}</span>
+                    <span className="text-sm text-white/40">{data.industry.sector} · {data.industry.totalStocks || data.stocks?.length || 0} stocks</span>
                   </div>
                   <div className="flex items-center gap-6">
                     <div>

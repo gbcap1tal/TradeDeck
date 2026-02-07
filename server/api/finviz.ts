@@ -2,11 +2,14 @@ import * as cheerio from 'cheerio';
 import { getCached, setCache } from './cache';
 import * as fs from 'fs';
 import * as path from 'path';
+import { FINVIZ_SECTOR_MAP } from '../data/sectors';
 
-const FINVIZ_CACHE_TTL = 86400; // 24 hours
+const FINVIZ_CACHE_TTL = 86400;
 const FINVIZ_PERSIST_PATH = path.join(process.cwd(), '.finviz-cache.json');
-const REQUEST_DELAY = 100; // ms between requests within a sector
-const CONCURRENT_SECTORS = 4; // number of sectors to scrape in parallel
+const REQUEST_DELAY = 600;
+const RETRY_DELAY = 3000;
+const MAX_RETRIES = 5;
+const MAX_CONSECUTIVE_FAILURES = 5;
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 export interface FinvizStock {
@@ -14,9 +17,6 @@ export interface FinvizStock {
   name: string;
   sector: string;
   industry: string;
-  marketCap?: string;
-  price?: number;
-  change?: number;
 }
 
 export interface FinvizIndustryData {
@@ -35,7 +35,10 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 function persistFinvizToFile(data: FinvizSectorData): void {
   try {
     fs.writeFileSync(FINVIZ_PERSIST_PATH, JSON.stringify({ data, savedAt: Date.now() }), 'utf-8');
-  } catch {}
+    console.log('[finviz] Data persisted to file');
+  } catch (e: any) {
+    console.log(`[finviz] Failed to persist: ${e.message}`);
+  }
 }
 
 function loadPersistedFinviz(): FinvizSectorData | null {
@@ -45,14 +48,20 @@ function loadPersistedFinviz(): FinvizSectorData | null {
     if (raw?.data && raw.savedAt) {
       const ageHours = (Date.now() - raw.savedAt) / (1000 * 60 * 60);
       if (ageHours < 48) {
-        return raw.data as FinvizSectorData;
+        const sectorCount = Object.keys(raw.data).length;
+        if (sectorCount >= 8) {
+          return raw.data as FinvizSectorData;
+        }
+        console.log(`[finviz] Persisted cache only has ${sectorCount} sectors, need 8+. Discarding.`);
+      } else {
+        console.log(`[finviz] Persisted cache is ${ageHours.toFixed(1)}h old (>48h). Discarding.`);
       }
     }
   } catch {}
   return null;
 }
 
-async function fetchPage(url: string): Promise<string | null> {
+async function fetchPage(url: string): Promise<{ html: string | null; status: number }> {
   try {
     const response = await fetch(url, {
       headers: {
@@ -63,13 +72,11 @@ async function fetchPage(url: string): Promise<string | null> {
       },
     });
     if (!response.ok) {
-      console.log(`Finviz fetch failed: ${response.status} for ${url}`);
-      return null;
+      return { html: null, status: response.status };
     }
-    return await response.text();
+    return { html: await response.text(), status: response.status };
   } catch (err: any) {
-    console.log(`Finviz fetch error: ${err.message}`);
-    return null;
+    return { html: null, status: 0 };
   }
 }
 
@@ -77,107 +84,113 @@ function parseScreenerPage(html: string): { stocks: FinvizStock[]; totalRows: nu
   const $ = cheerio.load(html);
   const stocks: FinvizStock[] = [];
 
-  const totalMatch = html.match(/Total:\s*<\/b>\s*(\d+)/i) || html.match(/#1\s*\/\s*(\d+)/);
   let totalRows = 0;
-  
-  const countEl = $('td.count-text');
-  if (countEl.length > 0) {
-    const countText = countEl.text();
-    const match = countText.match(/Total:\s*(\d+)/i) || countText.match(/(\d+)\s*$/);
-    if (match) totalRows = parseInt(match[1], 10);
-  }
-  if (!totalRows && totalMatch) {
-    totalRows = parseInt(totalMatch[1], 10);
-  }
+  const totalMatch = html.match(/#1\s*\/\s*(\d+)/);
+  if (totalMatch) totalRows = parseInt(totalMatch[1], 10);
 
-  const rows = $('table.table-light tr, table.screener_table tr, #screener-content table tr');
-  
-  rows.each((_, row) => {
+  $('tr').each((_, row) => {
     const cells = $(row).find('td');
     if (cells.length < 10) return;
-    
-    const no = $(cells[0]).text().trim();
+
+    const no = cells.eq(0).text().trim();
     if (!no || isNaN(parseInt(no))) return;
 
-    const ticker = $(cells[1]).text().trim();
-    const company = $(cells[2]).text().trim();
-    const sector = $(cells[3]).text().trim();
-    const industry = $(cells[4]).text().trim();
+    const ticker = cells.eq(1).text().trim();
+    const company = cells.eq(2).text().trim();
+    const sector = cells.eq(3).text().trim();
+    const industry = cells.eq(4).text().trim();
 
     if (ticker && sector && industry) {
-      stocks.push({
-        symbol: ticker,
-        name: company,
-        sector,
-        industry,
-      });
+      stocks.push({ symbol: ticker, name: company, sector, industry });
     }
   });
 
   return { stocks, totalRows: totalRows || stocks.length };
 }
 
-const FINVIZ_SECTORS = [
-  'basicmaterials',
-  'communicationservices',
-  'consumercyclical',
-  'consumerdefensive',
-  'energy',
-  'financial',
-  'healthcare',
-  'industrials',
-  'realestate',
-  'technology',
-  'utilities',
-];
-
-async function scrapeSector(sectorFilter: string): Promise<FinvizStock[]> {
-  const sectorStocks: FinvizStock[] = [];
-  const maxPagesPerSector = 75;
+async function scrapeAllStocks(): Promise<FinvizStock[]> {
+  const allStocks: FinvizStock[] = [];
+  const seenSymbols = new Set<string>();
   let offset = 1;
+  let totalExpected = 0;
+  let consecutiveFailures = 0;
   let pageCount = 0;
+  const maxPages = 600;
 
-  while (pageCount < maxPagesPerSector) {
-    const url = `https://finviz.com/screener.ashx?v=111&f=geo_usa,sec_${sectorFilter}&r=${offset}`;
-    const html = await fetchPage(url);
-    
-    if (!html) break;
+  console.log('[finviz] Starting single-pass scrape of all US stocks...');
+  const startTime = Date.now();
 
-    const { stocks } = parseScreenerPage(html);
-    if (stocks.length === 0) break;
+  while (pageCount < maxPages) {
+    const url = `https://finviz.com/screener.ashx?v=111&f=geo_usa&r=${offset}`;
 
-    sectorStocks.push(...stocks);
+    let html: string | null = null;
+    let succeeded = false;
+
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      const result = await fetchPage(url);
+      if (result.html) {
+        html = result.html;
+        succeeded = true;
+        break;
+      }
+      if (result.status === 429) {
+        const backoff = RETRY_DELAY * Math.pow(2, attempt);
+        console.log(`[finviz] Rate limited at offset ${offset}, waiting ${backoff}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        await sleep(backoff);
+      } else {
+        const backoff = RETRY_DELAY * Math.pow(1.5, attempt);
+        await sleep(backoff);
+      }
+    }
+
+    if (!succeeded || !html) {
+      consecutiveFailures++;
+      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+        console.log(`[finviz] Stopping at offset ${offset} after ${MAX_CONSECUTIVE_FAILURES} consecutive failures`);
+        break;
+      }
+      offset += 20;
+      await sleep(REQUEST_DELAY * 2);
+      continue;
+    }
+
+    consecutiveFailures = 0;
+    const { stocks, totalRows } = parseScreenerPage(html);
+
+    if (totalExpected === 0 && totalRows > 0) {
+      totalExpected = totalRows;
+      console.log(`[finviz] Total stocks to scrape: ${totalExpected}`);
+    }
+
+    if (stocks.length === 0) {
+      console.log(`[finviz] Empty page at offset ${offset}, done.`);
+      break;
+    }
+
+    for (const stock of stocks) {
+      if (!seenSymbols.has(stock.symbol)) {
+        seenSymbols.add(stock.symbol);
+        allStocks.push(stock);
+      }
+    }
+
     pageCount++;
+    if (pageCount % 50 === 0) {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
+      console.log(`[finviz] Progress: ${allStocks.length} stocks scraped (page ${pageCount}, ${elapsed}s)`);
+    }
 
-    if (stocks.length < 20) break;
+    if (stocks.length < 20) {
+      console.log(`[finviz] Last page (${stocks.length} stocks), done.`);
+      break;
+    }
+
     offset += 20;
     await sleep(REQUEST_DELAY);
   }
 
-  return sectorStocks;
-}
-
-async function scrapeAllStocks(): Promise<FinvizStock[]> {
-  const allStocks: FinvizStock[] = [];
-
-  console.log('[finviz] Starting parallel sector scrape...');
-  const startTime = Date.now();
-
-  for (let i = 0; i < FINVIZ_SECTORS.length; i += CONCURRENT_SECTORS) {
-    const batch = FINVIZ_SECTORS.slice(i, i + CONCURRENT_SECTORS);
-    const results = await Promise.allSettled(batch.map(s => scrapeSector(s)));
-    for (let j = 0; j < results.length; j++) {
-      const r = results[j];
-      if (r.status === 'fulfilled' && r.value.length > 0) {
-        allStocks.push(...r.value);
-        const industries = new Set(r.value.map(s => s.industry));
-        console.log(`[finviz] ${batch[j]}: ${r.value.length} stocks, ${industries.size} industries`);
-      }
-    }
-  }
-
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  console.log(`[finviz] Scrape complete: ${allStocks.length} total stocks in ${elapsed}s`);
+  console.log(`[finviz] Scrape complete: ${allStocks.length} unique stocks in ${elapsed}s (${pageCount} pages)`);
   return allStocks;
 }
 
@@ -185,16 +198,18 @@ function organizeByIndustry(stocks: FinvizStock[]): FinvizSectorData {
   const sectorData: FinvizSectorData = {};
 
   for (const stock of stocks) {
-    if (!sectorData[stock.sector]) {
-      sectorData[stock.sector] = { industries: [], stocks: {} };
+    const ourSectorName = FINVIZ_SECTOR_MAP[stock.sector] || stock.sector;
+
+    if (!sectorData[ourSectorName]) {
+      sectorData[ourSectorName] = { industries: [], stocks: {} };
     }
-    const sd = sectorData[stock.sector];
-    
+    const sd = sectorData[ourSectorName];
+
     if (!sd.stocks[stock.industry]) {
       sd.stocks[stock.industry] = [];
       sd.industries.push(stock.industry);
     }
-    
+
     sd.stocks[stock.industry].push({
       symbol: stock.symbol,
       name: stock.name,
@@ -233,19 +248,34 @@ export async function getFinvizData(): Promise<FinvizSectorData | null> {
   scrapePromise = (async () => {
     try {
       const stocks = await scrapeAllStocks();
-      if (stocks.length < 100) {
+      if (stocks.length < 500) {
         console.log(`[finviz] Too few stocks scraped (${stocks.length}), likely blocked. Skipping.`);
         return null;
       }
-      
+
       const organized = organizeByIndustry(stocks);
       const sectorCount = Object.keys(organized).length;
       let industryCount = 0;
+      let stockCount = 0;
       for (const sector of Object.values(organized)) {
         industryCount += sector.industries.length;
+        for (const stocks of Object.values(sector.stocks)) {
+          stockCount += stocks.length;
+        }
       }
-      
-      console.log(`[finviz] Organized: ${sectorCount} sectors, ${industryCount} industries, ${stocks.length} stocks`);
+
+      console.log(`[finviz] Organized: ${sectorCount} sectors, ${industryCount} industries, ${stockCount} stocks`);
+
+      for (const [sector, data] of Object.entries(organized)) {
+        const indStocks = Object.entries(data.stocks).map(([ind, s]) => `${ind}(${s.length})`).join(', ');
+        console.log(`[finviz]   ${sector}: ${data.industries.length} industries - ${indStocks}`);
+      }
+
+      if (sectorCount < 8) {
+        console.log(`[finviz] Only ${sectorCount} sectors, likely incomplete scrape. Not persisting.`);
+        return null;
+      }
+
       setCache(cacheKey, organized, FINVIZ_CACHE_TTL);
       persistFinvizToFile(organized);
       return organized;
@@ -261,229 +291,45 @@ export async function getFinvizData(): Promise<FinvizSectorData | null> {
   return scrapePromise;
 }
 
-export function mergeStockLists(
-  hardcoded: Array<{ symbol: string; name: string }>,
-  finvizStocks: Array<{ symbol: string; name: string }> | undefined
-): Array<{ symbol: string; name: string }> {
-  if (!finvizStocks || finvizStocks.length === 0) return hardcoded;
-  
-  const seen = new Set<string>();
-  const merged: Array<{ symbol: string; name: string }> = [];
-
-  for (const stock of hardcoded) {
-    if (!seen.has(stock.symbol)) {
-      seen.add(stock.symbol);
-      merged.push(stock);
-    }
-  }
-
-  for (const stock of finvizStocks) {
-    if (!seen.has(stock.symbol)) {
-      seen.add(stock.symbol);
-      merged.push(stock);
-    }
-  }
-
-  return merged;
-}
-
-const FINVIZ_TO_OUR_NAMES: Record<string, string[]> = {
-  'Semiconductors': ['Semiconductors'],
-  'Software - Infrastructure': ['Software-Infrastructure', 'Cloud Computing', 'Cybersecurity', 'Data Storage'],
-  'Software - Application': ['Software-Application'],
-  'Banks - Regional': ['Banks-Regional'],
-  'Banks - Diversified': ['Diversified Banks'],
-  'Insurance - Diversified': ['Insurance'],
-  'Insurance - Life': ['Life & Health Insurance'],
-  'Insurance - Property & Casualty': ['Insurance', 'Property & Casualty Insurance'],
-  'Insurance - Specialty': ['Insurance Brokers'],
-  'Insurance - Reinsurance': ['Reinsurance'],
-  'Financial Conglomerates': ['Multi-Sector Holdings'],
-  'Shell Companies': ['Multi-Sector Holdings'],
-  'Financial Data & Stock Exchanges': ['Financial Data'],
-  'Credit Services': ['Credit Services', 'Consumer Finance'],
-  'Drug Manufacturers - General': ['Drug Manufacturers', 'Pharmaceuticals'],
-  'Drug Manufacturers - Specialty & Generic': ['Drug Manufacturers', 'Pharmaceuticals'],
-  'Medical Devices': ['Medical Devices'],
-  'Medical Instruments & Supplies': ['Medical Devices', 'Health Care Supplies'],
-  'Healthcare Plans': ['Healthcare Plans'],
-  'Medical Care Facilities': ['Healthcare Facilities'],
-  'Health Information Services': ['Health Information'],
-  'Diagnostics & Research': ['Diagnostics', 'Life Sciences Tools'],
-  'Biotechnology': ['Biotechnology'],
-  'Pharmaceutical Retailers': ['Drug Retail'],
-  'Healthcare Information Services': ['Health Information', 'Healthcare Services'],
-  'Medical Distribution': ['Medical Distribution'],
-  'Oil & Gas E&P': ['Oil & Gas E&P'],
-  'Oil & Gas Integrated': ['Integrated Oil & Gas', 'Oil & Gas E&P'],
-  'Oil & Gas Midstream': ['Oil & Gas Midstream'],
-  'Oil & Gas Refining & Marketing': ['Oil Refining'],
-  'Oil & Gas Equipment & Services': ['Oil & Gas Equipment'],
-  'Oil & Gas Drilling': ['Oil & Gas Drilling'],
-  'Uranium': ['Uranium', 'Nuclear Energy'],
-  'Thermal Coal': ['Coal'],
-  'Aerospace & Defense': ['Aerospace & Defense'],
-  'Specialty Industrial Machinery': ['Industrial Machinery', 'Specialty Machinery'],
-  'Railroads': ['Railroads'],
-  'Farm & Heavy Construction Machinery': ['Farm Machinery', 'Farm & Construction Machinery'],
-  'Building Products & Equipment': ['Building Products'],
-  'Waste Management': ['Waste Management'],
-  'Electrical Equipment & Parts': ['Electrical Equipment'],
-  'Trucking': ['Trucking'],
-  'Marine Shipping': ['Marine Shipping'],
-  'Airlines': ['Airlines'],
-  'Rental & Leasing Services': ['Rental & Leasing'],
-  'Engineering & Construction': ['Engineering', 'Construction'],
-  'Integrated Freight & Logistics': ['Air Freight & Logistics', 'Freight & Logistics'],
-  'Industrial Distribution': ['Industrial Distribution'],
-  'Conglomerates': ['Conglomerates'],
-  'Staffing & Employment Services': ['Staffing'],
-  'Security & Protection Services': ['Security Services'],
-  'Metal Fabrication': ['Metal Fabrication'],
-  'Consulting Services': ['Consulting Services'],
-  'Specialty Business Services': ['Staffing', 'Consulting Services'],
-  'Business Equipment & Supplies': ['Conglomerates'],
-  'Pollution & Treatment Controls': ['Waste Management'],
-  'Internet Retail': ['Internet Retail', 'Broadline Retail'],
-  'Restaurants': ['Restaurants'],
-  'Home Improvement Retail': ['Home Improvement'],
-  'Travel Services': ['Travel & Leisure'],
-  'Auto Manufacturers': ['Auto Manufacturers'],
-  'Apparel Retail': ['Apparel'],
-  'Apparel Manufacturing': ['Apparel'],
-  'Auto Parts': ['Auto Parts'],
-  'Residential Construction': ['Homebuilding'],
-  'Leisure': ['Leisure Products'],
-  'Footwear & Accessories': ['Footwear'],
-  'Specialty Retail': ['Specialty Retail', 'Broadline Retail'],
-  'Resorts & Casinos': ['Gambling'],
-  'Gambling': ['Gambling'],
-  'Lodging': ['Travel & Leisure'],
-  'Auto & Truck Dealerships': ['Auto Manufacturers'],
-  'Furnishings, Fixtures & Appliances': ['Luxury Goods'],
-  'Packaging & Containers': ['Paper & Packaging'],
-  'Textile Manufacturing': ['Apparel'],
-  'Department Stores': ['Broadline Retail'],
-  'Luxury Goods': ['Luxury Goods'],
-  'Household & Personal Products': ['Household Products', 'Personal Products'],
-  'Packaged Foods': ['Packaged Foods'],
-  'Discount Stores': ['Discount Stores'],
-  'Beverages - Non-Alcoholic': ['Beverages'],
-  'Beverages - Wineries & Distilleries': ['Brewers & Distillers'],
-  'Beverages - Brewers': ['Brewers & Distillers'],
-  'Tobacco': ['Tobacco'],
-  'Confectioners': ['Packaged Foods'],
-  'Farm Products': ['Farm Products'],
-  'Food Distribution': ['Food Distribution'],
-  'Grocery Stores': ['Food Retail'],
-  'Education & Training Services': ['Education Services'],
-  'REIT - Residential': ['REIT-Residential'],
-  'REIT - Industrial': ['REIT-Industrial'],
-  'REIT - Retail': ['REIT-Retail'],
-  'REIT - Healthcare Facilities': ['REIT-Healthcare'],
-  'REIT - Office': ['REIT-Office'],
-  'REIT - Specialty': ['REIT-Specialty'],
-  'REIT - Hotel & Motel': ['REIT-Hotel'],
-  'REIT - Diversified': ['REIT-Diversified'],
-  'REIT - Mortgage': ['REIT-Diversified'],
-  'Real Estate Services': ['Real Estate Services'],
-  'Real Estate - Development': ['Real Estate Development'],
-  'Real Estate - Diversified': ['REIT-Diversified'],
-  'Utilities - Regulated Electric': ['Electric Utilities'],
-  'Utilities - Regulated Gas': ['Gas Utilities'],
-  'Utilities - Regulated Water': ['Water Utilities'],
-  'Utilities - Diversified': ['Multi-Utilities'],
-  'Utilities - Renewable': ['Renewable Utilities'],
-  'Utilities - Independent Power Producers': ['Independent Power', 'Nuclear Energy'],
-  'Gold': ['Gold', 'Precious Metals'],
-  'Copper': ['Copper'],
-  'Aluminum': ['Aluminium'],
-  'Steel': ['Steel'],
-  'Lumber & Wood Production': ['Lumber & Wood'],
-  'Paper & Paper Products': ['Paper & Packaging'],
-  'Other Precious Metals & Mining': ['Precious Metals', 'Silver'],
-  'Specialty Chemicals': ['Specialty Chemicals'],
-  'Chemicals': ['Commodity Chemicals', 'Specialty Chemicals'],
-  'Agricultural Inputs': ['Fertilizers'],
-  'Building Materials': ['Building Materials'],
-  'Coking Coal': ['Coal'],
-  'Silver': ['Silver'],
-  'Other Industrial Metals & Mining': ['Diversified Metals & Mining'],
-  'Telecom Services': ['Telecom Services', 'Integrated Telecom', 'Wireless Telecom'],
-  'Internet Content & Information': ['Internet Content', 'Social Media', 'Streaming'],
-  'Entertainment': ['Entertainment', 'Gaming', 'Streaming'],
-  'Electronic Gaming & Multimedia': ['Gaming'],
-  'Advertising Agencies': ['Advertising'],
-  'Broadcasting': ['Broadcasting'],
-  'Publishing': ['Publishing'],
-  'Pay TV': ['Broadcasting'],
-  'Communication Equipment': ['Communications Equipment'],
-  'Information Technology Services': ['IT Services'],
-  'Semiconductor Equipment & Materials': ['Semiconductor Equipment'],
-  'Scientific & Technical Instruments': ['Electronic Manufacturing'],
-  'Solar': ['Renewable Energy'],
-  'Computer Hardware': ['Computer Hardware'],
-  'Consumer Electronics': ['Consumer Electronics'],
-  'Electronic Components': ['Electronic Components'],
-  'Electronics & Computer Distribution': ['Technology Distributors'],
-  'Exchange Traded Fund': [],
-};
-
-let reverseMapCache: Record<string, string[]> | null = null;
-
-function buildReverseMap(): Record<string, string[]> {
-  if (reverseMapCache) return reverseMapCache;
-  const result: Record<string, string[]> = {};
-  for (const [finvizName, ourNames] of Object.entries(FINVIZ_TO_OUR_NAMES)) {
-    for (const ourName of ourNames) {
-      if (!result[ourName]) result[ourName] = [];
-      if (!result[ourName].includes(finvizName)) {
-        result[ourName].push(finvizName);
-      }
-    }
-  }
-  reverseMapCache = result;
-  return result;
-}
-
-export function getIndustryNameMapping(finvizIndustry: string): string | null {
-  const targets = FINVIZ_TO_OUR_NAMES[finvizIndustry];
-  return targets && targets.length > 0 ? targets[0] : null;
-}
-
-export function getFinvizNamesForIndustry(ourIndustryName: string): string[] {
-  const reverseMap = buildReverseMap();
-  return reverseMap[ourIndustryName] || [];
-}
-
 export function getFinvizDataSync(): FinvizSectorData | null {
   const cached = getCached<FinvizSectorData>('finviz_sector_data');
   if (cached) return cached;
   return loadPersistedFinviz();
 }
 
-export function getStocksForIndustry(ourIndustryName: string): Array<{ symbol: string; name: string }> {
+export function getIndustriesForSector(sectorName: string): string[] {
+  const data = getFinvizDataSync();
+  if (!data || !data[sectorName]) return [];
+  return data[sectorName].industries;
+}
+
+export function getStocksForIndustry(industryName: string): Array<{ symbol: string; name: string }> {
   const data = getFinvizDataSync();
   if (!data) return [];
 
-  const finvizNames = getFinvizNamesForIndustry(ourIndustryName);
-  if (finvizNames.length === 0) return [];
-
-  const seen = new Set<string>();
-  const result: Array<{ symbol: string; name: string }> = [];
-
   for (const sector of Object.values(data)) {
-    for (const finvizName of finvizNames) {
-      const stocks = sector.stocks[finvizName];
-      if (!stocks) continue;
-      for (const stock of stocks) {
-        if (!seen.has(stock.symbol)) {
-          seen.add(stock.symbol);
-          result.push(stock);
-        }
-      }
+    const stocks = sector.stocks[industryName];
+    if (stocks && stocks.length > 0) {
+      return stocks;
     }
   }
 
+  return [];
+}
+
+export function getAllIndustriesWithStockCount(): Array<{ name: string; sector: string; stockCount: number }> {
+  const data = getFinvizDataSync();
+  if (!data) return [];
+
+  const result: Array<{ name: string; sector: string; stockCount: number }> = [];
+  for (const [sector, sectorData] of Object.entries(data)) {
+    for (const industry of sectorData.industries) {
+      result.push({
+        name: industry,
+        sector,
+        stockCount: sectorData.stocks[industry]?.length || 0,
+      });
+    }
+  }
   return result;
 }

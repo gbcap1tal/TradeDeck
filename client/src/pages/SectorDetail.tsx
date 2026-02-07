@@ -6,11 +6,14 @@ import { ArrowLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 function getGridConfig(count: number): { cols: number; rows: number } {
-  if (count <= 7) return { cols: 4, rows: 2 };
+  if (count <= 6) return { cols: 3, rows: 2 };
+  if (count <= 8) return { cols: 4, rows: 2 };
   if (count <= 10) return { cols: 5, rows: 2 };
   if (count <= 12) return { cols: 4, rows: 3 };
   if (count <= 15) return { cols: 5, rows: 3 };
-  return { cols: 4, rows: 4 };
+  if (count <= 20) return { cols: 5, rows: 4 };
+  if (count <= 25) return { cols: 5, rows: 5 };
+  return { cols: 6, rows: Math.ceil(count / 6) };
 }
 
 export default function SectorDetail() {
