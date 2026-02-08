@@ -26,7 +26,7 @@ function getChange(ind: any, tf: Timeframe): number {
 }
 
 function BarChart({ items, title, isMegatrendMap, onClickItem }: {
-  items: Array<{ name: string; change: number; sector?: string }>;
+  items: Array<{ name: string; change: number; sector?: string; megatrendId?: number }>;
   title: string;
   isMegatrendMap: Set<string>;
   onClickItem: (item: any) => void;
@@ -233,6 +233,7 @@ export default function Market() {
 
   const megatrendItems = megatrends.map((mt: any) => ({
     name: mt.name,
+    megatrendId: mt.id,
     dailyChange: mt.dailyChange || 0,
     weeklyChange: mt.weeklyChange || 0,
     monthlyChange: mt.monthlyChange || 0,
@@ -250,7 +251,10 @@ export default function Market() {
   const bottom20 = [...combined].sort((a: any, b: any) => getChange(a, tf) - getChange(b, tf)).slice(0, 20);
 
   const handleClickItem = (item: any) => {
-    if (megatrendNames.has(item.name)) return;
+    if (item.megatrendId) {
+      setLocation(`/megatrends/${item.megatrendId}`);
+      return;
+    }
     const ind = industries.find((i: any) => i.name === item.name);
     if (ind?.sector) {
       setLocation(`/sectors/${encodeURIComponent(ind.sector)}/industries/${encodeURIComponent(item.name)}`);
@@ -312,14 +316,14 @@ export default function Market() {
             <div className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
                 <BarChart
-                  items={top20.map(i => ({ name: i.name, change: getChange(i, tf), sector: (i as any).sector }))}
+                  items={top20.map(i => ({ name: i.name, change: getChange(i, tf), sector: (i as any).sector, megatrendId: (i as any).megatrendId }))}
                   title="TOP 20 PERFORMERS"
                   isMegatrendMap={megatrendNames}
                   onClickItem={handleClickItem}
                 />
                 <BarChart
-                  items={bottom20.map(i => ({ name: i.name, change: getChange(i, tf), sector: (i as any).sector }))}
-                  title="BOTTOM 20 PERFORMERS"
+                  items={bottom20.map(i => ({ name: i.name, change: getChange(i, tf), sector: (i as any).sector, megatrendId: (i as any).megatrendId }))}
+                  title="WORST 20 PERFORMERS"
                   isMegatrendMap={megatrendNames}
                   onClickItem={handleClickItem}
                 />

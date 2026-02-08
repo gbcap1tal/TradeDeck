@@ -25,7 +25,8 @@ Preferred communication style: Simple, everyday language.
 
 ### Key Frontend Pages
 - `/` — Capital Flow (Dashboard) with indices, heatmap, breadth, sector rotation, RS leaders, sector performance
-- `/markets` — Megatrends: Top/Bottom 20 industry performance bar charts (D/W/M/3M/6M/Y timeframes from Finviz), megatrend baskets with admin CRUD
+- `/markets` — Megatrends: Top/Worst 20 industry performance bar charts (D/W/M/3M/6M/Y timeframes from Finviz), megatrend baskets with admin CRUD. All items clickable → industry or megatrend stock lists
+- `/megatrends/:id` — Megatrend basket detail with constituent stock list (quotes from Yahoo Finance)
 - `/sectors/:sectorName` — Sector detail with industry breakdown
 - `/sectors/:sectorName/industries/:industryName` — Industry detail with stock list
 - `/stocks/:symbol` — Individual stock detail with chart, CANSLIM scorecard, earnings, news
@@ -57,6 +58,11 @@ Preferred communication style: Simple, everyday language.
 - `GET /api/stocks/:symbol/news` — Stock news
 - `GET /api/watchlists` — User watchlists (authenticated)
 - `POST /api/watchlists` — Create watchlist (authenticated)
+- `GET /api/megatrends` — List all megatrend baskets with multi-timeframe performance
+- `GET /api/megatrends/:id/stocks` — Megatrend basket stocks with Yahoo Finance quotes
+- `POST /api/megatrends` — Create megatrend basket (admin only)
+- `PUT /api/megatrends/:id` — Update megatrend basket (admin only)
+- `DELETE /api/megatrends/:id` — Delete megatrend basket (admin only)
 - `GET /api/diagnostics/speed` — Performance speed test measuring response times for all API endpoints and cache status
 - Auth routes at `/api/login`, `/api/logout`, `/api/auth/user`
 
@@ -96,7 +102,7 @@ Preferred communication style: Simple, everyday language.
 ### Required Services
 - **PostgreSQL Database**: Required. Connection via `DATABASE_URL` environment variable. Used for user sessions, user accounts, and watchlists.
 - **Replit Auth (OpenID Connect)**: Authentication provider. Requires `REPL_ID`, `ISSUER_URL`, and `SESSION_SECRET` environment variables.
-- **Resend** (email alerts via Replit connector): Sends alert emails to invest@gb.capital when critical system failures occur. Alert module at `server/api/alerts.ts` with 30-minute cooldown per category. Categories: `finviz_scrape`, `breadth_scan`, `rotation`, `industry_perf`, `general`. Alerts fire on: Finviz scrape failures (blocked, incomplete, exception), Market Quality breadth scan failures, rotation data failures, industry performance fallbacks. Uses Resend connector for API key management.
+- **Resend** (email alerts via Replit connector): Sends alert emails to invest@gb.capital when critical system failures occur. Alert module at `server/api/alerts.ts` with 24-hour cooldown per category. Categories: `finviz_scrape`, `breadth_scan`, `rotation`, `industry_perf`, `megatrend_perf`, `megatrend_api`, `general`. Alerts fire on: Finviz scrape failures (blocked, incomplete, exception), Market Quality breadth scan failures, rotation data failures, industry performance fallbacks, megatrend performance computation failures, megatrend API endpoint errors. Uses Resend connector for API key management.
 
 ### Key NPM Packages
 - **drizzle-orm** + **drizzle-kit**: Database ORM and migration tooling

@@ -123,8 +123,8 @@ async function computeMegatrendPerformance(): Promise<Map<number, any>> {
     let dailySum = 0, weekSum = 0, monthSum = 0, quarterSum = 0, halfSum = 0, yearSum = 0;
     let dailyCount = 0, multiCount = 0;
 
-    for (const ticker of mt.tickers) {
-      const upper = ticker.toUpperCase();
+    const uniqueTickers = Array.from(new Set(mt.tickers.map(t => t.toUpperCase())));
+    for (const upper of uniqueTickers) {
 
       if (finvizData) {
         let found = false;
@@ -500,6 +500,7 @@ function initBackgroundTasks() {
       console.log(`[bg] Megatrend performance computed: ${mtPerf.size} baskets`);
     } catch (err: any) {
       console.log(`[bg] Megatrend performance error: ${err.message}`);
+      sendAlert('Megatrend Performance Failed on Startup', `Megatrend performance computation failed during server boot.\n\nError: ${err.message}`, 'megatrend_perf');
     }
   }, 1000);
 
@@ -581,6 +582,7 @@ function initBackgroundTasks() {
       console.log(`[scheduler] Megatrend performance refreshed: ${mtPerf.size} baskets`);
     } catch (err: any) {
       console.error(`[scheduler] Megatrend performance error: ${err.message}`);
+        sendAlert('Megatrend Performance Refresh Failed', `Megatrend performance computation failed during ${windowLabel} refresh.\n\nError: ${(err as any).message}`, 'megatrend_perf');
     }
 
     console.log(`[scheduler] === Full data refresh complete: ${windowLabel} in ${((Date.now() - start) / 1000).toFixed(1)}s ===`);
@@ -1139,7 +1141,10 @@ export async function registerRoutes(
         try {
           const perfMap = await computeMegatrendPerformance();
           perfCached = Object.fromEntries(perfMap);
-        } catch {}
+        } catch (compErr: any) {
+          console.error(`[api] Megatrend cold-cache computation failed: ${compErr.message}`);
+          sendAlert('Megatrend Performance Computation Failed', `On-demand megatrend performance computation failed (cold cache).\n\nError: ${compErr.message}`, 'megatrend_perf');
+        }
       }
 
       const megatrendsWithPerf = mts.map(mt => {
@@ -1150,8 +1155,9 @@ export async function registerRoutes(
 
         let dailyChange = 0;
         let count = 0;
-        if (finvizData && mt.tickers.length > 0) {
-          for (const ticker of mt.tickers) {
+        const uniqueFallbackTickers = Array.from(new Set(mt.tickers.map((t: string) => t.toUpperCase())));
+        if (finvizData && uniqueFallbackTickers.length > 0) {
+          for (const ticker of uniqueFallbackTickers) {
             let found = false;
             for (const sectorData of Object.values(finvizData)) {
               if (found) break;
@@ -1175,7 +1181,9 @@ export async function registerRoutes(
         };
       });
       res.json(megatrendsWithPerf);
-    } catch (err) {
+    } catch (err: any) {
+      console.error(`[api] Megatrends endpoint error: ${err.message}`);
+      sendAlert('Megatrends API Failed', `The /api/megatrends endpoint returned an error.\n\nError: ${err.message}`, 'megatrend_api');
       res.status(500).json({ message: "Failed to fetch megatrends" });
     }
   });
@@ -1215,6 +1223,59 @@ export async function registerRoutes(
       res.status(204).send();
     } catch (err) {
       res.status(500).json({ message: "Failed to delete megatrend" });
+    }
+  });
+
+  app.get('/api/megatrends/:id/stocks', async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const mts = await storage.getMegatrends();
+      const mt = mts.find(m => m.id === id);
+      if (!mt) return res.status(404).json({ message: "Megatrend not found" });
+
+      const uniqueTickers = Array.from(new Set(mt.tickers.map(t => t.toUpperCase())));
+      let quotes: any[] = [];
+      try {
+        quotes = await yahoo.getMultipleQuotes(uniqueTickers);
+      } catch {}
+
+      const quoteMap = new Map<string, any>();
+      for (const q of quotes) {
+        if (q) quoteMap.set(q.symbol, q);
+      }
+
+      const perfCached = getMegatrendPerfCached();
+      const cached = perfCached?.[String(mt.id)];
+
+      const stocks = uniqueTickers.map(ticker => {
+        const q = quoteMap.get(ticker);
+        return {
+          symbol: ticker,
+          name: q?.name || ticker,
+          price: q?.price ?? 0,
+          change: q?.change ?? 0,
+          changePercent: q?.changePercent ?? 0,
+          volume: q?.volume ?? 0,
+          marketCap: q?.marketCap ?? 0,
+        };
+      });
+
+      stocks.sort((a, b) => (b.marketCap || 0) - (a.marketCap || 0));
+
+      res.json({
+        megatrend: {
+          id: mt.id,
+          name: mt.name,
+          dailyChange: cached?.dailyChange ?? 0,
+          weeklyChange: cached?.weeklyChange ?? 0,
+          monthlyChange: cached?.monthlyChange ?? 0,
+          totalStocks: uniqueTickers.length,
+        },
+        stocks,
+      });
+    } catch (err: any) {
+      console.error(`[api] Megatrend stocks error: ${err.message}`);
+      res.status(500).json({ message: "Failed to fetch megatrend stocks" });
     }
   });
 
