@@ -515,6 +515,21 @@ function initBackgroundTasks() {
       console.log(`[bg] Megatrend performance error: ${err.message}`);
       sendAlert('Megatrend Performance Failed on Startup', `Megatrend performance computation failed during server boot.\n\nError: ${err.message}`, 'megatrend_perf');
     }
+
+    try {
+      const allMegatrends = await storage.getMegatrends();
+      const allTickers = new Set<string>();
+      for (const mt of allMegatrends) {
+        for (const t of (mt.tickers || [])) allTickers.add(t);
+      }
+      if (allTickers.size > 0) {
+        console.log(`[bg] Pre-warming YTD prices for ${allTickers.size} megatrend tickers...`);
+        await yahoo.getYearStartPrices(Array.from(allTickers));
+        console.log(`[bg] YTD prices pre-warmed`);
+      }
+    } catch (err: any) {
+      console.log(`[bg] YTD pre-warm error: ${err.message}`);
+    }
   }, 1000);
 
   let lastScheduledWindow = '';
