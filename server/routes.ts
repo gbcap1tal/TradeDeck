@@ -7,7 +7,7 @@ import * as yahoo from "./api/yahoo";
 import * as fmp from "./api/fmp";
 import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
-import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, scrapeIndustryRS, fetchIndustryRSFromFinviz, getIndustryRSRating, getAllIndustryRS } from "./api/finviz";
+import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, scrapeIndustryRS, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData } from "./api/breadth";
 import { sendAlert, clearFailures } from "./api/alerts";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripe/stripeClient";
@@ -67,7 +67,7 @@ async function computeMegatrendPerformance(): Promise<Map<number, any>> {
     for (const t of mt.tickers) allTickers.add(t.toUpperCase());
   }
 
-  const tickerPrices = new Map<string, { current: number; w: number; m: number; q: number; h: number; y: number }>();
+  const tickerPrices = new Map<string, { current: number; w: number; m: number; q: number; h: number; y: number; ytd: number }>();
 
   const tickerArr = Array.from(allTickers);
   const BATCH_SIZE = 5;
@@ -107,6 +107,16 @@ async function computeMegatrendPerformance(): Promise<Map<number, any>> {
       return closest.close;
     };
 
+    const yearStartDate = new Date(new Date().getFullYear(), 0, 1).getTime();
+    const findPriceAtDate = (targetTime: number): number => {
+      let closest = hist[0];
+      for (const h of hist) {
+        const t = new Date(h.time).getTime();
+        if (t <= targetTime) closest = h;
+      }
+      return closest.close;
+    };
+
     tickerPrices.set(ticker.toUpperCase(), {
       current: currentPrice,
       w: findPriceAtDaysAgo(7),
@@ -114,13 +124,14 @@ async function computeMegatrendPerformance(): Promise<Map<number, any>> {
       q: findPriceAtDaysAgo(90),
       h: findPriceAtDaysAgo(180),
       y: hist[0].close,
+      ytd: findPriceAtDate(yearStartDate),
     });
   }
 
   const finvizData = getFinvizDataSync();
 
   for (const mt of mts) {
-    let dailySum = 0, weekSum = 0, monthSum = 0, quarterSum = 0, halfSum = 0, yearSum = 0;
+    let dailySum = 0, weekSum = 0, monthSum = 0, quarterSum = 0, halfSum = 0, yearSum = 0, ytdSum = 0;
     let dailyCount = 0, multiCount = 0;
 
     const uniqueTickers = Array.from(new Set(mt.tickers.map(t => t.toUpperCase())));
@@ -149,6 +160,7 @@ async function computeMegatrendPerformance(): Promise<Map<number, any>> {
         if (prices.q > 0) quarterSum += ((prices.current - prices.q) / prices.q) * 100;
         if (prices.h > 0) halfSum += ((prices.current - prices.h) / prices.h) * 100;
         if (prices.y > 0) yearSum += ((prices.current - prices.y) / prices.y) * 100;
+        if (prices.ytd > 0) ytdSum += ((prices.current - prices.ytd) / prices.ytd) * 100;
         multiCount++;
       }
     }
@@ -161,6 +173,7 @@ async function computeMegatrendPerformance(): Promise<Map<number, any>> {
       quarterChange: multiCount > 0 ? round2(quarterSum / multiCount) : 0,
       halfChange: multiCount > 0 ? round2(halfSum / multiCount) : 0,
       yearlyChange: multiCount > 0 ? round2(yearSum / multiCount) : 0,
+      ytdChange: multiCount > 0 ? round2(ytdSum / multiCount) : 0,
     });
   }
 
@@ -810,18 +823,29 @@ export async function registerRoutes(
       if (q) quoteMap.set(q.symbol, q);
     }
 
-    const industryRS = getIndustryRSRating(industryName);
+    let ytdPrices = new Map<string, number>();
+    try {
+      ytdPrices = await yahoo.getYearStartPrices(symbolsToQuote);
+    } catch {}
+
+    const industryRSData = getIndustryRSData(industryName);
 
     const stocks = stockDefs.map(stock => {
       const q = quoteMap.get(stock.symbol);
+      const currentPrice = q?.price ?? 0;
+      const yearStartPrice = ytdPrices.get(stock.symbol);
+      const ytdChange = yearStartPrice && yearStartPrice > 0
+        ? Math.round(((currentPrice / yearStartPrice) - 1) * 10000) / 100
+        : null;
       return {
         symbol: stock.symbol,
         name: q?.name || stock.name,
-        price: q?.price ?? 0,
+        price: currentPrice,
         change: q?.change ?? 0,
         changePercent: q?.changePercent ?? 0,
         volume: q?.volume ?? 0,
         marketCap: q?.marketCap ?? 0,
+        ytdChange,
       };
     });
 
@@ -832,7 +856,10 @@ export async function registerRoutes(
         name: industryName,
         sector: sectorName,
         changePercent: getIndustryAvgChange(industryName),
-        rs: industryRS,
+        weeklyChange: industryRSData?.perfWeek ?? 0,
+        monthlyChange: industryRSData?.perfMonth ?? 0,
+        ytdChange: industryRSData?.perfYTD ?? 0,
+        rs: industryRSData?.rsRating ?? 0,
         totalStocks: stockDefs.length,
       },
       stocks,
@@ -1244,19 +1271,30 @@ export async function registerRoutes(
         if (q) quoteMap.set(q.symbol, q);
       }
 
+      let ytdPrices = new Map<string, number>();
+      try {
+        ytdPrices = await yahoo.getYearStartPrices(uniqueTickers);
+      } catch {}
+
       const perfCached = getMegatrendPerfCached();
       const cached = perfCached?.[String(mt.id)];
 
       const stocks = uniqueTickers.map(ticker => {
         const q = quoteMap.get(ticker);
+        const currentPrice = q?.price ?? 0;
+        const yearStartPrice = ytdPrices.get(ticker);
+        const ytdChange = yearStartPrice && yearStartPrice > 0
+          ? Math.round(((currentPrice / yearStartPrice) - 1) * 10000) / 100
+          : null;
         return {
           symbol: ticker,
           name: q?.name || ticker,
-          price: q?.price ?? 0,
+          price: currentPrice,
           change: q?.change ?? 0,
           changePercent: q?.changePercent ?? 0,
           volume: q?.volume ?? 0,
           marketCap: q?.marketCap ?? 0,
+          ytdChange,
         };
       });
 
@@ -1269,6 +1307,7 @@ export async function registerRoutes(
           dailyChange: cached?.dailyChange ?? 0,
           weeklyChange: cached?.weeklyChange ?? 0,
           monthlyChange: cached?.monthlyChange ?? 0,
+          ytdChange: cached?.ytdChange ?? 0,
           totalStocks: uniqueTickers.length,
         },
         stocks,

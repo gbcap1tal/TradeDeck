@@ -466,6 +466,7 @@ export interface IndustryRS {
   perfQuarter: number;
   perfHalf: number;
   perfYear: number;
+  perfYTD: number;
   rawScore: number;
   rsRating: number;
 }
@@ -523,7 +524,7 @@ export async function fetchIndustryRSFromFinviz(forceRefresh = false): Promise<I
     }
 
     const $ = cheerio.load(result.html);
-    const industries: Array<{ name: string; perfDay: number; perfWeek: number; perfMonth: number; perfQuarter: number; perfHalf: number; perfYear: number }> = [];
+    const industries: Array<{ name: string; perfDay: number; perfWeek: number; perfMonth: number; perfQuarter: number; perfHalf: number; perfYear: number; perfYTD: number }> = [];
 
     const parsePerf = (val: string): number => {
       const cleaned = val.replace('%', '').trim();
@@ -548,6 +549,7 @@ export async function fetchIndustryRSFromFinviz(forceRefresh = false): Promise<I
         perfQuarter: parsePerf(cells.eq(4).text()),
         perfHalf: parsePerf(cells.eq(5).text()),
         perfYear: parsePerf(cells.eq(6).text()),
+        perfYTD: parsePerf(cells.eq(7).text()),
         perfDay: parsePerf(cells.eq(10).text()),
       });
     });
@@ -577,6 +579,7 @@ export async function fetchIndustryRSFromFinviz(forceRefresh = false): Promise<I
         perfQuarter: ind.perfQuarter,
         perfHalf: ind.perfHalf,
         perfYear: ind.perfYear,
+        perfYTD: ind.perfYTD,
         rawScore: Math.round(ind.rawScore * 100) / 100,
         rsRating: Math.max(1, Math.min(99, percentile)),
       };
@@ -598,6 +601,11 @@ export function getIndustryRSRating(industryName: string): number {
   if (!cached) return 0;
   const match = cached.find(i => i.name.toLowerCase() === industryName.toLowerCase());
   return match?.rsRating || 0;
+}
+
+export function getIndustryRSData(industryName: string): IndustryRS | null {
+  const all = getAllIndustryRS();
+  return all.find(i => i.name.toLowerCase() === industryName.toLowerCase()) || null;
 }
 
 export function getAllIndustryRS(): IndustryRS[] {

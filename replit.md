@@ -28,7 +28,7 @@ Preferred communication style: Simple, everyday language.
 - `/markets` — Megatrends: Top/Worst 20 industry performance bar charts (D/W/M/3M/6M/Y timeframes from Finviz), megatrend baskets with admin CRUD. All items clickable → industry or megatrend stock lists
 - `/megatrends/:id` — Megatrend basket detail with constituent stock list (quotes from Yahoo Finance)
 - `/sectors/:sectorName` — Sector detail with industry breakdown
-- `/sectors/:sectorName/industries/:industryName` — Industry detail with stock list
+- `/sectors/:sectorName/industries/:industryName` — Industry detail with stock list (shared StockListPage component, columns: Stock/Price/Change/MktCap/YTD)
 - `/stocks/:symbol` — Individual stock detail with chart, CANSLIM scorecard, earnings, news
 - `/login` — Login page (Replit Auth)
 

@@ -144,6 +144,59 @@ export async function getMultipleHistories(symbols: string[], range: string = '1
   return results;
 }
 
+export async function getYearStartPrices(symbols: string[]): Promise<Map<string, number>> {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const cacheKey = `ytd_year_start_${currentYear}`;
+  const cached = getCached<Record<string, number>>(cacheKey);
+  const priceMap = new Map<string, number>();
+
+  if (cached) {
+    for (const [sym, price] of Object.entries(cached)) {
+      priceMap.set(sym, price);
+    }
+    const missing = symbols.filter(s => !priceMap.has(s));
+    if (missing.length === 0) return priceMap;
+  }
+
+  const period1 = new Date(currentYear - 1, 11, 28);
+  const period2 = new Date(currentYear, 0, 8);
+
+  const missing = symbols.filter(s => !priceMap.has(s));
+  await batchConcurrent(missing, async (sym) => {
+    const perStockKey = `ytd_start_${sym}_${currentYear}`;
+    const cachedPrice = getCached<number>(perStockKey);
+    if (cachedPrice !== undefined) {
+      priceMap.set(sym, cachedPrice);
+      return null;
+    }
+    try {
+      const result = await throttledYahooCall(() => yf.chart(sym, {
+        period1,
+        period2,
+        interval: '1d' as const,
+      }));
+      if (result?.quotes?.length > 0) {
+        const validQuotes = result.quotes.filter((q: any) => q.close != null);
+        if (validQuotes.length > 0) {
+          const lastClose = validQuotes[validQuotes.length - 1].close;
+          priceMap.set(sym, lastClose);
+          setCache(perStockKey, lastClose, 86400);
+        }
+      }
+    } catch {}
+    return null;
+  }, 10);
+
+  const allPrices: Record<string, number> = {};
+  priceMap.forEach((price, sym) => {
+    allPrices[sym] = price;
+  });
+  setCache(cacheKey, allPrices, 3600);
+
+  return priceMap;
+}
+
 export async function getHistory(symbol: string, range: string = '1M') {
   const key = `yf_hist_${symbol}_${range}`;
   const cached = getCached<any[]>(key);
