@@ -85,7 +85,7 @@ export default function StockListPage({
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       <main className="flex-1">
-        <div className="max-w-[1200px] mx-auto px-6 py-8">
+        <div className="max-w-[960px] mx-auto px-6 py-8">
           <div className="flex items-center gap-2 mb-6 text-[12px] text-white/30 flex-wrap">
             {breadcrumbs.map((bc, i) => (
               <span key={i} className="flex items-center gap-2">
@@ -103,22 +103,22 @@ export default function StockListPage({
             </div>
           ) : hasData ? (
             <div className="space-y-4">
-              <div className="glass-card rounded-xl px-6 py-5">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex items-baseline gap-4 flex-wrap">
-                    <h1 className="text-xl font-semibold tracking-tight text-white" data-testid="text-page-title">{title}</h1>
+              <div className="glass-card rounded-xl px-5 py-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="flex items-baseline gap-3 flex-wrap">
+                    <h1 className="text-lg font-semibold tracking-tight text-white" data-testid="text-page-title">{title}</h1>
                     {rs !== undefined && rs > 0 && (
-                      <span className="font-mono-nums text-xl font-bold text-white" data-testid="text-rs-rating">
+                      <span className="font-mono-nums text-lg font-bold text-white" data-testid="text-rs-rating">
                         RS {rs}
                       </span>
                     )}
-                    <span className="text-[12px] text-white/30">{subtitle}</span>
+                    <span className="text-[11px] text-white/30">{subtitle}</span>
                   </div>
-                  <div className="flex items-center gap-5 flex-wrap">
+                  <div className="flex items-center gap-4 flex-wrap">
                     {headerStats.map((stat, i) => (
                       <div key={i} className="text-right">
-                        <div className="text-[10px] uppercase tracking-wider text-white/25 mb-0.5">{stat.label}</div>
-                        <div className={cn("text-[13px] font-mono-nums font-medium", statColor(stat.value))} data-testid={stat.testId || `text-stat-${i}`}>
+                        <div className="text-[9px] uppercase tracking-wider text-white/25 mb-0.5">{stat.label}</div>
+                        <div className={cn("text-[12px] font-mono-nums", statColor(stat.value))} data-testid={stat.testId || `text-stat-${i}`}>
                           {stat.value >= 0 ? '+' : ''}{stat.value.toFixed(2)}%
                         </div>
                       </div>
@@ -128,54 +128,49 @@ export default function StockListPage({
               </div>
 
               <div className="glass-card rounded-xl overflow-hidden">
-                <table className="w-full">
-                  <thead>
-                    <tr className="text-[10px] text-white/25 font-medium uppercase tracking-wider border-b border-white/5">
-                      <th className="text-left px-5 py-2.5 font-medium w-[35%]">Stock</th>
-                      <th className="text-right px-3 py-2.5 font-medium w-[15%]">Price</th>
-                      <th className="text-right px-3 py-2.5 font-medium w-[15%] cursor-pointer select-none" onClick={() => handleSort('changePercent')} data-testid="button-sort-change">
-                        <span className="inline-flex items-center gap-1 justify-end">Change <ArrowUpDown className="w-2.5 h-2.5" /></span>
-                      </th>
-                      <th className="text-right px-3 py-2.5 font-medium w-[15%] cursor-pointer select-none" onClick={() => handleSort('marketCap')} data-testid="button-sort-mktcap">
-                        <span className="inline-flex items-center gap-1 justify-end">Mkt Cap <ArrowUpDown className="w-2.5 h-2.5" /></span>
-                      </th>
-                      <th className="text-right px-5 py-2.5 font-medium w-[20%] cursor-pointer select-none" onClick={() => handleSort('ytdChange')} data-testid="button-sort-ytd">
-                        <span className="inline-flex items-center gap-1 justify-end">YTD <ArrowUpDown className="w-2.5 h-2.5" /></span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sortedStocks.map((stock: any) => {
-                      const dailyChg = formatChange(stock.changePercent);
-                      const ytdChg = formatChange(stock.ytdChange);
-                      return (
-                        <tr
-                          key={stock.symbol}
-                          className="border-b border-white/[0.03] cursor-pointer hover:bg-white/[0.03] transition-colors"
-                          onClick={() => setLocation(`/stocks/${stock.symbol}`)}
-                          data-testid={`row-stock-${stock.symbol}`}
-                        >
-                          <td className="px-5 py-3">
-                            <div className="font-medium text-[13px] text-white">{stock.symbol}</div>
-                            <div className="text-[11px] text-white/30 truncate max-w-[200px]">{stock.name}</div>
-                          </td>
-                          <td className="text-right px-3 py-3 font-mono-nums text-[13px] text-white/90">
-                            ${stock.price.toFixed(2)}
-                          </td>
-                          <td className={cn("text-right px-3 py-3 font-mono-nums text-[13px]", dailyChg.color)}>
-                            {dailyChg.text}
-                          </td>
-                          <td className="text-right px-3 py-3 font-mono-nums text-[12px] text-white/35">
-                            {formatMktCap(stock.marketCap)}
-                          </td>
-                          <td className={cn("text-right px-5 py-3 font-mono-nums text-[13px]", ytdChg.color)}>
-                            {ytdChg.text}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <div className="hidden md:flex items-center px-4 py-2 text-[10px] text-white/25 font-medium uppercase tracking-wider border-b border-white/5">
+                  <div className="flex-[2.5] min-w-0">Stock</div>
+                  <div className="flex-1 text-right">Price</div>
+                  <div className="flex-1 text-right cursor-pointer select-none" onClick={() => handleSort('changePercent')} data-testid="button-sort-change">
+                    <span className="inline-flex items-center gap-1 justify-end">Change <ArrowUpDown className="w-2.5 h-2.5" /></span>
+                  </div>
+                  <div className="flex-1 text-right cursor-pointer select-none" onClick={() => handleSort('marketCap')} data-testid="button-sort-mktcap">
+                    <span className="inline-flex items-center gap-1 justify-end">Mkt Cap <ArrowUpDown className="w-2.5 h-2.5" /></span>
+                  </div>
+                  <div className="flex-1 text-right cursor-pointer select-none" onClick={() => handleSort('ytdChange')} data-testid="button-sort-ytd">
+                    <span className="inline-flex items-center gap-1 justify-end">YTD <ArrowUpDown className="w-2.5 h-2.5" /></span>
+                  </div>
+                </div>
+
+                {sortedStocks.map((stock: any) => {
+                  const dailyChg = formatChange(stock.changePercent);
+                  const ytdChg = formatChange(stock.ytdChange);
+                  return (
+                    <div
+                      key={stock.symbol}
+                      className="flex items-center px-4 py-2.5 border-b border-white/[0.03] cursor-pointer hover:bg-white/[0.03] transition-colors"
+                      onClick={() => setLocation(`/stocks/${stock.symbol}`)}
+                      data-testid={`row-stock-${stock.symbol}`}
+                    >
+                      <div className="flex-[2.5] min-w-0">
+                        <div className="font-medium text-[13px] text-white">{stock.symbol}</div>
+                        <div className="text-[10px] text-white/30 truncate">{stock.name}</div>
+                      </div>
+                      <div className="flex-1 text-right font-mono-nums text-[13px] text-white/80">
+                        ${stock.price.toFixed(2)}
+                      </div>
+                      <div className={cn("flex-1 text-right font-mono-nums text-[13px]", dailyChg.color)}>
+                        {dailyChg.text}
+                      </div>
+                      <div className="flex-1 text-right font-mono-nums text-[12px] text-white/30">
+                        {formatMktCap(stock.marketCap)}
+                      </div>
+                      <div className={cn("flex-1 text-right font-mono-nums text-[13px]", ytdChg.color)}>
+                        {ytdChg.text}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ) : (
