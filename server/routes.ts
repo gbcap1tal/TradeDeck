@@ -1259,6 +1259,9 @@ export async function registerRoutes(
       if (!name || !Array.isArray(tickers)) return res.status(400).json({ message: "name and tickers[] required" });
       const mt = await storage.createMegatrend({ name, tickers: tickers.map((t: string) => t.toUpperCase()) });
       res.status(201).json(mt);
+      computeMegatrendPerformance().catch(err =>
+        console.error(`[api] Background megatrend perf recompute after create failed: ${err.message}`)
+      );
     } catch (err) {
       res.status(500).json({ message: "Failed to create megatrend" });
     }
@@ -1274,6 +1277,9 @@ export async function registerRoutes(
       if (Array.isArray(tickers)) updates.tickers = tickers.map((t: string) => t.toUpperCase());
       const mt = await storage.updateMegatrend(id, updates);
       res.json(mt);
+      computeMegatrendPerformance().catch(err =>
+        console.error(`[api] Background megatrend perf recompute after update failed: ${err.message}`)
+      );
     } catch (err) {
       res.status(500).json({ message: "Failed to update megatrend" });
     }
@@ -1285,6 +1291,9 @@ export async function registerRoutes(
       const id = Number(req.params.id);
       await storage.deleteMegatrend(id);
       res.status(204).send();
+      computeMegatrendPerformance().catch(err =>
+        console.error(`[api] Background megatrend perf recompute after delete failed: ${err.message}`)
+      );
     } catch (err) {
       res.status(500).json({ message: "Failed to delete megatrend" });
     }
