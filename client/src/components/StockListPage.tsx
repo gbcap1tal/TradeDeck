@@ -81,6 +81,9 @@ export default function StockListPage({
     return (aVal - bVal) * multiplier;
   });
 
+  const mainStats = headerStats.filter(s => s.label !== 'YTD');
+  const ytdStat = headerStats.find(s => s.label === 'YTD');
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
@@ -104,25 +107,37 @@ export default function StockListPage({
           ) : hasData ? (
             <div className="space-y-4">
               <div className="glass-card rounded-xl px-5 py-4">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div className="flex items-baseline gap-3 flex-wrap">
-                    <h1 className="text-lg font-semibold tracking-tight text-white" data-testid="text-page-title">{title}</h1>
-                    {rs !== undefined && rs > 0 && (
-                      <span className="font-mono-nums text-lg font-bold text-white" data-testid="text-rs-rating">
-                        RS {rs}
-                      </span>
-                    )}
-                    <span className="text-[11px] text-white/30">{subtitle}</span>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4 min-w-0 flex-wrap">
+                    <h1 className="text-lg font-semibold tracking-tight text-white whitespace-nowrap" data-testid="text-page-title">{title}</h1>
+                    <span className="text-[11px] text-white/30 whitespace-nowrap">{subtitle}</span>
                   </div>
-                  <div className="flex items-center gap-4 flex-wrap">
-                    {headerStats.map((stat, i) => (
-                      <div key={i} className="text-right">
+
+                  <div className="flex items-center gap-0 shrink-0">
+                    {rs !== undefined && rs > 0 && (
+                      <div className="text-right mr-5" data-testid="text-rs-rating">
+                        <div className="text-[9px] uppercase tracking-wider text-white/25 mb-0.5">RS</div>
+                        <div className="text-[13px] font-mono-nums font-bold text-white">{rs}</div>
+                      </div>
+                    )}
+
+                    {mainStats.map((stat, i) => (
+                      <div key={i} className="text-right px-2.5">
                         <div className="text-[9px] uppercase tracking-wider text-white/25 mb-0.5">{stat.label}</div>
                         <div className={cn("text-[12px] font-mono-nums", statColor(stat.value))} data-testid={stat.testId || `text-stat-${i}`}>
                           {stat.value >= 0 ? '+' : ''}{stat.value.toFixed(2)}%
                         </div>
                       </div>
                     ))}
+
+                    {ytdStat && (
+                      <div className="text-right pl-4 ml-2 border-l border-white/10">
+                        <div className="text-[9px] uppercase tracking-wider text-white/25 mb-0.5">{ytdStat.label}</div>
+                        <div className={cn("text-[13px] font-mono-nums font-medium", statColor(ytdStat.value))} data-testid={ytdStat.testId || 'text-stat-ytd'}>
+                          {ytdStat.value >= 0 ? '+' : ''}{ytdStat.value.toFixed(2)}%
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
