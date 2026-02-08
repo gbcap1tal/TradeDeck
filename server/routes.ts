@@ -190,6 +190,28 @@ function getMegatrendPerfCached(): Record<string, any> | null {
   return loadPersistedMegatrendPerf();
 }
 
+function computeMegatrendRS(cached: any | null): number {
+  if (!cached) return 0;
+  const q = cached.quarterChange ?? 0;
+  const h = cached.halfChange ?? 0;
+  const y = cached.yearlyChange ?? 0;
+  const rawScore = (2 * q + h + y) / 4;
+
+  const allIndustryRS = getAllIndustryRS();
+  if (!allIndustryRS || allIndustryRS.length < 10) return 0;
+
+  const industryScores = allIndustryRS.map(ind => ind.rawScore);
+  const n = industryScores.length;
+  let below = 0;
+  let equal = 0;
+  for (const score of industryScores) {
+    if (score < rawScore) below++;
+    else if (score === rawScore) equal++;
+  }
+  const percentile = Math.round(((below + equal * 0.5) / n) * 99);
+  return Math.max(1, Math.min(99, percentile));
+}
+
 async function computeSectorsData(): Promise<any[]> {
   const data = await yahoo.getSectorETFs();
   if (!data || data.length === 0) return [];
@@ -1291,7 +1313,15 @@ export async function registerRoutes(
         ytdPrices = await yahoo.getYearStartPrices(uniqueTickers);
       } catch {}
 
-      const perfCached = getMegatrendPerfCached();
+      let perfCached = getMegatrendPerfCached();
+      if (!perfCached) {
+        try {
+          const perfMap = await computeMegatrendPerformance();
+          perfCached = Object.fromEntries(perfMap);
+        } catch (compErr: any) {
+          console.error(`[api] Megatrend stocks cold-cache computation failed: ${compErr.message}`);
+        }
+      }
       const cached = perfCached?.[String(mt.id)];
 
       const stocks = uniqueTickers.map(ticker => {
@@ -1315,6 +1345,8 @@ export async function registerRoutes(
 
       stocks.sort((a, b) => (b.marketCap || 0) - (a.marketCap || 0));
 
+      const rsRating = computeMegatrendRS(cached);
+
       res.json({
         megatrend: {
           id: mt.id,
@@ -1323,6 +1355,7 @@ export async function registerRoutes(
           weeklyChange: cached?.weeklyChange ?? 0,
           monthlyChange: cached?.monthlyChange ?? 0,
           ytdChange: cached?.ytdChange ?? 0,
+          rsRating,
           totalStocks: uniqueTickers.length,
         },
         stocks,

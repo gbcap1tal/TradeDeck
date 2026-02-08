@@ -31,6 +31,7 @@ export default function MegatrendDetail() {
         { label: 'Megatrends', href: '/markets' },
       ]}
       headerStats={headerStats}
+      rs={data?.megatrend?.rsRating}
       stocks={data?.stocks || []}
       isLoading={isLoading}
       hasData={!!data}
