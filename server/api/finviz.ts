@@ -458,6 +458,145 @@ export async function getFinvizNews(symbol: string): Promise<Array<{ id: string;
   }
 }
 
+export interface IndustryRS {
+  name: string;
+  perfQuarter: number;
+  perfHalf: number;
+  perfYear: number;
+  rawScore: number;
+  rsRating: number;
+}
+
+const INDUSTRY_RS_PERSIST_PATH = path.join(process.cwd(), '.industry-rs-cache.json');
+const INDUSTRY_RS_CACHE_KEY = 'finviz_industry_rs';
+const INDUSTRY_RS_TTL = 43200;
+
+function persistIndustryRS(data: IndustryRS[]): void {
+  try {
+    fs.writeFileSync(INDUSTRY_RS_PERSIST_PATH, JSON.stringify({ data, savedAt: Date.now() }), 'utf-8');
+  } catch {}
+}
+
+function loadPersistedIndustryRS(): IndustryRS[] | null {
+  try {
+    if (!fs.existsSync(INDUSTRY_RS_PERSIST_PATH)) return null;
+    const raw = JSON.parse(fs.readFileSync(INDUSTRY_RS_PERSIST_PATH, 'utf-8'));
+    if (raw?.data && raw.savedAt) {
+      const ageHours = (Date.now() - raw.savedAt) / (1000 * 60 * 60);
+      if (ageHours < 72) return raw.data;
+    }
+    return null;
+  } catch { return null; }
+}
+
+export async function scrapeIndustryRS(): Promise<IndustryRS[]> {
+  const cached = getCached<IndustryRS[]>(INDUSTRY_RS_CACHE_KEY);
+  if (cached) return cached;
+
+  const persisted = loadPersistedIndustryRS();
+  if (persisted) {
+    setCache(INDUSTRY_RS_CACHE_KEY, persisted, INDUSTRY_RS_TTL);
+    return persisted;
+  }
+
+  return fetchIndustryRSFromFinviz();
+}
+
+export async function fetchIndustryRSFromFinviz(forceRefresh = false): Promise<IndustryRS[]> {
+  if (!forceRefresh) {
+    const cached = getCached<IndustryRS[]>(INDUSTRY_RS_CACHE_KEY);
+    if (cached) return cached;
+  }
+
+  const url = 'https://finviz.com/groups.ashx?g=industry&v=140&o=name';
+  console.log('[finviz] Fetching industry performance groups for RS calculation...');
+
+  try {
+    const result = await fetchPage(url);
+    if (!result.html) {
+      console.log('[finviz] Industry groups page returned no data');
+      const persisted = loadPersistedIndustryRS();
+      return persisted || [];
+    }
+
+    const $ = cheerio.load(result.html);
+    const industries: Array<{ name: string; perfWeek: number; perfMonth: number; perfQuarter: number; perfHalf: number; perfYear: number }> = [];
+
+    $('tr').each((_, row) => {
+      const cells = $(row).find('td');
+      if (cells.length < 9) return;
+
+      const no = cells.eq(0).text().trim();
+      if (!no || isNaN(parseInt(no))) return;
+
+      const name = cells.eq(1).text().trim();
+      if (!name) return;
+
+      const parsePerf = (val: string): number => {
+        const cleaned = val.replace('%', '').trim();
+        if (!cleaned || cleaned === '-') return 0;
+        return parseFloat(cleaned) || 0;
+      };
+
+      industries.push({
+        name,
+        perfWeek: parsePerf(cells.eq(2).text()),
+        perfMonth: parsePerf(cells.eq(3).text()),
+        perfQuarter: parsePerf(cells.eq(4).text()),
+        perfHalf: parsePerf(cells.eq(5).text()),
+        perfYear: parsePerf(cells.eq(6).text()),
+      });
+    });
+
+    if (industries.length < 10) {
+      console.log(`[finviz] Too few industries from groups page: ${industries.length}`);
+      const persisted = loadPersistedIndustryRS();
+      return persisted || [];
+    }
+
+    const withRaw = industries.map(ind => ({
+      ...ind,
+      rawScore: (2 * ind.perfQuarter + ind.perfHalf + ind.perfYear) / 4,
+    }));
+
+    const sorted = [...withRaw].sort((a, b) => a.rawScore - b.rawScore);
+    const n = sorted.length;
+
+    const result2: IndustryRS[] = withRaw.map(ind => {
+      const rank = sorted.findIndex(s => s.name === ind.name);
+      const percentile = Math.round(((rank + 1) / n) * 99);
+      return {
+        name: ind.name,
+        perfQuarter: ind.perfQuarter,
+        perfHalf: ind.perfHalf,
+        perfYear: ind.perfYear,
+        rawScore: Math.round(ind.rawScore * 100) / 100,
+        rsRating: Math.max(1, Math.min(99, percentile)),
+      };
+    });
+
+    console.log(`[finviz] Industry RS calculated for ${result2.length} industries`);
+    setCache(INDUSTRY_RS_CACHE_KEY, result2, INDUSTRY_RS_TTL);
+    persistIndustryRS(result2);
+    return result2;
+  } catch (err: any) {
+    console.error(`[finviz] Industry RS scrape error: ${err.message}`);
+    const persisted = loadPersistedIndustryRS();
+    return persisted || [];
+  }
+}
+
+export function getIndustryRSRating(industryName: string): number {
+  const cached = getCached<IndustryRS[]>(INDUSTRY_RS_CACHE_KEY);
+  if (!cached) return 0;
+  const match = cached.find(i => i.name.toLowerCase() === industryName.toLowerCase());
+  return match?.rsRating || 0;
+}
+
+export function getAllIndustryRS(): IndustryRS[] {
+  return getCached<IndustryRS[]>(INDUSTRY_RS_CACHE_KEY) || loadPersistedIndustryRS() || [];
+}
+
 export function getAllIndustriesWithStockCount(): Array<{ name: string; sector: string; stockCount: number }> {
   const data = getFinvizDataSync();
   if (!data) return [];

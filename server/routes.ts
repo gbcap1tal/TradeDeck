@@ -7,7 +7,7 @@ import * as yahoo from "./api/yahoo";
 import * as fmp from "./api/fmp";
 import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
-import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews } from "./api/finviz";
+import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, scrapeIndustryRS, fetchIndustryRSFromFinviz, getIndustryRSRating, getAllIndustryRS } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData } from "./api/breadth";
 import { sendAlert, clearFailures } from "./api/alerts";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripe/stripeClient";
@@ -310,6 +310,13 @@ function initBackgroundTasks() {
       sendAlert('Finviz Scrape Failed on Startup', 'Finviz data could not be loaded during server boot. Industry performance will use persisted cache if available.', 'finviz_scrape');
     }
 
+    try {
+      const rsData = await scrapeIndustryRS();
+      console.log(`[bg] Industry RS ratings loaded: ${rsData.length} industries`);
+    } catch (e: any) {
+      console.log(`[bg] Industry RS scrape error: ${e.message}`);
+    }
+
     console.log('[bg] Computing industry performance from Finviz data...');
     let perfData = await computeIndustryPerformance();
     if (!perfData.fullyEnriched) {
@@ -377,6 +384,13 @@ function initBackgroundTasks() {
     } catch (err: any) {
       console.error(`[scheduler] Finviz refresh error: ${err.message}`);
       sendAlert('Scheduled Finviz Refresh Failed', `Finviz scrape failed during ${windowLabel} refresh.\n\nError: ${err.message}`, 'finviz_scrape');
+    }
+
+    try {
+      const rsData = await fetchIndustryRSFromFinviz(true);
+      console.log(`[scheduler] Industry RS refreshed: ${rsData.length} industries`);
+    } catch (e: any) {
+      console.log(`[scheduler] Industry RS refresh error: ${e.message}`);
     }
 
     let perfData = await computeIndustryPerformance();
@@ -601,7 +615,7 @@ export async function registerRoutes(
         name: ind,
         changePercent: avgChange,
         stockCount: stocks.length,
-        rs: 0,
+        rs: getIndustryRSRating(ind),
         topStocks: stocks.slice(0, 3).map(s => s.symbol),
         etf: etf || undefined,
       };
@@ -638,6 +652,8 @@ export async function registerRoutes(
       if (q) quoteMap.set(q.symbol, q);
     }
 
+    const industryRS = getIndustryRSRating(industryName);
+
     const stocks = stockDefs.map(stock => {
       const q = quoteMap.get(stock.symbol);
       return {
@@ -648,8 +664,6 @@ export async function registerRoutes(
         changePercent: q?.changePercent ?? 0,
         volume: q?.volume ?? 0,
         marketCap: q?.marketCap ?? 0,
-        rs: 0,
-        canslimGrade: 'N/A',
       };
     });
 
@@ -660,7 +674,7 @@ export async function registerRoutes(
         name: industryName,
         sector: sectorName,
         changePercent: getIndustryAvgChange(industryName),
-        rs: 0,
+        rs: industryRS,
         totalStocks: stockDefs.length,
       },
       stocks,
@@ -706,10 +720,6 @@ export async function registerRoutes(
       console.error(`History error for ${symbol}:`, e.message);
     }
     return res.json([]);
-  });
-
-  app.get('/api/stocks/:symbol/canslim', (req, res) => {
-    res.json({ overall: { grade: 'N/A', score: 0, color: '#666' }, metrics: [] });
   });
 
   app.get('/api/stocks/:symbol/quality', async (req, res) => {

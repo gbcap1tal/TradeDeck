@@ -30,18 +30,6 @@ export function useStockHistory(symbol: string, range: '1D' | '1W' | '1M' | '3M'
   });
 }
 
-export function useStockCANSLIM(symbol: string) {
-  return useQuery({
-    queryKey: ['/api/stocks', symbol, 'canslim'],
-    queryFn: async () => {
-      const res = await fetch(`/api/stocks/${symbol}/canslim`, { credentials: "include" });
-      if (!res.ok) return null;
-      return res.json();
-    },
-    enabled: !!symbol,
-  });
-}
-
 export function useStockEarnings(symbol: string) {
   return useQuery({
     queryKey: ['/api/stocks', symbol, 'earnings'],

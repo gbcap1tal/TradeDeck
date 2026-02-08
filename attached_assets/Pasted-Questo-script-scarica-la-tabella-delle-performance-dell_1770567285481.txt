@@ -1,0 +1,93 @@
+Questo script scarica la tabella delle performance delle industrie direttamente da Finviz e calcola il Rating IBD.
+
+Nota sulla formula: Finviz ci dà Perf Quarter (3m), Perf Half (6m) e Perf Year (12m). Manca il "9 mesi" esatto. Per adattare la formula IBD mantenendo lo spirito (peso doppio al recente), faremo:
+RS = (2 * 3m + 6m + 12m) / 4 (invece che diviso 5, dato che manca un termine). È un'approssimazione eccellente.
+
+python
+Copy
+import pandas as pd
+import requests
+from io import StringIO
+
+def get_finviz_industry_rs():
+    # URL della pagina Groups di Finviz, ordinata per Ticker (v=140 è la vista Performance)
+    url = "https://finviz.com/groups.ashx?g=industry&v=140&o=name"
+    
+    # Finviz blocca le richieste senza User-Agent, quindi ci fingiamo un browser
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+
+    print("Recupero dati industrie da Finviz...")
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+    except Exception as e:
+        return f"Errore nella chiamata: {e}"
+
+    # Parsing della tabella HTML con Pandas
+    # Finviz ha diverse tabelle, di solito quella dei dati è la più grande o specifica
+    try:
+        dfs = pd.read_html(StringIO(response.text))
+        # Cerchiamo il dataframe che contiene la colonna 'Name' e 'Perf Year'
+        df = None
+        for d in dfs:
+            if 'Name' in d.columns and 'Perf Year' in d.columns:
+                df = d
+                break
+        
+        if df is None:
+            return "Impossibile trovare la tabella dati."
+
+    except Exception as e:
+        return f"Errore nel parsing: {e}"
+
+    # Pulizia dei dati (rimuovere il simbolo % e convertire in float)
+    cols_to_clean = ['Perf Quarter', 'Perf Half', 'Perf Year']
+    
+    for col in cols_to_clean:
+        # Rimuove %, converte in numero, gestisce eventuali '-'
+        df[col] = df[col].astype(str).str.replace('%', '').str.replace('-', '0')
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    # --- CALCOLO FORMULA IBD ADATTATA ---
+    # Formula originale: (2*3m + 6m + 9m + 12m) / 5
+    # Formula adattata (senza 9m): (2 * 3m + 6m + 12m) / 4
+    
+    # Nota: Finviz 'Perf Quarter' è circa 3 mesi.
+    
+    df['Raw_RS_Score'] = (
+        (2 * df['Perf Quarter']) + 
+        df['Perf Half'] + 
+        df['Perf Year']
+    ) / 4
+
+    # --- CALCOLO PERCENTILE (1-99) ---
+    df['IBD_RS_Rating'] = df['Raw_RS_Score'].rank(pct=True) * 99
+    df['IBD_RS_Rating'] = df['IBD_RS_Rating'].round(0).astype(int)
+
+    # Pulizia finale del DataFrame
+    result_df = df[['Name', 'IBD_RS_Rating', 'Raw_RS_Score', 'Perf Quarter', 'Perf Half', 'Perf Year']].copy()
+    
+    # Ordinamento per Rating decrescente (i migliori in alto)
+    result_df = result_df.sort_values(by='IBD_RS_Rating', ascending=False).reset_index(drop=True)
+
+    return result_df
+
+# Esecuzione
+if __name__ == "__main__":
+    rankings = get_finviz_industry_rs()
+    
+    if isinstance(rankings, pd.DataFrame):
+        print(f"Trovate {len(rankings)} industrie.")
+        print(rankings.head(10)) # Stampa le top 10
+        
+        # Esempio: Salva in CSV per la tua app
+        # rankings.to_csv("industry_rs.csv", index=False)
+    else:
+        print(rankings)
+Vantaggi di questo approccio:
+Coerenza: Mantieni esattamente le stesse industrie che vedi su Finviz (che sono molto dettagliate).
+Leggerezza: Fai 1 sola chiamata HTTP invece di migliaia. Replit non andrà in timeout.
+Formula IBD: Anche se manca il dato esatto dei 9 mesi, la logica matematica di "pesare il doppio l'ultimo trimestre" è preservata perfettamente.
+Gratis: Non serve pagare API costose.
