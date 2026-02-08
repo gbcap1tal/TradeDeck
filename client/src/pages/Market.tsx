@@ -52,7 +52,7 @@ function BarChart({ items, title, isMegatrendMap, onClickItem }: {
               <span className="text-[11px] text-white/20 font-mono w-5 shrink-0 text-right">{idx + 1}</span>
               <span className={cn(
                 "text-[12px] font-medium w-[220px] shrink-0 truncate group-hover:text-white transition-colors",
-                isMegatrend ? "text-[#bf5af2]" : "text-white/70"
+                isMegatrend ? "text-white" : "text-white/70"
               )}>
                 {item.name}
               </span>
@@ -161,7 +161,7 @@ function MegatrendAdmin({ megatrends, onClose }: { megatrends: any[]; onClose: (
             ) : (
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <div className="text-[13px] font-medium text-[#bf5af2]">{mt.name}</div>
+                  <div className="text-[13px] font-medium text-white">{mt.name}</div>
                   <div className="text-[11px] text-white/30 font-mono mt-0.5 truncate max-w-[400px]">
                     {mt.tickers.join(', ')}
                   </div>
@@ -234,11 +234,11 @@ export default function Market() {
   const megatrendItems = megatrends.map((mt: any) => ({
     name: mt.name,
     dailyChange: mt.dailyChange || 0,
-    weeklyChange: 0,
-    monthlyChange: 0,
-    quarterChange: 0,
-    halfChange: 0,
-    yearlyChange: 0,
+    weeklyChange: mt.weeklyChange || 0,
+    monthlyChange: mt.monthlyChange || 0,
+    quarterChange: mt.quarterChange || 0,
+    halfChange: mt.halfChange || 0,
+    yearlyChange: mt.yearlyChange || 0,
     sector: 'Megatrend',
     isMegatrend: true,
   }));
@@ -332,7 +332,7 @@ export default function Market() {
                     <span className="text-[11px] text-white/30">Industry</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <div className="w-2.5 h-2.5 rounded-sm bg-[#bf5af2]" />
+                    <div className="w-2.5 h-2.5 rounded-sm bg-white" />
                     <span className="text-[11px] text-white/30">Megatrend Basket</span>
                   </div>
                 </div>

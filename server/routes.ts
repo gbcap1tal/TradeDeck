@@ -40,6 +40,143 @@ function loadPersistedIndustryPerf(): any | null {
   return null;
 }
 
+const MEGATREND_PERF_PERSIST_PATH = path.join(process.cwd(), '.megatrend-perf-cache.json');
+
+function persistMegatrendPerfToFile(data: any): void {
+  try {
+    fs.writeFileSync(MEGATREND_PERF_PERSIST_PATH, JSON.stringify({ data, savedAt: Date.now() }), 'utf-8');
+  } catch {}
+}
+
+function loadPersistedMegatrendPerf(): any | null {
+  try {
+    if (!fs.existsSync(MEGATREND_PERF_PERSIST_PATH)) return null;
+    const raw = JSON.parse(fs.readFileSync(MEGATREND_PERF_PERSIST_PATH, 'utf-8'));
+    if (raw?.data && Date.now() - raw.savedAt < 24 * 3600000) return raw.data;
+  } catch {}
+  return null;
+}
+
+async function computeMegatrendPerformance(): Promise<Map<number, any>> {
+  const mts = await storage.getMegatrends();
+  const perfMap = new Map<number, any>();
+  if (mts.length === 0) return perfMap;
+
+  const allTickers = new Set<string>();
+  for (const mt of mts) {
+    for (const t of mt.tickers) allTickers.add(t.toUpperCase());
+  }
+
+  const tickerPrices = new Map<string, { current: number; w: number; m: number; q: number; h: number; y: number }>();
+
+  const tickerArr = Array.from(allTickers);
+  const BATCH_SIZE = 5;
+  const histories: PromiseSettledResult<{ ticker: string; hist: any[] }>[] = [];
+  for (let i = 0; i < tickerArr.length; i += BATCH_SIZE) {
+    const batch = tickerArr.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.allSettled(
+      batch.map(async (ticker) => {
+        try {
+          const hist = await yahoo.getHistory(ticker, '1Y');
+          if (!hist || hist.length < 2) return { ticker, hist: [] };
+          return { ticker, hist };
+        } catch {
+          return { ticker, hist: [] };
+        }
+      })
+    );
+    histories.push(...batchResults);
+    if (i + BATCH_SIZE < tickerArr.length) {
+      await new Promise(r => setTimeout(r, 200));
+    }
+  }
+
+  for (const result of histories) {
+    if (result.status !== 'fulfilled' || !result.value.hist.length) continue;
+    const { ticker, hist } = result.value;
+    const currentPrice = hist[hist.length - 1].close;
+    const now = Date.now();
+
+    const findPriceAtDaysAgo = (days: number): number => {
+      const target = now - days * 86400000;
+      let closest = hist[0];
+      for (const h of hist) {
+        const t = new Date(h.time).getTime();
+        if (t <= target) closest = h;
+      }
+      return closest.close;
+    };
+
+    tickerPrices.set(ticker.toUpperCase(), {
+      current: currentPrice,
+      w: findPriceAtDaysAgo(7),
+      m: findPriceAtDaysAgo(30),
+      q: findPriceAtDaysAgo(90),
+      h: findPriceAtDaysAgo(180),
+      y: hist[0].close,
+    });
+  }
+
+  const finvizData = getFinvizDataSync();
+
+  for (const mt of mts) {
+    let dailySum = 0, weekSum = 0, monthSum = 0, quarterSum = 0, halfSum = 0, yearSum = 0;
+    let dailyCount = 0, multiCount = 0;
+
+    for (const ticker of mt.tickers) {
+      const upper = ticker.toUpperCase();
+
+      if (finvizData) {
+        let found = false;
+        for (const sectorData of Object.values(finvizData)) {
+          if (found) break;
+          for (const stockList of Object.values(sectorData.stocks)) {
+            const stock = stockList.find(s => s.symbol?.toUpperCase() === upper);
+            if (stock && stock.changePercent !== undefined) {
+              dailySum += stock.changePercent;
+              dailyCount++;
+              found = true;
+              break;
+            }
+          }
+        }
+      }
+
+      const prices = tickerPrices.get(upper);
+      if (prices && prices.current > 0) {
+        if (prices.w > 0) weekSum += ((prices.current - prices.w) / prices.w) * 100;
+        if (prices.m > 0) monthSum += ((prices.current - prices.m) / prices.m) * 100;
+        if (prices.q > 0) quarterSum += ((prices.current - prices.q) / prices.q) * 100;
+        if (prices.h > 0) halfSum += ((prices.current - prices.h) / prices.h) * 100;
+        if (prices.y > 0) yearSum += ((prices.current - prices.y) / prices.y) * 100;
+        multiCount++;
+      }
+    }
+
+    const round2 = (v: number) => Math.round(v * 100) / 100;
+    perfMap.set(mt.id, {
+      dailyChange: dailyCount > 0 ? round2(dailySum / dailyCount) : 0,
+      weeklyChange: multiCount > 0 ? round2(weekSum / multiCount) : 0,
+      monthlyChange: multiCount > 0 ? round2(monthSum / multiCount) : 0,
+      quarterChange: multiCount > 0 ? round2(quarterSum / multiCount) : 0,
+      halfChange: multiCount > 0 ? round2(halfSum / multiCount) : 0,
+      yearlyChange: multiCount > 0 ? round2(yearSum / multiCount) : 0,
+    });
+  }
+
+  const persistData = Object.fromEntries(perfMap);
+  persistMegatrendPerfToFile(persistData);
+  setCache('megatrend_perf', persistData, 3600000);
+
+  return perfMap;
+}
+
+function getMegatrendPerfCached(): Record<string, any> | null {
+  const cached = getCached<Record<string, any>>('megatrend_perf');
+  if (cached) return cached;
+  return loadPersistedMegatrendPerf();
+}
+
 async function computeSectorsData(): Promise<any[]> {
   const data = await yahoo.getSectorETFs();
   if (!data || data.length === 0) return [];
@@ -357,6 +494,13 @@ function initBackgroundTasks() {
       console.log(`[bg] Breadth full scan error: ${err.message}`);
       sendAlert('Market Breadth Scan Failed', `Full breadth scan failed during startup.\n\nError: ${err.message}`, 'breadth_scan');
     }
+
+    try {
+      const mtPerf = await computeMegatrendPerformance();
+      console.log(`[bg] Megatrend performance computed: ${mtPerf.size} baskets`);
+    } catch (err: any) {
+      console.log(`[bg] Megatrend performance error: ${err.message}`);
+    }
   }, 1000);
 
   let lastScheduledWindow = '';
@@ -432,6 +576,13 @@ function initBackgroundTasks() {
       })(),
     ]);
 
+    try {
+      const mtPerf = await computeMegatrendPerformance();
+      console.log(`[scheduler] Megatrend performance refreshed: ${mtPerf.size} baskets`);
+    } catch (err: any) {
+      console.error(`[scheduler] Megatrend performance error: ${err.message}`);
+    }
+
     console.log(`[scheduler] === Full data refresh complete: ${windowLabel} in ${((Date.now() - start) / 1000).toFixed(1)}s ===`);
   }
 
@@ -445,12 +596,20 @@ function initBackgroundTasks() {
     const timeMinutes = hours * 60 + minutes;
     const dateStr = `${et.getFullYear()}-${et.getMonth()}-${et.getDate()}`;
 
-    const inOpenWindow = timeMinutes >= 570 && timeMinutes <= 600;
-    const inCloseWindow = timeMinutes >= 945 && timeMinutes <= 1035;
+    const marketOpen = 570;
+    const marketClosePlus5 = 965;
+
+    if (timeMinutes < marketOpen || timeMinutes > marketClosePlus5) return;
 
     let windowKey = '';
-    if (inOpenWindow) windowKey = `${dateStr}-open`;
-    else if (inCloseWindow) windowKey = `${dateStr}-close`;
+
+    if (timeMinutes >= 570 && timeMinutes <= 580) {
+      windowKey = `${dateStr}-open`;
+    } else if (timeMinutes >= 960 && timeMinutes <= 965) {
+      windowKey = `${dateStr}-close`;
+    } else if (minutes >= 0 && minutes <= 10) {
+      windowKey = `${dateStr}-h${hours}`;
+    }
 
     if (windowKey && windowKey !== lastScheduledWindow) {
       lastScheduledWindow = windowKey;
@@ -973,8 +1132,22 @@ export async function registerRoutes(
   app.get('/api/megatrends', async (req, res) => {
     try {
       const mts = await storage.getMegatrends();
+      let perfCached = getMegatrendPerfCached();
       const finvizData = getFinvizDataSync();
+
+      if (!perfCached && mts.length > 0) {
+        try {
+          const perfMap = await computeMegatrendPerformance();
+          perfCached = Object.fromEntries(perfMap);
+        } catch {}
+      }
+
       const megatrendsWithPerf = mts.map(mt => {
+        const cached = perfCached?.[String(mt.id)];
+        if (cached) {
+          return { ...mt, ...cached, tickerCount: mt.tickers.length };
+        }
+
         let dailyChange = 0;
         let count = 0;
         if (finvizData && mt.tickers.length > 0) {
@@ -997,6 +1170,7 @@ export async function registerRoutes(
         return {
           ...mt,
           dailyChange: count > 0 ? Math.round((dailyChange / count) * 100) / 100 : 0,
+          weeklyChange: 0, monthlyChange: 0, quarterChange: 0, halfChange: 0, yearlyChange: 0,
           tickerCount: mt.tickers.length,
         };
       });
