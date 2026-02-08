@@ -4,14 +4,6 @@ import { ChevronRight, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
-function rsColor(rs: number): string {
-  if (rs >= 80) return '#30d158';
-  if (rs >= 60) return '#3d8a4e';
-  if (rs >= 40) return 'rgba(255,255,255,0.5)';
-  if (rs >= 20) return '#b85555';
-  return '#ff453a';
-}
-
 function formatMktCap(cap: number): string {
   if (cap >= 1e12) return `$${(cap / 1e12).toFixed(2)}T`;
   if (cap >= 1e9) return `$${(cap / 1e9).toFixed(1)}B`;
@@ -20,12 +12,17 @@ function formatMktCap(cap: number): string {
 }
 
 function formatChange(val: number | null | undefined): { text: string; color: string } {
-  if (val == null) return { text: '—', color: 'text-white/30' };
+  if (val == null) return { text: '—', color: 'text-white/20' };
   const isPositive = val >= 0;
   return {
     text: `${isPositive ? '+' : ''}${val.toFixed(2)}%`,
-    color: isPositive ? 'text-[#30d158]' : 'text-[#ff453a]',
+    color: isPositive ? 'text-emerald-400/80' : 'text-red-400/80',
   };
+}
+
+function statColor(val: number): string {
+  if (val >= 0) return 'text-emerald-400/70';
+  return 'text-red-400/70';
 }
 
 interface Breadcrumb {
@@ -88,101 +85,103 @@ export default function StockListPage({
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       <main className="flex-1">
-        <div className="max-w-[1400px] mx-auto px-6 py-8">
-          <div className="flex items-center gap-2 mb-6 text-[13px] text-white/40 flex-wrap">
+        <div className="max-w-[1200px] mx-auto px-6 py-8">
+          <div className="flex items-center gap-2 mb-6 text-[12px] text-white/30 flex-wrap">
             {breadcrumbs.map((bc, i) => (
               <span key={i} className="flex items-center gap-2">
-                <Link href={bc.href} className="hover:text-white/70 transition-colors" data-testid={`link-breadcrumb-${i}`}>{bc.label}</Link>
+                <Link href={bc.href} className="hover:text-white/60 transition-colors" data-testid={`link-breadcrumb-${i}`}>{bc.label}</Link>
                 <ChevronRight className="w-3 h-3" />
               </span>
             ))}
-            <span className="text-white/80" data-testid="text-breadcrumb-current">{title || 'Loading...'}</span>
+            <span className="text-white/60" data-testid="text-breadcrumb-current">{title || 'Loading...'}</span>
           </div>
 
           {isLoading ? (
-            <div className="space-y-3">
-              <div className="shimmer h-24 rounded-xl" />
-              {[1, 2, 3, 4, 5].map(i => <div key={i} className="shimmer h-14 rounded-xl" />)}
+            <div className="space-y-2">
+              <div className="shimmer h-20 rounded-xl" />
+              {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="shimmer h-12 rounded-lg" />)}
             </div>
           ) : hasData ? (
-            <div className="space-y-6">
-              <div className="glass-card rounded-xl p-6">
+            <div className="space-y-4">
+              <div className="glass-card rounded-xl px-6 py-5">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-white mb-1" data-testid="text-page-title">{title}</h1>
-                    <span className="text-[13px] text-white/40">{subtitle}</span>
+                  <div className="flex items-baseline gap-4 flex-wrap">
+                    <h1 className="text-xl font-semibold tracking-tight text-white" data-testid="text-page-title">{title}</h1>
+                    {rs !== undefined && rs > 0 && (
+                      <span className="font-mono-nums text-xl font-bold text-white" data-testid="text-rs-rating">
+                        RS {rs}
+                      </span>
+                    )}
+                    <span className="text-[12px] text-white/30">{subtitle}</span>
                   </div>
-                  <div className="flex items-center gap-6 flex-wrap">
+                  <div className="flex items-center gap-5 flex-wrap">
                     {headerStats.map((stat, i) => (
-                      <div key={i} className="text-center">
-                        <div className="label-text mb-1">{stat.label}</div>
-                        <div className={cn("text-lg font-bold font-mono-nums", stat.value >= 0 ? "text-[#30d158]" : "text-[#ff453a]")} data-testid={stat.testId || `text-stat-${i}`}>
+                      <div key={i} className="text-right">
+                        <div className="text-[10px] uppercase tracking-wider text-white/25 mb-0.5">{stat.label}</div>
+                        <div className={cn("text-[13px] font-mono-nums font-medium", statColor(stat.value))} data-testid={stat.testId || `text-stat-${i}`}>
                           {stat.value >= 0 ? '+' : ''}{stat.value.toFixed(2)}%
                         </div>
                       </div>
                     ))}
-                    {rs !== undefined && rs > 0 && (
-                      <div className="text-center">
-                        <div className="label-text mb-1">RS</div>
-                        <div className="text-lg font-bold font-mono-nums" style={{ color: rsColor(rs) }} data-testid="text-rs-rating">
-                          {rs}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
 
               <div className="glass-card rounded-xl overflow-hidden">
-                <div className="hidden md:grid grid-cols-12 gap-4 px-5 py-3 text-[11px] text-white/30 font-medium uppercase tracking-wider border-b border-white/5">
-                  <div className="col-span-3">Stock</div>
-                  <div className="col-span-2 text-right">Price</div>
-                  <div className="col-span-2 text-right cursor-pointer flex items-center justify-end gap-1" onClick={() => handleSort('changePercent')} data-testid="button-sort-change">
-                    Change <ArrowUpDown className="w-3 h-3" />
-                  </div>
-                  <div className="col-span-2 text-right cursor-pointer flex items-center justify-end gap-1" onClick={() => handleSort('marketCap')} data-testid="button-sort-mktcap">
-                    Mkt Cap <ArrowUpDown className="w-3 h-3" />
-                  </div>
-                  <div className="col-span-3 text-right cursor-pointer flex items-center justify-end gap-1" onClick={() => handleSort('ytdChange')} data-testid="button-sort-ytd">
-                    YTD <ArrowUpDown className="w-3 h-3" />
-                  </div>
-                </div>
-
-                {sortedStocks.map((stock: any) => {
-                  const dailyChg = formatChange(stock.changePercent);
-                  const ytdChg = formatChange(stock.ytdChange);
-                  return (
-                    <div
-                      key={stock.symbol}
-                      className="grid grid-cols-12 gap-4 px-5 py-3.5 items-center border-b border-white/[0.03] cursor-pointer hover:bg-white/[0.03] transition-colors"
-                      onClick={() => setLocation(`/stocks/${stock.symbol}`)}
-                      data-testid={`row-stock-${stock.symbol}`}
-                    >
-                      <div className="col-span-3">
-                        <div className="font-semibold text-[14px] text-white">{stock.symbol}</div>
-                        <div className="text-[11px] text-white/40 truncate">{stock.name}</div>
-                      </div>
-                      <div className="col-span-2 text-right font-mono-nums text-[14px] text-white font-medium">
-                        ${stock.price.toFixed(2)}
-                      </div>
-                      <div className={cn("col-span-2 text-right font-mono-nums text-[14px] font-semibold", dailyChg.color)}>
-                        {dailyChg.text}
-                      </div>
-                      <div className="col-span-2 text-right font-mono-nums text-[13px] text-white/50">
-                        {formatMktCap(stock.marketCap)}
-                      </div>
-                      <div className={cn("col-span-3 text-right font-mono-nums text-[14px] font-semibold", ytdChg.color)}>
-                        {ytdChg.text}
-                      </div>
-                    </div>
-                  );
-                })}
+                <table className="w-full">
+                  <thead>
+                    <tr className="text-[10px] text-white/25 font-medium uppercase tracking-wider border-b border-white/5">
+                      <th className="text-left px-5 py-2.5 font-medium w-[35%]">Stock</th>
+                      <th className="text-right px-3 py-2.5 font-medium w-[15%]">Price</th>
+                      <th className="text-right px-3 py-2.5 font-medium w-[15%] cursor-pointer select-none" onClick={() => handleSort('changePercent')} data-testid="button-sort-change">
+                        <span className="inline-flex items-center gap-1 justify-end">Change <ArrowUpDown className="w-2.5 h-2.5" /></span>
+                      </th>
+                      <th className="text-right px-3 py-2.5 font-medium w-[15%] cursor-pointer select-none" onClick={() => handleSort('marketCap')} data-testid="button-sort-mktcap">
+                        <span className="inline-flex items-center gap-1 justify-end">Mkt Cap <ArrowUpDown className="w-2.5 h-2.5" /></span>
+                      </th>
+                      <th className="text-right px-5 py-2.5 font-medium w-[20%] cursor-pointer select-none" onClick={() => handleSort('ytdChange')} data-testid="button-sort-ytd">
+                        <span className="inline-flex items-center gap-1 justify-end">YTD <ArrowUpDown className="w-2.5 h-2.5" /></span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedStocks.map((stock: any) => {
+                      const dailyChg = formatChange(stock.changePercent);
+                      const ytdChg = formatChange(stock.ytdChange);
+                      return (
+                        <tr
+                          key={stock.symbol}
+                          className="border-b border-white/[0.03] cursor-pointer hover:bg-white/[0.03] transition-colors"
+                          onClick={() => setLocation(`/stocks/${stock.symbol}`)}
+                          data-testid={`row-stock-${stock.symbol}`}
+                        >
+                          <td className="px-5 py-3">
+                            <div className="font-medium text-[13px] text-white">{stock.symbol}</div>
+                            <div className="text-[11px] text-white/30 truncate max-w-[200px]">{stock.name}</div>
+                          </td>
+                          <td className="text-right px-3 py-3 font-mono-nums text-[13px] text-white/90">
+                            ${stock.price.toFixed(2)}
+                          </td>
+                          <td className={cn("text-right px-3 py-3 font-mono-nums text-[13px]", dailyChg.color)}>
+                            {dailyChg.text}
+                          </td>
+                          <td className="text-right px-3 py-3 font-mono-nums text-[12px] text-white/35">
+                            {formatMktCap(stock.marketCap)}
+                          </td>
+                          <td className={cn("text-right px-5 py-3 font-mono-nums text-[13px]", ytdChg.color)}>
+                            {ytdChg.text}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           ) : (
             <div className="text-center py-20">
               <h2 className="text-xl font-semibold text-white mb-2">{notFoundMessage}</h2>
-              <p className="text-white/40">The requested data could not be found.</p>
+              <p className="text-white/30">The requested data could not be found.</p>
             </div>
           )}
         </div>
