@@ -23,6 +23,13 @@ export const watchlistItems = pgTable("watchlist_items", {
   addedAt: timestamp("added_at").defaultNow(),
 });
 
+export const megatrends = pgTable("megatrends", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  tickers: text("tickers").array().notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === RELATIONS ===
 
 export const watchlistsRelations = relations(watchlists, ({ one, many }) => ({
@@ -44,12 +51,15 @@ export const watchlistItemsRelations = relations(watchlistItems, ({ one }) => ({
 
 export const insertWatchlistSchema = createInsertSchema(watchlists).omit({ id: true, createdAt: true });
 export const insertWatchlistItemSchema = createInsertSchema(watchlistItems).omit({ id: true, addedAt: true });
+export const insertMegatrendSchema = createInsertSchema(megatrends).omit({ id: true, createdAt: true });
 
 // === EXPLICIT API CONTRACT TYPES ===
 
 // Domain types
 export type Watchlist = typeof watchlists.$inferSelect;
 export type WatchlistItem = typeof watchlistItems.$inferSelect;
+export type Megatrend = typeof megatrends.$inferSelect;
+export type CreateMegatrendRequest = z.infer<typeof insertMegatrendSchema>;
 
 // Request types
 export type CreateWatchlistRequest = z.infer<typeof insertWatchlistSchema>;

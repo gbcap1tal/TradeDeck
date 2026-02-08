@@ -104,8 +104,8 @@ export function Navbar() {
   };
 
   const navItems = [
-    { label: "Dashboard", href: "/" },
-    { label: "Themes", href: "/markets" },
+    { label: "Capital Flow", href: "/" },
+    { label: "Megatrends", href: "/markets" },
   ];
 
   return (

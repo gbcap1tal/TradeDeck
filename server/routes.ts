@@ -72,64 +72,61 @@ async function computeSectorsData(): Promise<any[]> {
 }
 
 async function computeIndustryPerformance(etfOnly: boolean = false): Promise<any> {
-  const allIndustries: Array<{ name: string; sector: string; etf: string | null; stockCount: number }> = [];
+  const rsData = getAllIndustryRS();
 
+  if (rsData.length > 0) {
+    const industries = rsData.map(ind => {
+      const sectorMatch = SECTORS_DATA.find(s => {
+        const sectorIndustries = getIndustriesForSector(s.name);
+        return sectorIndustries.some(si => si.toLowerCase() === ind.name.toLowerCase());
+      });
+
+      return {
+        name: ind.name,
+        sector: sectorMatch?.name || '',
+        dailyChange: ind.perfDay,
+        weeklyChange: ind.perfWeek,
+        monthlyChange: ind.perfMonth,
+        quarterChange: ind.perfQuarter,
+        halfChange: ind.perfHalf,
+        yearlyChange: ind.perfYear,
+        stockCount: getStocksForIndustry(ind.name).length,
+        hasETF: !!INDUSTRY_ETF_MAP[ind.name],
+        rsRating: ind.rsRating,
+      };
+    });
+
+    const hasData = industries.some(ind => ind.dailyChange !== 0);
+    const result = { industries, fullyEnriched: hasData };
+    if (hasData) persistIndustryPerfToFile(result);
+    return result;
+  }
+
+  const allIndustries: Array<{ name: string; sector: string; stockCount: number }> = [];
   for (const sector of SECTORS_DATA) {
     const industries = getIndustriesForSector(sector.name);
     for (const ind of industries) {
-      const etf = INDUSTRY_ETF_MAP[ind] || null;
-      const stocks = getStocksForIndustry(ind);
-      allIndustries.push({
-        name: ind,
-        sector: sector.name,
-        etf,
-        stockCount: stocks.length,
-      });
+      allIndustries.push({ name: ind, sector: sector.name, stockCount: getStocksForIndustry(ind).length });
     }
   }
 
-  const etfSymbols = allIndustries.map(i => i.etf).filter(Boolean) as string[];
-  const uniqueETFs = Array.from(new Set(etfSymbols));
-
-  const etfHistResults = uniqueETFs.length > 0
-    ? await yahoo.getMultipleHistories(uniqueETFs, '1M')
-    : new Map<string, any>();
-
-  const industries = allIndustries.map(ind => {
-    const dailyChange = getIndustryAvgChange(ind.name);
-
-    let weeklyChange = 0;
-    let monthlyChange = 0;
-
-    if (ind.etf) {
-      const hist = etfHistResults.get(ind.etf);
-      if (hist && hist.length >= 2) {
-        const latest = hist[hist.length - 1];
-        if (hist.length >= 6) {
-          const weekAgo = hist[Math.max(0, hist.length - 6)];
-          weeklyChange = Math.round(((latest.close - weekAgo.close) / weekAgo.close) * 10000) / 100;
-        }
-        const monthAgo = hist[0];
-        monthlyChange = Math.round(((latest.close - monthAgo.close) / monthAgo.close) * 10000) / 100;
-      }
-    }
-
-    return {
-      name: ind.name,
-      sector: ind.sector,
-      dailyChange,
-      weeklyChange,
-      monthlyChange,
-      stockCount: ind.stockCount,
-      hasETF: !!ind.etf,
-    };
-  });
+  const industries = allIndustries.map(ind => ({
+    name: ind.name,
+    sector: ind.sector,
+    dailyChange: getIndustryAvgChange(ind.name),
+    weeklyChange: 0,
+    monthlyChange: 0,
+    quarterChange: 0,
+    halfChange: 0,
+    yearlyChange: 0,
+    stockCount: ind.stockCount,
+    hasETF: !!INDUSTRY_ETF_MAP[ind.name],
+    rsRating: getIndustryRSRating(ind.name),
+  }));
 
   const hasData = industries.some(ind => ind.dailyChange !== 0);
   const result = { industries, fullyEnriched: hasData };
-  if (hasData) {
-    persistIndustryPerfToFile(result);
-  }
+  if (hasData) persistIndustryPerfToFile(result);
   return result;
 }
 
@@ -966,6 +963,85 @@ export async function registerRoutes(
     if (watchlist.userId !== req.user.claims.sub) return res.status(401).json({ message: "Unauthorized" });
     await storage.removeWatchlistItem(id, symbol);
     res.status(204).send();
+  });
+
+  const ADMIN_USER_ID = '54198443';
+  const isAdmin = (req: any): boolean => {
+    return req.user?.claims?.sub === ADMIN_USER_ID;
+  };
+
+  app.get('/api/megatrends', async (req, res) => {
+    try {
+      const mts = await storage.getMegatrends();
+      const finvizData = getFinvizDataSync();
+      const megatrendsWithPerf = mts.map(mt => {
+        let dailyChange = 0;
+        let count = 0;
+        if (finvizData && mt.tickers.length > 0) {
+          for (const ticker of mt.tickers) {
+            let found = false;
+            for (const sectorData of Object.values(finvizData)) {
+              if (found) break;
+              for (const stockList of Object.values(sectorData.stocks)) {
+                const stock = stockList.find(s => s.symbol?.toUpperCase() === ticker.toUpperCase());
+                if (stock) {
+                  dailyChange += stock.changePercent || 0;
+                  count++;
+                  found = true;
+                  break;
+                }
+              }
+            }
+          }
+        }
+        return {
+          ...mt,
+          dailyChange: count > 0 ? Math.round((dailyChange / count) * 100) / 100 : 0,
+          tickerCount: mt.tickers.length,
+        };
+      });
+      res.json(megatrendsWithPerf);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to fetch megatrends" });
+    }
+  });
+
+  app.post('/api/megatrends', isAuthenticated, async (req: any, res) => {
+    if (!isAdmin(req)) return res.status(403).json({ message: "Admin only" });
+    try {
+      const { name, tickers } = req.body;
+      if (!name || !Array.isArray(tickers)) return res.status(400).json({ message: "name and tickers[] required" });
+      const mt = await storage.createMegatrend({ name, tickers: tickers.map((t: string) => t.toUpperCase()) });
+      res.status(201).json(mt);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to create megatrend" });
+    }
+  });
+
+  app.put('/api/megatrends/:id', isAuthenticated, async (req: any, res) => {
+    if (!isAdmin(req)) return res.status(403).json({ message: "Admin only" });
+    try {
+      const id = Number(req.params.id);
+      const { name, tickers } = req.body;
+      const updates: any = {};
+      if (name) updates.name = name;
+      if (Array.isArray(tickers)) updates.tickers = tickers.map((t: string) => t.toUpperCase());
+      const mt = await storage.updateMegatrend(id, updates);
+      res.json(mt);
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update megatrend" });
+    }
+  });
+
+  app.delete('/api/megatrends/:id', isAuthenticated, async (req: any, res) => {
+    if (!isAdmin(req)) return res.status(403).json({ message: "Admin only" });
+    try {
+      const id = Number(req.params.id);
+      await storage.deleteMegatrend(id);
+      res.status(204).send();
+    } catch (err) {
+      res.status(500).json({ message: "Failed to delete megatrend" });
+    }
   });
 
   app.get('/api/diagnostics/speed', async (req, res) => {

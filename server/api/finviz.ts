@@ -460,6 +460,9 @@ export async function getFinvizNews(symbol: string): Promise<Array<{ id: string;
 
 export interface IndustryRS {
   name: string;
+  perfDay: number;
+  perfWeek: number;
+  perfMonth: number;
   perfQuarter: number;
   perfHalf: number;
   perfYear: number;
@@ -520,23 +523,23 @@ export async function fetchIndustryRSFromFinviz(forceRefresh = false): Promise<I
     }
 
     const $ = cheerio.load(result.html);
-    const industries: Array<{ name: string; perfWeek: number; perfMonth: number; perfQuarter: number; perfHalf: number; perfYear: number }> = [];
+    const industries: Array<{ name: string; perfDay: number; perfWeek: number; perfMonth: number; perfQuarter: number; perfHalf: number; perfYear: number }> = [];
+
+    const parsePerf = (val: string): number => {
+      const cleaned = val.replace('%', '').trim();
+      if (!cleaned || cleaned === '-') return 0;
+      return parseFloat(cleaned) || 0;
+    };
 
     $('tr').each((_, row) => {
       const cells = $(row).find('td');
-      if (cells.length < 9) return;
+      if (cells.length < 11) return;
 
       const no = cells.eq(0).text().trim();
       if (!no || isNaN(parseInt(no))) return;
 
       const name = cells.eq(1).text().trim();
       if (!name) return;
-
-      const parsePerf = (val: string): number => {
-        const cleaned = val.replace('%', '').trim();
-        if (!cleaned || cleaned === '-') return 0;
-        return parseFloat(cleaned) || 0;
-      };
 
       industries.push({
         name,
@@ -545,6 +548,7 @@ export async function fetchIndustryRSFromFinviz(forceRefresh = false): Promise<I
         perfQuarter: parsePerf(cells.eq(4).text()),
         perfHalf: parsePerf(cells.eq(5).text()),
         perfYear: parsePerf(cells.eq(6).text()),
+        perfDay: parsePerf(cells.eq(10).text()),
       });
     });
 
@@ -567,6 +571,9 @@ export async function fetchIndustryRSFromFinviz(forceRefresh = false): Promise<I
       const percentile = Math.round(((rank + 1) / n) * 99);
       return {
         name: ind.name,
+        perfDay: ind.perfDay,
+        perfWeek: ind.perfWeek,
+        perfMonth: ind.perfMonth,
         perfQuarter: ind.perfQuarter,
         perfHalf: ind.perfHalf,
         perfYear: ind.perfYear,

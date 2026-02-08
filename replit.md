@@ -24,8 +24,8 @@ Preferred communication style: Simple, everyday language.
 - **Path aliases**: `@/` maps to `client/src/`, `@shared/` maps to `shared/`
 
 ### Key Frontend Pages
-- `/` — Dashboard with indices, heatmap, breadth, sector rotation, RS leaders, sector performance
-- `/markets` — Themes view (extended market overview with indices, heatmap, breadth, sector performance)
+- `/` — Capital Flow (Dashboard) with indices, heatmap, breadth, sector rotation, RS leaders, sector performance
+- `/markets` — Megatrends: Top/Bottom 20 industry performance bar charts (D/W/M/3M/6M/Y timeframes from Finviz), megatrend baskets with admin CRUD
 - `/sectors/:sectorName` — Sector detail with industry breakdown
 - `/sectors/:sectorName/industries/:industryName` — Industry detail with stock list
 - `/stocks/:symbol` — Individual stock detail with chart, CANSLIM scorecard, earnings, news
@@ -71,6 +71,7 @@ Preferred communication style: Simple, everyday language.
 2. **users** — User accounts (id UUID, email, firstName, lastName, profileImageUrl, timestamps). Mandatory for Replit Auth.
 3. **watchlists** — User watchlists (id serial, userId FK, name, createdAt)
 4. **watchlistItems** — Items in watchlists (id serial, watchlistId FK, symbol, addedAt)
+5. **megatrends** — Custom industry baskets (id serial, name text, tickers text[], createdAt). Admin (userId 54198443) can CRUD via `/api/megatrends`. Performance = avg daily change of constituent stocks from Finviz data.
 
 ### Authentication
 - **Method**: Replit Auth via OpenID Connect

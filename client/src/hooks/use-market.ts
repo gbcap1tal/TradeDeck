@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 async function fetchWithWarmingRetry(url: string) {
   const res = await fetch(url, { credentials: "include" });
@@ -117,5 +118,41 @@ export function useIndustryStocks(sectorName: string, industryName: string) {
       return res.json();
     },
     enabled: !!sectorName && !!industryName,
+  });
+}
+
+export function useMegatrends() {
+  return useQuery({
+    queryKey: ['/api/megatrends'],
+    refetchInterval: 120000,
+  });
+}
+
+export function useCreateMegatrend() {
+  return useMutation({
+    mutationFn: async (data: { name: string; tickers: string[] }) => {
+      const res = await apiRequest('POST', '/api/megatrends', data);
+      return res.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/megatrends'] }); },
+  });
+}
+
+export function useUpdateMegatrend() {
+  return useMutation({
+    mutationFn: async ({ id, ...data }: { id: number; name?: string; tickers?: string[] }) => {
+      const res = await apiRequest('PUT', `/api/megatrends/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/megatrends'] }); },
+  });
+}
+
+export function useDeleteMegatrend() {
+  return useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest('DELETE', `/api/megatrends/${id}`);
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['/api/megatrends'] }); },
   });
 }
