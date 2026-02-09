@@ -88,7 +88,7 @@ export default function StockListPage({
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       <main className="flex-1">
-        <div className="max-w-[960px] mx-auto px-6 py-8">
+        <div className="max-w-[960px] mx-auto px-3 sm:px-6 py-4 sm:py-8">
           <div className="flex items-center gap-2 mb-6 text-[12px] text-white/30 flex-wrap">
             {breadcrumbs.map((bc, i) => (
               <span key={i} className="flex items-center gap-2">
@@ -106,23 +106,23 @@ export default function StockListPage({
             </div>
           ) : hasData ? (
             <div className="space-y-4">
-              <div className="rounded-xl px-5 py-4 border border-white/[0.06]" style={{ background: 'rgba(255,255,255,0.04)' }}>
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-4 min-w-0 flex-wrap">
-                    <h1 className="text-lg font-semibold tracking-tight text-white whitespace-nowrap" data-testid="text-page-title">{title}</h1>
+              <div className="rounded-xl px-3 sm:px-5 py-3 sm:py-4 border border-white/[0.06]" style={{ background: 'rgba(255,255,255,0.04)' }}>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+                  <div className="flex items-center gap-3 min-w-0 flex-wrap">
+                    <h1 className="text-base sm:text-lg font-semibold tracking-tight text-white whitespace-nowrap" data-testid="text-page-title">{title}</h1>
                     <span className="text-[11px] text-white/30 whitespace-nowrap">{subtitle}</span>
                   </div>
 
                   <div className="flex items-center gap-0 shrink-0">
                     {rs !== undefined && rs > 0 && (
-                      <div className="text-right mr-5" data-testid="text-rs-rating">
+                      <div className="text-right mr-3 sm:mr-5" data-testid="text-rs-rating">
                         <div className="text-[9px] uppercase tracking-wider text-white/25 mb-0.5">RS</div>
                         <div className="text-[13px] font-mono-nums font-bold text-white">{rs}</div>
                       </div>
                     )}
 
                     {mainStats.map((stat, i) => (
-                      <div key={i} className="text-right px-2.5">
+                      <div key={i} className="text-right px-1.5 sm:px-2.5">
                         <div className="text-[9px] uppercase tracking-wider text-white/25 mb-0.5">{stat.label}</div>
                         <div className={cn("text-[12px] font-mono-nums", statColor(stat.value))} data-testid={stat.testId || `text-stat-${i}`}>
                           {stat.value >= 0 ? '+' : ''}{stat.value.toFixed(2)}%
@@ -131,7 +131,7 @@ export default function StockListPage({
                     ))}
 
                     {ytdStat && (
-                      <div className="text-right pl-4 ml-2 border-l border-white/10">
+                      <div className="text-right pl-2 sm:pl-4 ml-1.5 sm:ml-2 border-l border-white/10">
                         <div className="text-[9px] uppercase tracking-wider text-white/25 mb-0.5">{ytdStat.label}</div>
                         <div className={cn("text-[13px] font-mono-nums font-medium", statColor(ytdStat.value))} data-testid={ytdStat.testId || 'text-stat-ytd'}>
                           {ytdStat.value >= 0 ? '+' : ''}{ytdStat.value.toFixed(2)}%
@@ -163,11 +163,11 @@ export default function StockListPage({
                   return (
                     <div
                       key={stock.symbol}
-                      className="flex items-center px-4 py-2.5 border-b border-white/[0.03] cursor-pointer hover:bg-white/[0.03] transition-colors"
+                      className="flex items-center px-3 sm:px-4 py-2.5 border-b border-white/[0.03] cursor-pointer hover:bg-white/[0.03] transition-colors"
                       onClick={() => setLocation(`/stocks/${stock.symbol}`)}
                       data-testid={`row-stock-${stock.symbol}`}
                     >
-                      <div className="flex-[2.5] min-w-0">
+                      <div className="flex-[2] sm:flex-[2.5] min-w-0">
                         <div className="font-medium text-[13px] text-white">{stock.symbol}</div>
                         <div className="text-[10px] text-white/30 truncate">{stock.name}</div>
                       </div>
@@ -177,10 +177,10 @@ export default function StockListPage({
                       <div className={cn("flex-1 text-right font-mono-nums text-[13px]", dailyChg.color)}>
                         {dailyChg.text}
                       </div>
-                      <div className="flex-1 text-right font-mono-nums text-[12px] text-white/30">
+                      <div className="hidden md:block flex-1 text-right font-mono-nums text-[12px] text-white/30">
                         {formatMktCap(stock.marketCap)}
                       </div>
-                      <div className={cn("flex-1 text-right font-mono-nums text-[13px]", ytdChg.color)}>
+                      <div className={cn("hidden md:block flex-1 text-right font-mono-nums text-[13px]", ytdChg.color)}>
                         {ytdChg.text}
                       </div>
                     </div>

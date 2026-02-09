@@ -35,8 +35,8 @@ function BarChart({ items, title, isMegatrendMap, onClickItem }: {
   const maxAbs = Math.max(...items.map(i => Math.abs(i.change)), 0.01);
 
   return (
-    <div className="glass-card rounded-xl p-5" data-testid={`chart-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-      <div className="label-text mb-4">{title}</div>
+    <div className="glass-card rounded-xl p-3 sm:p-5" data-testid={`chart-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+      <div className="label-text mb-3 sm:mb-4">{title}</div>
       <div className="space-y-1">
         {items.map((item, idx) => {
           const isPositive = item.change >= 0;
@@ -52,7 +52,7 @@ function BarChart({ items, title, isMegatrendMap, onClickItem }: {
             >
               <span className="text-[11px] text-white/20 font-mono w-5 shrink-0 text-right">{idx + 1}</span>
               <span className={cn(
-                "text-[12px] font-medium w-[220px] shrink-0 truncate group-hover:text-white transition-colors",
+                "text-[12px] font-medium w-[120px] sm:w-[220px] shrink-0 truncate group-hover:text-white transition-colors",
                 isMegatrend ? "text-white" : "text-white/70"
               )}>
                 {item.name}
@@ -69,7 +69,7 @@ function BarChart({ items, title, isMegatrendMap, onClickItem }: {
                   />
                 </div>
                 <span className={cn(
-                  "text-[12px] font-mono-nums font-semibold w-[65px] text-right shrink-0",
+                  "text-[12px] font-mono-nums font-semibold w-[55px] sm:w-[65px] text-right shrink-0",
                   isPositive ? "text-[#30d158]" : "text-[#ff453a]"
                 )}>
                   {isPositive ? '+' : ''}{item.change.toFixed(2)}%
@@ -266,7 +266,7 @@ export default function Market() {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       <main className="flex-1">
-        <div className="max-w-[1400px] mx-auto px-6 py-8">
+        <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-8">
           <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight text-white" data-testid="text-page-title">Megatrends</h1>
             <div className="flex items-center gap-3">

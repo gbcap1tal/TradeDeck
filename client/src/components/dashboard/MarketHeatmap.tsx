@@ -63,8 +63,8 @@ export function MarketHeatmap() {
         <div className="section-title" data-testid="text-heatmap-title">Market Heatmap</div>
         <TimeframeSwitch value={timeframe} onChange={setTimeframe} />
       </div>
-      <div className="glass-card rounded-xl p-4 aspect-square flex flex-col">
-        <div className="grid grid-cols-3 gap-2 flex-1">
+      <div className="glass-card rounded-xl p-3 sm:p-4 aspect-square flex flex-col">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 flex-1">
           {sorted.map((sector: any) => {
             const change = getChange(sector);
             const intensity = Math.min(Math.abs(change) / 3, 1);
@@ -80,10 +80,10 @@ export function MarketHeatmap() {
                 onClick={() => setLocation(`/sectors/${encodeURIComponent(sector.name)}`)}
                 data-testid={`heatmap-sector-${sector.ticker}`}
               >
-                <div className="text-[11px] font-semibold text-white/80 mb-1 truncate">{sector.name}</div>
+                <div className="text-[10px] sm:text-[11px] font-semibold text-white/80 mb-1 truncate">{sector.name}</div>
                 <div>
-                  <div className="text-[10px] text-white/50 font-mono">{sector.ticker}</div>
-                  <div className="text-lg font-bold font-mono-nums text-white">
+                  <div className="text-[9px] sm:text-[10px] text-white/50 font-mono">{sector.ticker}</div>
+                  <div className="text-sm sm:text-lg font-bold font-mono-nums text-white">
                     {change >= 0 ? '+' : ''}{change.toFixed(2)}%
                   </div>
                 </div>

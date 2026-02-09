@@ -122,22 +122,22 @@ function SMABar({
 
   return (
     <div data-testid={`breadth-bar-${label.replace(/\s+/g, '').toLowerCase()}`}>
-      <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-white/30 uppercase tracking-wider font-medium">{leftText}</span>
-          {!rightLabel && <span className="text-[10px] text-white/30 uppercase tracking-wider font-medium">{label}</span>}
-          <span className="text-[11px] font-mono-nums font-medium text-white/50">
+      <div className="flex items-center justify-between mb-1.5 gap-1">
+        <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+          <span className="text-[9px] sm:text-[10px] text-white/30 uppercase tracking-wider font-medium">{leftText}</span>
+          {!rightLabel && <span className="text-[9px] sm:text-[10px] text-white/30 uppercase tracking-wider font-medium">{label}</span>}
+          <span className="text-[10px] sm:text-[11px] font-mono-nums font-medium text-white/50">
             {abovePct.toFixed(1)}%
           </span>
-          <span className="text-[10px] font-mono-nums text-white/15">({aboveCount.toLocaleString()})</span>
+          <span className="text-[9px] sm:text-[10px] font-mono-nums text-white/15 hidden sm:inline">({aboveCount.toLocaleString()})</span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono-nums text-white/15">({belowCount.toLocaleString()})</span>
-          <span className="text-[11px] font-mono-nums font-medium text-white/50">
+        <div className="flex items-center gap-1 sm:gap-2 min-w-0">
+          <span className="text-[9px] sm:text-[10px] font-mono-nums text-white/15 hidden sm:inline">({belowCount.toLocaleString()})</span>
+          <span className="text-[10px] sm:text-[11px] font-mono-nums font-medium text-white/50">
             {belowPct.toFixed(1)}%
           </span>
-          <span className="text-[10px] text-white/30 uppercase tracking-wider font-medium">{rightText}</span>
-          {!rightLabel && <span className="text-[10px] text-white/30 uppercase tracking-wider font-medium">{label}</span>}
+          <span className="text-[9px] sm:text-[10px] text-white/30 uppercase tracking-wider font-medium">{rightText}</span>
+          {!rightLabel && <span className="text-[9px] sm:text-[10px] text-white/30 uppercase tracking-wider font-medium">{label}</span>}
         </div>
       </div>
       <div className="flex h-1 rounded-full overflow-hidden gap-[1px]">
@@ -217,11 +217,11 @@ export function MarketBreadth() {
         </div>
       </div>
 
-      <div className="glass-card rounded-xl p-6">
-        <div className="flex items-center gap-8">
+      <div className="glass-card rounded-xl p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8">
           <ScoreRing score={overall} label={condition} />
 
-          <div className="flex-1 flex flex-col gap-3">
+          <div className="flex-1 w-full flex flex-col gap-3">
             {tiers.map(tier => (
               <TierBar key={tier.name} {...tier} />
             ))}
@@ -229,7 +229,7 @@ export function MarketBreadth() {
         </div>
       </div>
 
-      <div className="glass-card rounded-xl p-5 mt-2">
+      <div className="glass-card rounded-xl p-3 sm:p-5 mt-2">
         <div className="flex flex-col gap-3.5">
           <SMABar
             label="Strength"

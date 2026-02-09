@@ -157,7 +157,7 @@ export default function News() {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       <main className="flex-1">
-        <div className="max-w-[1400px] mx-auto px-6 py-8">
+        <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-8">
 
           {/* Headlines That Matter - centered top section */}
           <div className="mb-8">
@@ -170,7 +170,7 @@ export default function News() {
                 </span>
               )}
             </div>
-            <div className="glass-card rounded-xl p-6" data-testid="card-daily-digest">
+            <div className="glass-card rounded-xl p-4 sm:p-6" data-testid="card-daily-digest">
               {digestLoading ? (
                 <div className="space-y-4 max-w-3xl mx-auto">
                   <div className="shimmer h-7 w-3/4 rounded" />
@@ -295,8 +295,8 @@ export default function News() {
                         }`}
                         data-testid={`premarket-entry-${i}`}
                       >
-                        <div className="flex items-start gap-4">
-                          <div className="flex-shrink-0 w-[44px] pt-0.5">
+                        <div className="flex items-start gap-2 sm:gap-4">
+                          <div className="flex-shrink-0 w-[36px] sm:w-[44px] pt-0.5">
                             <span className="text-[11px] font-mono text-white/30" data-testid={`premarket-time-${i}`}>
                               {entry.time}
                             </span>
@@ -358,7 +358,7 @@ export default function News() {
 
         </div>
       </main>
-      <footer className="border-t border-white/5 py-6 px-6 text-center">
+      <footer className="border-t border-white/5 py-6 px-3 sm:px-6 text-center">
         <p className="text-[11px] text-white/20">TradeDeck &middot; Data provided by Briefing.com &amp; Finviz</p>
       </footer>
     </div>

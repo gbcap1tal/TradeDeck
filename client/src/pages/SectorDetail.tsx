@@ -32,37 +32,37 @@ export default function SectorDetail() {
   const gridConfig = data ? getGridConfig(data.industries.length) : { cols: 5, rows: 2 };
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div className="min-h-screen lg:h-screen bg-background flex flex-col lg:overflow-hidden">
       <Navbar />
       <main className="flex-1 flex flex-col min-h-0">
-        <div className="max-w-[1600px] w-full mx-auto px-6 py-3 flex flex-col flex-1 min-h-0">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
+        <div className="max-w-[1600px] w-full mx-auto px-3 sm:px-6 py-3 flex flex-col flex-1 min-h-0">
+          <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+            <div className="flex items-center gap-2 sm:gap-3">
               <Link href="/">
                 <Button variant="ghost" size="icon" data-testid="button-back-dashboard">
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
               </Link>
               <div className="flex items-center gap-2 text-[13px] text-white/40">
-                <Link href="/" className="hover:text-white/70 transition-colors" data-testid="breadcrumb-home">Dashboard</Link>
-                <ChevronRight className="w-3 h-3" />
+                <Link href="/" className="hover:text-white/70 transition-colors hidden sm:inline" data-testid="breadcrumb-home">Dashboard</Link>
+                <ChevronRight className="w-3 h-3 hidden sm:inline" />
                 <span className="text-white/80" data-testid="breadcrumb-sector">{sectorName}</span>
               </div>
             </div>
 
             {data && (
-              <div className="flex items-center gap-6">
-                <div className="text-right">
+              <div className="flex items-center gap-3 sm:gap-6">
+                <div className="text-right hidden sm:block">
                   <div className="label-text mb-0.5">Sector ETF</div>
                   <div className="text-sm font-mono-nums text-white/60">{data.sector.ticker}</div>
                 </div>
                 <div className="text-right">
                   <div className="label-text mb-0.5">Price</div>
-                  <div className="text-lg font-bold font-mono-nums text-white" data-testid="text-sector-price">${data.sector.price?.toFixed(2)}</div>
+                  <div className="text-base sm:text-lg font-bold font-mono-nums text-white" data-testid="text-sector-price">${data.sector.price?.toFixed(2)}</div>
                 </div>
                 <div className="text-right">
                   <div className="label-text mb-0.5">Change</div>
-                  <div className={cn("text-lg font-bold font-mono-nums", (data.sector.changePercent ?? 0) >= 0 ? "text-[#30d158]" : "text-[#ff453a]")} data-testid="text-sector-change">
+                  <div className={cn("text-base sm:text-lg font-bold font-mono-nums", (data.sector.changePercent ?? 0) >= 0 ? "text-[#30d158]" : "text-[#ff453a]")} data-testid="text-sector-change">
                     {(data.sector.changePercent ?? 0) >= 0 ? '+' : ''}{(data.sector.changePercent ?? 0).toFixed(2)}%
                   </div>
                 </div>
@@ -82,13 +82,13 @@ export default function SectorDetail() {
                 <h1 className="text-2xl font-bold tracking-tight text-white" data-testid="text-sector-name">{data.sector.name}</h1>
                 <span className="text-sm text-white/30">{data.industries.length} industries</span>
               </div>
-              <div className="flex-1 min-h-0">
+              <div className="flex-1 min-h-0 overflow-auto lg:overflow-hidden">
                 <div
-                  className="grid gap-2 h-full"
+                  className="sector-heatmap-grid grid gap-2 h-full"
                   style={{
-                    gridTemplateColumns: `repeat(${gridConfig.cols}, 1fr)`,
-                    gridTemplateRows: `repeat(${gridConfig.rows}, 1fr)`,
-                  }}
+                    '--heatmap-cols': gridConfig.cols,
+                    '--heatmap-rows': gridConfig.rows,
+                  } as React.CSSProperties}
                   data-testid="grid-industry-heatmap"
                 >
                   {data.industries.map((industry: any) => {

@@ -187,4 +187,21 @@
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
   }
+
+  .sector-heatmap-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (min-width: 640px) {
+    .sector-heatmap-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .sector-heatmap-grid {
+      grid-template-columns: repeat(var(--heatmap-cols), 1fr);
+      grid-template-rows: repeat(var(--heatmap-rows), 1fr);
+    }
+  }
 }

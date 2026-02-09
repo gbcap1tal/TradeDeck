@@ -617,10 +617,10 @@ export default function StockDetail() {
   if (!symbol) return null;
 
   return (
-    <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div className="min-h-screen lg:h-screen bg-background flex flex-col lg:overflow-hidden">
       <Navbar />
       <main className="flex-1 min-h-0 flex flex-col">
-        <div className="max-w-[1440px] w-full mx-auto px-4 py-2 flex-1 min-h-0 flex flex-col gap-2">
+        <div className="max-w-[1440px] w-full mx-auto px-3 sm:px-4 py-2 flex-1 min-h-0 flex flex-col gap-2">
           {(isQuoteLoading || (isQuoteFetching && !quote)) ? (
             <div className="flex-1 flex flex-col gap-2">
               <div className="shimmer h-10 rounded-xl" />
@@ -628,9 +628,9 @@ export default function StockDetail() {
             </div>
           ) : quote ? (
             <>
-              <div className="flex items-center justify-between gap-3 flex-shrink-0" data-testid="stock-header">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="flex items-center gap-1.5 text-[11px] text-white/30 flex-shrink-0">
+              <div className="flex items-center justify-between gap-2 sm:gap-3 flex-shrink-0 flex-wrap" data-testid="stock-header">
+                <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+                  <div className="flex items-center gap-1.5 text-[11px] text-white/30 flex-shrink-0 hidden sm:flex">
                     <Link href="/" className="hover:text-white/50 transition-colors" data-testid="link-breadcrumb-home">Home</Link>
                     <ChevronRight className="w-3 h-3" />
                     {quote.sector && (
@@ -643,12 +643,12 @@ export default function StockDetail() {
                   <h1 className="text-lg font-bold tracking-tight text-white flex-shrink-0" data-testid="text-stock-symbol">{quote.symbol}</h1>
                   <span className="text-[12px] text-white/30 truncate hidden sm:block">{quote.name}</span>
                 </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                   <div className="text-right">
-                    <span className="text-lg font-bold font-mono-nums text-white tracking-tight" data-testid="text-stock-price">
+                    <span className="text-base sm:text-lg font-bold font-mono-nums text-white tracking-tight" data-testid="text-stock-price">
                       ${quote.price.toFixed(2)}
                     </span>
-                    <span className={cn("ml-2 font-mono-nums text-[12px] font-medium", quote.change >= 0 ? "text-[#30d158]" : "text-[#ff453a]")}>
+                    <span className={cn("ml-1.5 sm:ml-2 font-mono-nums text-[11px] sm:text-[12px] font-medium", quote.change >= 0 ? "text-[#30d158]" : "text-[#ff453a]")}>
                       {quote.change >= 0 ? <TrendingUp className="w-3 h-3 inline mr-0.5" /> : <TrendingDown className="w-3 h-3 inline mr-0.5" />}
                       {quote.change > 0 ? "+" : ""}{quote.change.toFixed(2)} ({quote.changePercent.toFixed(2)}%)
                     </span>
@@ -676,20 +676,20 @@ export default function StockDetail() {
               </div>
 
               <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-2">
-                <div className="lg:col-span-7 flex flex-col gap-2 min-h-0" style={{ height: 'calc(100vh - 100px)' }}>
-                  <div className="flex-[3] min-h-0">
+                <div className="lg:col-span-7 flex flex-col gap-2 min-h-0 h-auto lg:h-[calc(100vh-100px)]">
+                  <div className="min-h-[250px] sm:min-h-[300px] lg:flex-[3] lg:min-h-0">
                     <StockChart symbol={symbol} currentPrice={quote.price} compact />
                   </div>
-                  <div className="flex-[4] min-h-0">
+                  <div className="min-h-[300px] sm:min-h-[350px] lg:flex-[4] lg:min-h-0">
                     <EarningsSalesChart symbol={symbol} />
                   </div>
                 </div>
 
-                <div className="lg:col-span-5 flex flex-col gap-2 min-h-0" style={{ height: 'calc(100vh - 100px)' }}>
-                  <div className="flex-[5] min-h-0 overflow-auto">
+                <div className="lg:col-span-5 flex flex-col gap-2 min-h-0 h-auto lg:h-[calc(100vh-100px)]">
+                  <div className="min-h-[200px] lg:flex-[5] lg:min-h-0 overflow-auto">
                     <StockQualityPanel symbol={symbol} />
                   </div>
-                  <div className="flex-[3] min-h-0">
+                  <div className="min-h-[200px] lg:flex-[3] lg:min-h-0">
                     <NewsPanel symbol={symbol} />
                   </div>
                 </div>
