@@ -93,8 +93,8 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
           <QualityRow label="Float" value={formatVolume(quality.details.floatShares)} />
           <QualityRow
             label="RS"
-            value={quality.details.rsVsSpy.toString()}
-            color={quality.details.rsVsSpy >= 80 ? "text-[#30d158]" : quality.details.rsVsSpy >= 50 ? "text-white/80" : "text-[#ff453a]/80"}
+            value={`${quality.details.rsVsSpy >= 0 ? '+' : ''}${quality.details.rsVsSpy.toFixed(1)}%`}
+            color={quality.details.rsVsSpy > 0 ? "text-[#30d158]" : quality.details.rsVsSpy < 0 ? "text-[#ff453a]/80" : "text-white/50"}
           />
           <QualityRow label="ADR %" value={`${quality.details.adr}%`} />
           <QualityRow label="Inst. Own" value={`${quality.details.instOwnership}%`} />

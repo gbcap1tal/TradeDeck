@@ -9,6 +9,7 @@ import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefre
 import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
 import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, scrapeIndustryRS, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData } from "./api/breadth";
+import { getRSScore, getCachedRS } from "./api/rs";
 import { sendAlert, clearFailures } from "./api/alerts";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripe/stripeClient";
 import { db } from "./db";
@@ -1059,7 +1060,7 @@ export async function registerRoutes(
         details: {
           marketCap,
           floatShares,
-          rsVsSpy: 0,
+          rsVsSpy: await getRSScore(sym),
           rsTimeframe: req.query.rsTimeframe || 'current',
           adr,
           instOwnership,
