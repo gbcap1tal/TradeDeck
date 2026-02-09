@@ -1,6 +1,6 @@
 import { useRoute, Link } from "wouter";
 import { Navbar } from "@/components/layout/Navbar";
-import { useStockQuote, useStockQuality, useStockEarnings, useStockNews } from "@/hooks/use-stocks";
+import { useStockQuote, useStockQuality, useStockEarnings, useStockNews, useStockSnapshot } from "@/hooks/use-stocks";
 import { StockChart } from "@/components/stock/StockChart";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, Plus, TrendingDown, TrendingUp, Check, X, AlertTriangle, Calendar, Newspaper } from "lucide-react";
@@ -47,6 +47,65 @@ function QualityRow({ label, value, color }: { label: string; value: string; col
     <div className="flex items-center justify-between py-[3px]">
       <span className="text-[12px] text-white/50">{label}</span>
       <span className={cn("text-[12px] font-mono-nums font-medium", color || "text-white/80")}>{value}</span>
+    </div>
+  );
+}
+
+function SnapshotTable({ symbol }: { symbol: string }) {
+  const { data: snapshot, isLoading } = useStockSnapshot(symbol);
+
+  if (isLoading) return <div className="glass-card rounded-xl shimmer h-20" />;
+  if (!snapshot || Object.keys(snapshot).length === 0) return null;
+
+  const layout: Array<[string, string, string, string, string, string]> = [
+    ['P/E', 'Forward P/E', 'PEG', 'EPS (ttm)', 'EPS next Y', 'EPS next Q'],
+    ['Market Cap', 'Enterprise Value', 'Income', 'Sales', 'Book/sh', 'Cash/sh'],
+    ['P/S', 'P/B', 'P/C', 'P/FCF', 'EV/EBITDA', 'EV/Sales'],
+    ['ROA', 'ROE', 'ROIC', 'Gross Margin', 'Oper. Margin', 'Profit Margin'],
+    ['Inst Own', 'Insider Own', 'Short Float', 'Short Ratio', 'Short Interest', 'Shs Outstand'],
+    ['Perf Week', 'Perf Month', 'Perf Quarter', 'Perf Half Y', 'Perf YTD', 'Perf Year'],
+    ['SMA20', 'SMA50', 'SMA200', 'RSI (14)', 'Beta', 'ATR (14)'],
+    ['52W High', '52W Low', 'Volatility', 'Rel Volume', 'Avg Volume', 'Volume'],
+    ['Dividend Est.', 'Dividend TTM', 'Earnings', 'Target Price', 'Recom', 'Employees'],
+  ];
+
+  const colorValue = (label: string, val: string): string => {
+    if (!val || val === '-') return 'text-white/60';
+    const isPerf = label.startsWith('Perf') || label.startsWith('SMA');
+    if (isPerf) {
+      const num = parseFloat(val);
+      if (!isNaN(num)) return num >= 0 ? 'text-[#30d158]' : 'text-[#ff453a]';
+    }
+    if (label === 'RSI (14)') {
+      const num = parseFloat(val);
+      if (!isNaN(num)) {
+        if (num >= 70) return 'text-[#ff453a]';
+        if (num <= 30) return 'text-[#30d158]';
+      }
+    }
+    return 'text-white/80';
+  };
+
+  return (
+    <div className="glass-card rounded-xl px-3 py-2.5" data-testid="card-snapshot">
+      <h2 className="text-[13px] font-semibold text-white/90 mb-2 tracking-wide">Snapshot</h2>
+      <div className="space-y-0">
+        {layout.map((row, ri) => (
+          <div key={ri} className="grid grid-cols-6 gap-x-2 border-b border-white/[0.04] last:border-0">
+            {row.map((label) => {
+              const val = snapshot[label] || '-';
+              return (
+                <div key={label} className="py-[3px] min-w-0 overflow-hidden">
+                  <div className="text-[8px] text-white/30 truncate leading-tight">{label}</div>
+                  <div className={cn("text-[10px] font-mono-nums font-medium truncate leading-tight", colorValue(label, val))} data-testid={`snapshot-${label.replace(/[^a-zA-Z0-9]/g, '-')}`}>
+                    {val}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -207,154 +266,210 @@ interface EarningsQuarterData {
   isEstimate: boolean;
   epsEstimate?: number;
   epsSurprise?: number;
-}
-
-function CompactBarRow({
-  label,
-  data,
-  valueKey,
-  growthKey,
-  color,
-  formatValue,
-  unit,
-}: {
-  label: string;
-  data: EarningsQuarterData[];
-  valueKey: 'revenue' | 'eps';
-  growthKey: 'revenueYoY' | 'epsYoY';
-  color: string;
-  formatValue: (v: number) => string;
-  unit: string;
-}) {
-  const values = data.map(d => Math.abs(d[valueKey]));
-  const maxVal = Math.max(...values, 0.01);
-  const [hovered, setHovered] = useState<number | null>(null);
-
-  return (
-    <div className="flex-1 min-h-0 flex flex-col">
-      <div className="flex items-center gap-2 mb-1.5 flex-shrink-0">
-        <span className="text-[10px] text-white/30 uppercase tracking-widest font-semibold">{label}</span>
-        {hovered !== null && (
-          <span className="text-[10px] font-mono-nums text-white/50">
-            {data[hovered].quarter}: <span style={{ color }}>{formatValue(data[hovered][valueKey])}{unit}</span>
-            {data[hovered][growthKey] != null && (
-              <span className={data[hovered][growthKey]! >= 0 ? "text-[#30d158]" : "text-[#ff453a]"}>
-                {' '}{data[hovered][growthKey]! > 0 ? '+' : ''}{data[hovered][growthKey]!.toFixed(1)}% YoY
-              </span>
-            )}
-            {valueKey === 'eps' && data[hovered].epsSurprise != null && !data[hovered].isEstimate && (
-              <span className={data[hovered].epsSurprise! >= 0 ? "text-[#30d158]/70" : "text-[#ff453a]/70"}>
-                {' '}({data[hovered].epsSurprise! > 0 ? '+' : ''}{data[hovered].epsSurprise!.toFixed(1)}% surp.)
-              </span>
-            )}
-          </span>
-        )}
-      </div>
-      <div className="flex-1 min-h-0 flex items-end gap-[3px]" data-testid={`bars-${valueKey}`}>
-        {data.map((d, i) => {
-          const val = Math.abs(d[valueKey]);
-          const pct = maxVal > 0 ? (val / maxVal) * 100 : 0;
-          const isEst = d.isEstimate;
-          const isHov = hovered === i;
-          const growth = d[growthKey];
-
-          return (
-            <div
-              key={i}
-              className="flex-1 flex flex-col items-center min-w-0 gap-0.5"
-              onMouseEnter={() => setHovered(i)}
-              onMouseLeave={() => setHovered(null)}
-              style={{ cursor: 'pointer' }}
-              data-testid={`bar-${valueKey}-${i}`}
-            >
-              {growth != null && (
-                <span className={cn(
-                  "text-[8px] font-mono-nums font-semibold leading-none",
-                  growth >= 0 ? "text-[#30d158]" : "text-[#ff453a]"
-                )}>
-                  {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
-                </span>
-              )}
-              {growth == null && <span className="text-[8px] leading-none">&nbsp;</span>}
-              <div className="w-full flex-1 min-h-0 flex flex-col justify-end">
-                <div
-                  className="w-full rounded-sm transition-all duration-150"
-                  style={{
-                    height: `${Math.max(pct, 3)}%`,
-                    backgroundColor: isEst
-                      ? (isHov ? color : `${color}40`)
-                      : (isHov ? color : `${color}B3`),
-                    border: isEst ? `1px dashed ${color}80` : 'none',
-                    opacity: isHov ? 1 : 0.85,
-                  }}
-                />
-              </div>
-              <div className="flex flex-col items-center gap-0">
-                <span className={cn(
-                  "text-[8px] font-mono-nums leading-tight",
-                  isEst ? "text-white/25" : "text-white/40"
-                )}>
-                  {d.quarter}
-                </span>
-                <span className={cn(
-                  "text-[8px] font-mono-nums leading-tight",
-                  isEst ? "text-white/20 italic" : "text-white/35"
-                )}>
-                  {formatValue(d[valueKey])}{unit}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+  salesEstimate?: number;
+  numAnalysts?: number;
 }
 
 function EarningsSalesChart({ symbol }: { symbol: string }) {
-  const { data: rawData, isLoading } = useStockEarnings(symbol);
+  const [view, setView] = useState<'quarterly' | 'annual'>('quarterly');
+  const { data: rawData, isLoading } = useStockEarnings(symbol, view);
+  const [hoveredRevIdx, setHoveredRevIdx] = useState<number | null>(null);
+  const [hoveredEpsIdx, setHoveredEpsIdx] = useState<number | null>(null);
 
   if (isLoading) return <div className="glass-card rounded-xl shimmer h-full" />;
   if (!rawData || !Array.isArray(rawData) || rawData.length === 0) return null;
 
   const data = rawData as EarningsQuarterData[];
+  const revValues = data.map(d => Math.abs(d.revenue));
+  const epsValues = data.map(d => Math.abs(d.eps));
+  const maxRev = Math.max(...revValues, 0.01);
+  const maxEps = Math.max(...epsValues, 0.01);
+
+  const formatRev = (v: number) => `${v.toFixed(1)}B`;
+  const formatEps = (v: number) => `$${v.toFixed(2)}`;
 
   return (
     <div className="glass-card rounded-xl px-4 py-3 h-full flex flex-col" data-testid="card-earnings-sales">
-      <div className="flex items-center justify-between mb-2 flex-shrink-0">
+      <div className="flex items-center justify-between mb-3 flex-shrink-0">
         <h2 className="text-[13px] font-semibold text-white/90 tracking-wide">Earnings & Revenue</h2>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: 'rgba(255,255,255,0.45)' }} />
-            <span className="text-[9px] text-white/30">Actual</span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 mr-3">
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-sm bg-white/45" />
+              <span className="text-[9px] text-white/30">Actual</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-sm border border-dashed border-white/30" />
+              <span className="text-[9px] text-white/30">Estimate</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-sm border border-dashed border-white/30" />
-            <span className="text-[9px] text-white/30">Estimate</span>
+          <div className="flex bg-white/[0.06] rounded-md p-0.5">
+            <button
+              onClick={() => setView('quarterly')}
+              className={cn(
+                "text-[9px] px-2 py-0.5 rounded transition-colors font-medium",
+                view === 'quarterly' ? "bg-white/10 text-white/80" : "text-white/30 hover:text-white/50"
+              )}
+              data-testid="button-view-quarterly"
+            >
+              Quarterly
+            </button>
+            <button
+              onClick={() => setView('annual')}
+              className={cn(
+                "text-[9px] px-2 py-0.5 rounded transition-colors font-medium",
+                view === 'annual' ? "bg-white/10 text-white/80" : "text-white/30 hover:text-white/50"
+              )}
+              data-testid="button-view-annual"
+            >
+              Annual
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col gap-2">
-        <CompactBarRow
-          label="Revenue"
-          data={data}
-          valueKey="revenue"
-          growthKey="revenueYoY"
-          color="#ffffff"
-          formatValue={(v) => v.toFixed(1)}
-          unit="B"
-        />
+      <div className="flex-1 min-h-0 flex flex-col gap-1.5">
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex items-center gap-2 mb-1 flex-shrink-0">
+            <span className="text-[10px] text-white/30 uppercase tracking-widest font-semibold">Revenue</span>
+            {hoveredRevIdx !== null && (
+              <span className="text-[10px] font-mono-nums text-white/50">
+                {data[hoveredRevIdx].quarter}: <span className="text-white/80">{formatRev(data[hoveredRevIdx].revenue)}</span>
+                {data[hoveredRevIdx].isEstimate && data[hoveredRevIdx].salesEstimate != null && (
+                  <span className="text-white/30"> est.</span>
+                )}
+                {data[hoveredRevIdx].revenueYoY != null && (
+                  <span className={data[hoveredRevIdx].revenueYoY! >= 0 ? "text-[#30d158]" : "text-[#ff453a]"}>
+                    {' '}{data[hoveredRevIdx].revenueYoY! > 0 ? '+' : ''}{data[hoveredRevIdx].revenueYoY!.toFixed(1)}% YoY
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
+          <div className="flex-1 min-h-0 flex items-end gap-[2px]" data-testid="bars-revenue">
+            {data.map((d, i) => {
+              const pct = maxRev > 0 ? (Math.abs(d.revenue) / maxRev) * 100 : 0;
+              const isHov = hoveredRevIdx === i;
+              const growth = d.revenueYoY;
+
+              return (
+                <div
+                  key={i}
+                  className="flex-1 flex flex-col items-center min-w-0 gap-0"
+                  onMouseEnter={() => setHoveredRevIdx(i)}
+                  onMouseLeave={() => setHoveredRevIdx(null)}
+                  style={{ cursor: 'pointer' }}
+                  data-testid={`bar-revenue-${i}`}
+                >
+                  {growth != null && (
+                    <span className={cn(
+                      "text-[7px] font-mono-nums font-semibold leading-none mb-0.5",
+                      growth >= 0 ? "text-[#30d158]/80" : "text-[#ff453a]/80"
+                    )}>
+                      {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
+                    </span>
+                  )}
+                  {growth == null && <span className="text-[7px] leading-none mb-0.5">&nbsp;</span>}
+                  <div className="w-full flex-1 min-h-[20px] flex flex-col justify-end">
+                    <div
+                      className="w-full rounded-t-[2px] transition-all duration-150"
+                      style={{
+                        height: `${Math.max(pct, 4)}%`,
+                        minHeight: '4px',
+                        backgroundColor: d.isEstimate
+                          ? (isHov ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)')
+                          : (isHov ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.35)'),
+                        border: d.isEstimate ? '1px dashed rgba(255,255,255,0.25)' : 'none',
+                      }}
+                    />
+                  </div>
+                  <span className={cn(
+                    "text-[7px] font-mono-nums leading-tight mt-0.5 truncate w-full text-center",
+                    d.isEstimate ? "text-white/20" : "text-white/35"
+                  )}>
+                    {d.quarter}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="border-t border-white/[0.06]" />
-        <CompactBarRow
-          label="EPS"
-          data={data}
-          valueKey="eps"
-          growthKey="epsYoY"
-          color="#FBBB04"
-          formatValue={(v) => `$${v.toFixed(2)}`}
-          unit=""
-        />
+
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex items-center gap-2 mb-1 flex-shrink-0">
+            <span className="text-[10px] text-white/30 uppercase tracking-widest font-semibold">EPS</span>
+            {hoveredEpsIdx !== null && (
+              <span className="text-[10px] font-mono-nums text-white/50">
+                {data[hoveredEpsIdx].quarter}: <span className="text-[#FBBB04]">{formatEps(data[hoveredEpsIdx].eps)}</span>
+                {!data[hoveredEpsIdx].isEstimate && data[hoveredEpsIdx].epsEstimate != null && (
+                  <span className="text-white/30"> est. {formatEps(data[hoveredEpsIdx].epsEstimate!)}</span>
+                )}
+                {data[hoveredEpsIdx].isEstimate && (
+                  <span className="text-white/30"> est.</span>
+                )}
+                {data[hoveredEpsIdx].epsSurprise != null && !data[hoveredEpsIdx].isEstimate && (
+                  <span className={data[hoveredEpsIdx].epsSurprise! >= 0 ? "text-[#30d158]/70" : "text-[#ff453a]/70"}>
+                    {' '}{data[hoveredEpsIdx].epsSurprise! > 0 ? '+' : ''}{data[hoveredEpsIdx].epsSurprise!.toFixed(1)}% surp.
+                  </span>
+                )}
+                {data[hoveredEpsIdx].epsYoY != null && (
+                  <span className={data[hoveredEpsIdx].epsYoY! >= 0 ? "text-[#30d158]" : "text-[#ff453a]"}>
+                    {' '}{data[hoveredEpsIdx].epsYoY! > 0 ? '+' : ''}{data[hoveredEpsIdx].epsYoY!.toFixed(1)}% YoY
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
+          <div className="flex-1 min-h-0 flex items-end gap-[2px]" data-testid="bars-eps">
+            {data.map((d, i) => {
+              const pct = maxEps > 0 ? (Math.abs(d.eps) / maxEps) * 100 : 0;
+              const isHov = hoveredEpsIdx === i;
+              const growth = d.epsYoY;
+
+              return (
+                <div
+                  key={i}
+                  className="flex-1 flex flex-col items-center min-w-0 gap-0"
+                  onMouseEnter={() => setHoveredEpsIdx(i)}
+                  onMouseLeave={() => setHoveredEpsIdx(null)}
+                  style={{ cursor: 'pointer' }}
+                  data-testid={`bar-eps-${i}`}
+                >
+                  {growth != null && (
+                    <span className={cn(
+                      "text-[7px] font-mono-nums font-semibold leading-none mb-0.5",
+                      growth >= 0 ? "text-[#30d158]/80" : "text-[#ff453a]/80"
+                    )}>
+                      {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
+                    </span>
+                  )}
+                  {growth == null && <span className="text-[7px] leading-none mb-0.5">&nbsp;</span>}
+                  <div className="w-full flex-1 min-h-[20px] flex flex-col justify-end">
+                    <div
+                      className="w-full rounded-t-[2px] transition-all duration-150"
+                      style={{
+                        height: `${Math.max(pct, 4)}%`,
+                        minHeight: '4px',
+                        backgroundColor: d.isEstimate
+                          ? (isHov ? 'rgba(251,187,4,0.35)' : 'rgba(251,187,4,0.12)')
+                          : (isHov ? 'rgba(251,187,4,0.75)' : 'rgba(251,187,4,0.40)'),
+                        border: d.isEstimate ? '1px dashed rgba(251,187,4,0.3)' : 'none',
+                      }}
+                    />
+                  </div>
+                  <span className={cn(
+                    "text-[7px] font-mono-nums leading-tight mt-0.5 truncate w-full text-center",
+                    d.isEstimate ? "text-white/20" : "text-white/35"
+                  )}>
+                    {d.quarter}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -378,7 +493,7 @@ export default function StockDetail() {
     <div className="h-screen bg-background flex flex-col overflow-hidden">
       <Navbar />
       <main className="flex-1 min-h-0 flex flex-col">
-        <div className="max-w-[1440px] w-full mx-auto px-4 py-2 flex-1 min-h-0 flex flex-col gap-2">
+        <div className="max-w-[1440px] w-full mx-auto px-4 py-2 flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
           {(isQuoteLoading || (isQuoteFetching && !quote)) ? (
             <div className="flex-1 flex flex-col gap-2">
               <div className="shimmer h-10 rounded-xl" />
@@ -433,18 +548,20 @@ export default function StockDetail() {
                 </div>
               </div>
 
-              <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-2">
-                <div className="lg:col-span-8 flex flex-col gap-2 min-h-0">
-                  <div className="h-[48%] min-h-[180px]">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
+                <div className="lg:col-span-8 flex flex-col gap-2">
+                  <div className="h-[280px]">
                     <StockChart symbol={symbol} currentPrice={quote.price} compact />
                   </div>
 
-                  <div className="flex-1 min-h-0">
+                  <div className="h-[280px]">
                     <EarningsSalesChart symbol={symbol} />
                   </div>
+
+                  <SnapshotTable symbol={symbol} />
                 </div>
 
-                <div className="lg:col-span-4 min-h-0">
+                <div className="lg:col-span-4">
                   <StockQualityPanel symbol={symbol} />
                 </div>
               </div>

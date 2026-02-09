@@ -30,11 +30,11 @@ export function useStockHistory(symbol: string, range: '1D' | '1W' | '1M' | '3M'
   });
 }
 
-export function useStockEarnings(symbol: string) {
+export function useStockEarnings(symbol: string, view: 'quarterly' | 'annual' = 'quarterly') {
   return useQuery({
-    queryKey: ['/api/stocks', symbol, 'earnings'],
+    queryKey: ['/api/stocks', symbol, 'earnings', view],
     queryFn: async () => {
-      const res = await fetch(`/api/stocks/${symbol}/earnings`, { credentials: "include" });
+      const res = await fetch(`/api/stocks/${symbol}/earnings?view=${view}`, { credentials: "include" });
       if (!res.ok) return null;
       return res.json();
     },
@@ -60,6 +60,18 @@ export function useStockNews(symbol: string) {
     queryFn: async () => {
       const res = await fetch(`/api/stocks/${symbol}/news`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch stock news");
+      return res.json();
+    },
+    enabled: !!symbol,
+  });
+}
+
+export function useStockSnapshot(symbol: string) {
+  return useQuery({
+    queryKey: ['/api/stocks', symbol, 'snapshot'],
+    queryFn: async () => {
+      const res = await fetch(`/api/stocks/${symbol}/snapshot`, { credentials: "include" });
+      if (!res.ok) return null;
       return res.json();
     },
     enabled: !!symbol,

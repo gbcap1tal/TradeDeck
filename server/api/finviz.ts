@@ -660,6 +660,104 @@ export function getAllIndustryRS(): IndustryRS[] {
   return getCached<IndustryRS[]>(INDUSTRY_RS_CACHE_KEY) || loadPersistedIndustryRS() || [];
 }
 
+export interface FinvizEarningsEntry {
+  fiscalPeriod: string;
+  earningsDate: string | null;
+  fiscalEndDate: string;
+  epsActual: number | null;
+  epsEstimate: number | null;
+  epsReportedActual: number | null;
+  epsReportedEstimate: number | null;
+  salesActual: number | null;
+  salesEstimate: number | null;
+  epsAnalysts: number | null;
+  salesAnalysts: number | null;
+}
+
+export interface FinvizSnapshot {
+  [key: string]: string;
+}
+
+export interface FinvizQuoteData {
+  earnings: FinvizEarningsEntry[];
+  snapshot: FinvizSnapshot;
+}
+
+const FINVIZ_QUOTE_CACHE_TTL = 3600;
+
+export async function scrapeFinvizQuote(symbol: string): Promise<FinvizQuoteData | null> {
+  const cacheKey = `finviz_quote_${symbol}`;
+  const cached = getCached<FinvizQuoteData>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const url = `https://finviz.com/quote.ashx?t=${encodeURIComponent(symbol)}&p=d&ty=ea`;
+    const { html } = await fetchPage(url);
+    if (!html) return null;
+
+    const $ = cheerio.load(html);
+
+    const earnings: FinvizEarningsEntry[] = [];
+    const tickerPattern = `[{"ticker":"${symbol.toUpperCase()}"`;
+    let jsonStart = html.indexOf(tickerPattern);
+    if (jsonStart === -1) {
+      jsonStart = html.indexOf('[{"ticker"');
+    }
+
+    if (jsonStart > -1) {
+      let depth = 0;
+      let jsonEnd = jsonStart;
+      for (let i = jsonStart; i < html.length && i < jsonStart + 100000; i++) {
+        if (html[i] === '[') depth++;
+        if (html[i] === ']') {
+          depth--;
+          if (depth === 0) { jsonEnd = i + 1; break; }
+        }
+      }
+      try {
+        const rawData = JSON.parse(html.substring(jsonStart, jsonEnd));
+        for (const entry of rawData) {
+          if (entry.ticker?.toUpperCase() !== symbol.toUpperCase()) continue;
+          earnings.push({
+            fiscalPeriod: entry.fiscalPeriod || '',
+            earningsDate: entry.earningsDate || null,
+            fiscalEndDate: entry.fiscalEndDate || '',
+            epsActual: entry.epsActual ?? null,
+            epsEstimate: entry.epsEstimate ?? null,
+            epsReportedActual: entry.epsReportedActual ?? null,
+            epsReportedEstimate: entry.epsReportedEstimate ?? null,
+            salesActual: entry.salesActual ?? null,
+            salesEstimate: entry.salesEstimate ?? null,
+            epsAnalysts: entry.epsAnalysts ?? null,
+            salesAnalysts: entry.salesAnalysts ?? null,
+          });
+        }
+      } catch (e: any) {
+        console.log(`[finviz] Failed to parse earnings JSON for ${symbol}: ${e.message}`);
+      }
+    }
+
+    const snapshot: FinvizSnapshot = {};
+    $('table.snapshot-table2 tr').each(function () {
+      const cells = $(this).find('td');
+      for (let i = 0; i < cells.length - 1; i += 2) {
+        const label = $(cells[i]).text().trim();
+        const value = $(cells[i + 1]).text().trim();
+        if (label) snapshot[label] = value;
+      }
+    });
+
+    if (earnings.length === 0 && Object.keys(snapshot).length === 0) return null;
+
+    const result: FinvizQuoteData = { earnings, snapshot };
+    setCache(cacheKey, result, FINVIZ_QUOTE_CACHE_TTL);
+    return result;
+  } catch (e: any) {
+    console.error(`[finviz] Quote scrape error for ${symbol}: ${e.message}`);
+    return null;
+  }
+}
+
 export function getAllIndustriesWithStockCount(): Array<{ name: string; sector: string; stockCount: number }> {
   const data = getFinvizDataSync();
   if (!data) return [];
