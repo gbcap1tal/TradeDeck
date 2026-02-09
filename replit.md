@@ -77,7 +77,7 @@ Preferred communication style: Simple, everyday language.
 2. **users** — User accounts (id UUID, email, firstName, lastName, profileImageUrl, timestamps). Mandatory for Replit Auth.
 3. **watchlists** — User watchlists (id serial, userId FK, name, createdAt)
 4. **watchlistItems** — Items in watchlists (id serial, watchlistId FK, symbol, addedAt)
-5. **megatrends** — Custom industry baskets (id serial, name text, tickers text[], createdAt). Admin (userId 54198443) can CRUD via `/api/megatrends`. Performance = avg daily change of constituent stocks from Finviz data.
+5. **megatrends** — Custom industry baskets (id serial, name text, tickers text[], createdAt). Admin (userId 54198443) can CRUD via `/api/megatrends`. Performance = avg daily change of constituent stocks from Finviz data. Auto-recomputes performance on create/update/delete. RS rating computed synthetically by ranking basket performance against all Finviz industries.
 
 ### Authentication
 - **Method**: Replit Auth via OpenID Connect
@@ -118,7 +118,7 @@ Preferred communication style: Simple, everyday language.
 - **zod** + **drizzle-zod**: Schema validation
 
 ### Live Data Sources
-- **Yahoo Finance** (via `yahoo-finance2` npm package): Stock quotes, price history, indices, sector ETF quotes, company statistics. Unlimited requests, no API key needed.
+- **Yahoo Finance** (via `yahoo-finance2` npm package): Stock quotes, price history, indices, sector ETF quotes, company statistics, earnings fallback (earningsHistory for EPS per share, financialsChart for revenue). Unlimited requests, no API key needed.
 - **Financial Modeling Prep** (via REST API, `FMP_KEY` secret): Quarterly income statements, cash flow statements, company profiles. Free tier limited to 250 req/day, max 5 records per query. Uses stable API (`/stable/` endpoints).
 - **Alpha Vantage** (`ALPHA_VANTAGE_KEY` secret): Reserved for future use. 25 req/day limit.
 - **Caching**: In-memory TTL cache in `server/api/cache.ts` with varying TTLs (quotes: 60s, history: 300s, fundamentals: 3600s, profile: 86400s).

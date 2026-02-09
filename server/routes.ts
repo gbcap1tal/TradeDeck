@@ -1098,13 +1098,22 @@ export async function registerRoutes(
 
   app.get('/api/stocks/:symbol/earnings', async (req, res) => {
     const { symbol } = req.params;
+    const sym = symbol.toUpperCase();
     try {
-      const data = await fmp.getEarningsData(symbol.toUpperCase());
-      if (data) {
+      const data = await fmp.getEarningsData(sym);
+      if (data && data.quarters.length > 0) {
         return res.json(data);
       }
     } catch (e: any) {
-      console.error(`Earnings error for ${symbol}:`, e.message);
+      console.error(`FMP earnings error for ${sym}:`, e.message);
+    }
+    try {
+      const yahooData = await yahoo.getEarningsData(sym);
+      if (yahooData && yahooData.quarters.length > 0) {
+        return res.json(yahooData);
+      }
+    } catch (e: any) {
+      console.error(`Yahoo earnings error for ${sym}:`, e.message);
     }
     return res.json({ quarters: [], sales: [], earnings: [], salesGrowth: [], earningsGrowth: [] });
   });

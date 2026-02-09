@@ -391,6 +391,59 @@ export function searchStocks(query: string, limit: number = 10): Array<{ symbol:
   return [...symbolExact, ...symbolPrefix.sort((a, b) => a.symbol.length - b.symbol.length), ...nameMatch].slice(0, limit);
 }
 
+function parseFinvizDate(dateCell: string, lastDate: string): { timestamp: number; dateStr: string } {
+  const now = new Date();
+
+  if (dateCell.toLowerCase().startsWith('today')) {
+    const timePart = dateCell.replace(/today\s*/i, '').trim();
+    const ts = parseFinvizTime(now, timePart);
+    return { timestamp: ts, dateStr: dateCell };
+  }
+
+  const monthDayYearMatch = dateCell.match(/^([A-Za-z]{3})-(\d{2})-(\d{2})\s*(.*)/);
+  if (monthDayYearMatch) {
+    const [, mon, day, yr, timePart] = monthDayYearMatch;
+    const fullYear = 2000 + parseInt(yr);
+    const dateObj = new Date(`${mon} ${day}, ${fullYear}`);
+    if (!isNaN(dateObj.getTime())) {
+      const ts = parseFinvizTime(dateObj, timePart.trim());
+      return { timestamp: ts, dateStr: dateCell };
+    }
+  }
+
+  const timeMatch = dateCell.match(/^(\d{1,2}:\d{2}(?:AM|PM)?)$/i);
+  if (timeMatch && lastDate) {
+    const ldMatch = lastDate.match(/^([A-Za-z]{3})-(\d{2})-(\d{2})/);
+    if (ldMatch) {
+      const [, mon, day, yr] = ldMatch;
+      const fullYear = 2000 + parseInt(yr);
+      const dateObj = new Date(`${mon} ${day}, ${fullYear}`);
+      if (!isNaN(dateObj.getTime())) {
+        const ts = parseFinvizTime(dateObj, dateCell.trim());
+        return { timestamp: ts, dateStr: `${lastDate} ${dateCell}` };
+      }
+    }
+    const ts = parseFinvizTime(now, dateCell.trim());
+    return { timestamp: ts, dateStr: dateCell };
+  }
+
+  return { timestamp: now.getTime(), dateStr: dateCell };
+}
+
+function parseFinvizTime(baseDate: Date, timePart: string): number {
+  if (!timePart) return baseDate.getTime();
+  const m = timePart.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (!m) return baseDate.getTime();
+  let hours = parseInt(m[1]);
+  const mins = parseInt(m[2]);
+  const ampm = m[3]?.toUpperCase();
+  if (ampm === 'PM' && hours < 12) hours += 12;
+  if (ampm === 'AM' && hours === 12) hours = 0;
+  const d = new Date(baseDate);
+  d.setHours(hours, mins, 0, 0);
+  return d.getTime();
+}
+
 export async function getFinvizNews(symbol: string): Promise<Array<{ id: string; headline: string; summary: string; source: string; url: string; timestamp: number; relatedSymbols: string[] }> | null> {
   const key = `finviz_news_${symbol}`;
   const cached = getCached<any[]>(key);
@@ -409,7 +462,7 @@ export async function getFinvizNews(symbol: string): Promise<Array<{ id: string;
 
     let lastDate = '';
     newsTable.find('tr').each((i, row) => {
-      if (i >= 10) return false;
+      if (i >= 25) return false;
       const cells = $(row).find('td');
       if (cells.length < 2) return;
 
@@ -423,16 +476,11 @@ export async function getFinvizNews(symbol: string): Promise<Array<{ id: string;
       const sourceEl = newsCell.find('span');
       const source = sourceEl.text().trim().replace(/[()]/g, '') || 'Finviz';
 
-      if (dateCell.includes('-')) {
-        lastDate = dateCell;
+      if (dateCell.match(/^[A-Za-z]{3}-\d{2}-\d{2}/)) {
+        lastDate = dateCell.match(/^[A-Za-z]{3}-\d{2}-\d{2}/)![0];
       }
-      const dateStr = dateCell.includes('-') ? dateCell : `${lastDate} ${dateCell}`;
 
-      let timestamp = Date.now();
-      try {
-        const parsed = new Date(dateStr);
-        if (!isNaN(parsed.getTime())) timestamp = parsed.getTime();
-      } catch {}
+      const { timestamp } = parseFinvizDate(dateCell, lastDate);
 
       if (headline && newsUrl) {
         newsItems.push({
@@ -448,7 +496,7 @@ export async function getFinvizNews(symbol: string): Promise<Array<{ id: string;
     });
 
     if (newsItems.length > 0) {
-      setCache(key, newsItems, 900);
+      setCache(key, newsItems, 300);
       return newsItems;
     }
     return null;

@@ -156,27 +156,40 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
           </div>
           {newsLoading ? (
             <div className="space-y-2">
-              {[1, 2].map((i) => <div key={i} className="shimmer h-6 rounded" />)}
+              {[1, 2, 3].map((i) => <div key={i} className="shimmer h-6 rounded" />)}
             </div>
           ) : (
             <div className="space-y-1.5">
-              {news?.slice(0, 5).map((item: any) => (
-                <a
-                  key={item.id}
-                  href={item.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block group"
-                  data-testid={`news-item-${item.id}`}
-                >
-                  <p className="text-[11px] text-white/50 group-hover:text-white/75 transition-colors leading-snug line-clamp-1">
-                    {item.headline}
-                  </p>
-                  <span className="text-[9px] text-white/25 font-mono">
-                    {format(new Date(item.timestamp), "MMM d")} · {item.source}
-                  </span>
-                </a>
-              ))}
+              {news?.slice(0, 10).map((item: any) => {
+                const itemDate = new Date(item.timestamp);
+                const now = new Date();
+                const diffMs = now.getTime() - itemDate.getTime();
+                const diffHrs = Math.floor(diffMs / 3600000);
+                const diffDays = Math.floor(diffMs / 86400000);
+                let timeLabel: string;
+                if (diffHrs < 1) timeLabel = 'Just now';
+                else if (diffHrs < 24) timeLabel = `${diffHrs}h ago`;
+                else if (diffDays < 7) timeLabel = `${diffDays}d ago`;
+                else timeLabel = format(itemDate, "MMM d");
+
+                return (
+                  <a
+                    key={item.id}
+                    href={item.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block group"
+                    data-testid={`news-item-${item.id}`}
+                  >
+                    <p className="text-[11px] text-white/50 group-hover:text-white/75 transition-colors leading-snug line-clamp-1">
+                      {item.headline}
+                    </p>
+                    <span className="text-[9px] text-white/25 font-mono">
+                      {timeLabel} · {item.source}
+                    </span>
+                  </a>
+                );
+              })}
             </div>
           )}
         </div>

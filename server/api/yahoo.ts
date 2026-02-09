@@ -561,6 +561,70 @@ export async function getAllUSEquities(): Promise<any[]> {
   return [];
 }
 
+export async function getEarningsData(symbol: string): Promise<{ quarters: string[]; sales: number[]; earnings: number[]; salesGrowth: number[]; earningsGrowth: number[] } | null> {
+  const key = `yf_earnings_${symbol}`;
+  const cached = getCached<any>(key);
+  if (cached) return cached;
+
+  try {
+    const data = await throttledYahooCall(() =>
+      yf.quoteSummary(symbol, { modules: ['earnings', 'earningsHistory'] })
+    );
+
+    const earningsChart = data?.earnings?.financialsChart?.quarterly;
+    const earningsHistory = data?.earningsHistory?.history;
+
+    if (!earningsChart || earningsChart.length === 0) return null;
+
+    const epsMap = new Map<string, number>();
+    if (earningsHistory) {
+      for (const h of earningsHistory) {
+        if (h.quarter && h.epsActual != null) {
+          const d = new Date(h.quarter);
+          const q = Math.ceil((d.getMonth() + 1) / 3);
+          const yr = d.getFullYear();
+          epsMap.set(`${q}Q${yr}`, h.epsActual);
+        }
+      }
+    }
+
+    const quarters: string[] = [];
+    const sales: number[] = [];
+    const earnings: number[] = [];
+
+    for (const item of earningsChart) {
+      const label = item.date || item.fiscalQuarter || '';
+      const qMatch = label.match(/(\d)Q(\d{4})/);
+      if (!qMatch) continue;
+      const [, qNum, yearStr] = qMatch;
+      const shortLabel = `Q${qNum} '${yearStr.slice(-2)}`;
+      quarters.push(shortLabel);
+
+      const rev = item.revenue || 0;
+      sales.push(Math.round(rev / 1e9 * 10) / 10);
+
+      const eps = epsMap.get(`${qNum}Q${yearStr}`) ?? Math.round((item.earnings || 0) / 1e9 * 100) / 100;
+      earnings.push(Math.round(eps * 100) / 100);
+    }
+
+    if (quarters.length === 0) return null;
+
+    const salesGrowth = sales.map((s, i) =>
+      i === 0 ? 0 : Math.round(((s - sales[i - 1]) / Math.abs(sales[i - 1] || 1) * 100) * 10) / 10
+    );
+    const earningsGrowth = earnings.map((e, i) =>
+      i === 0 ? 0 : Math.round(((e - earnings[i - 1]) / Math.abs(earnings[i - 1] || 1) * 100) * 10) / 10
+    );
+
+    const result = { quarters, sales, earnings, salesGrowth, earningsGrowth };
+    setCache(key, result, CACHE_TTL.EARNINGS);
+    return result;
+  } catch (e: any) {
+    console.error(`[yahoo] Earnings data error for ${symbol}:`, e.message?.substring(0, 100));
+    return null;
+  }
+}
+
 export async function getBroadMarketData(): Promise<{
   movers: { bulls4: any[]; bears4: any[] };
   universe: any[];
