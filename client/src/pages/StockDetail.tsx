@@ -78,7 +78,13 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
 
   return (
     <div className="glass-card rounded-xl px-4 py-3 h-full flex flex-col overflow-hidden" data-testid="card-stock-quality">
-      <h2 className="text-[13px] font-semibold text-white/90 mb-2 tracking-wide flex-shrink-0">Stock Quality</h2>
+      <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
+        <h2 className="text-[13px] font-semibold text-white/90 tracking-wide">Stock Quality</h2>
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }} data-testid="badge-stock-quality-score">
+          <span className="text-[13px] font-bold text-white leading-none font-mono-nums">0</span>
+          <span className="text-[10px] text-white/30 leading-none">/10</span>
+        </div>
+      </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
         <div className="mb-2">
@@ -86,7 +92,7 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
           <QualityRow label="Market Cap" value={formatLargeNumber(quality.details.marketCap)} />
           <QualityRow label="Float" value={formatVolume(quality.details.floatShares)} />
           <QualityRow
-            label="RS vs SPY"
+            label="RS"
             value={quality.details.rsVsSpy.toString()}
             color={quality.details.rsVsSpy >= 80 ? "text-[#30d158]" : quality.details.rsVsSpy >= 50 ? "text-white/80" : "text-[#ff453a]/80"}
           />
