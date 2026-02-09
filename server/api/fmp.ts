@@ -76,7 +76,7 @@ export async function getCompanyProfile(symbol: string) {
 }
 
 export async function getIncomeStatement(symbol: string, period: string = 'quarter', limit: number = 5) {
-  const safeLimit = Math.min(limit, 5);
+  const safeLimit = Math.min(limit, 20);
   const key = `fmp_income_${symbol}_${period}_${safeLimit}`;
   const cached = getCached<any[]>(key);
   if (cached) return cached;

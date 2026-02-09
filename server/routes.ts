@@ -1400,6 +1400,73 @@ export async function registerRoutes(
     } catch (e: any) {
       console.error(`Yahoo enhanced earnings error for ${sym}:`, e.message);
     }
+
+    try {
+      const limit = view === 'annual' ? 8 : 20;
+      const period = view === 'annual' ? 'annual' : 'quarter';
+      const incomeData = await fmp.getIncomeStatement(sym, period, limit);
+      if (incomeData && incomeData.length > 0) {
+        const sorted = [...incomeData].reverse();
+
+        if (view === 'annual') {
+          const result = sorted.map(s => {
+            const d = new Date(s.date);
+            const yr = d.getFullYear();
+            return {
+              quarter: `FY '${String(yr).slice(-2)}`,
+              revenue: Math.round((s.revenue || 0) / 1e6 * 100) / 100,
+              eps: Math.round((s.epsDiluted || s.eps || 0) * 100) / 100,
+              revenueYoY: null as number | null,
+              epsYoY: null as number | null,
+              isEstimate: false,
+            };
+          });
+          for (let i = 1; i < result.length; i++) {
+            const prev = result[i - 1];
+            if (prev.revenue !== 0) result[i].revenueYoY = Math.round(((result[i].revenue - prev.revenue) / Math.abs(prev.revenue)) * 1000) / 10;
+            if (prev.eps !== 0) result[i].epsYoY = Math.round(((result[i].eps - prev.eps) / Math.abs(prev.eps)) * 1000) / 10;
+          }
+          return res.json(result);
+        }
+
+        const result = sorted.map(s => {
+          const d = new Date(s.date);
+          const q = Math.ceil((d.getMonth() + 1) / 3);
+          const yr = d.getFullYear();
+          return {
+            quarter: `Q${q} '${String(yr).slice(-2)}`,
+            revenue: Math.round((s.revenue || 0) / 1e6 * 100) / 100,
+            eps: Math.round((s.epsDiluted || s.eps || 0) * 100) / 100,
+            revenueYoY: null as number | null,
+            epsYoY: null as number | null,
+            isEstimate: false,
+          };
+        }).slice(-12);
+
+        const qKeyMap = new Map<string, number>();
+        for (let i = 0; i < result.length; i++) {
+          const m2 = result[i].quarter.match(/Q(\d)\s+'(\d{2})/);
+          if (m2) qKeyMap.set(`${m2[1]}Q20${m2[2]}`, i);
+        }
+        for (let i = 0; i < result.length; i++) {
+          const m2 = result[i].quarter.match(/Q(\d)\s+'(\d{2})/);
+          if (!m2) continue;
+          const qNum = parseInt(m2[1]);
+          const yr = 2000 + parseInt(m2[2]);
+          const prevIdx = qKeyMap.get(`${qNum}Q${yr - 1}`);
+          if (prevIdx != null) {
+            const prevRev = result[prevIdx].revenue;
+            const prevEps = result[prevIdx].eps;
+            if (prevRev !== 0) result[i].revenueYoY = Math.round(((result[i].revenue - prevRev) / Math.abs(prevRev)) * 1000) / 10;
+            if (prevEps !== 0) result[i].epsYoY = Math.round(((result[i].eps - prevEps) / Math.abs(prevEps)) * 1000) / 10;
+          }
+        }
+        return res.json(result);
+      }
+    } catch (e: any) {
+      console.error(`FMP earnings fallback error for ${sym}:`, e.message);
+    }
+
     return res.json([]);
   });
 

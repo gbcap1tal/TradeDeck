@@ -235,7 +235,14 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
   const [hoveredEpsIdx, setHoveredEpsIdx] = useState<number | null>(null);
 
   if (isLoading) return <div className="glass-card rounded-xl shimmer h-full" />;
-  if (!rawData || !Array.isArray(rawData) || rawData.length === 0) return null;
+  if (!rawData || !Array.isArray(rawData) || rawData.length === 0) {
+    return (
+      <div className="glass-card rounded-xl p-6 flex flex-col items-center justify-center h-full min-h-[200px] gap-2" data-testid="earnings-empty-state">
+        <span className="text-muted-foreground text-sm" data-testid="text-earnings-unavailable">No earnings data available for this stock</span>
+        <span className="text-muted-foreground/50 text-xs" data-testid="text-earnings-explanation">Small-cap or recently listed companies may lack analyst coverage</span>
+      </div>
+    );
+  }
 
   const rawArr = rawData as EarningsQuarterData[];
 
