@@ -98,7 +98,7 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
           />
           <QualityRow label="ADR %" value={`${quality.details.adr}%`} />
           <QualityRow label="Inst. Own" value={`${quality.details.instOwnership}%`} />
-          <QualityRow label="# Inst." value={quality.details.numInstitutions.toLocaleString()} />
+
           <QualityRow label="Avg Vol 50D" value={formatVolume(quality.details.avgVolume50d)} />
           {quality.details.shortInterest > 0 && (
             <QualityRow
@@ -125,7 +125,7 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
           <QualityRow label="EPS YoY" value={`${quality.fundamentals.epsYoY > 0 ? '+' : ''}${quality.fundamentals.epsYoY}%`} color={pctColor(quality.fundamentals.epsYoY)} />
           <QualityRow label="Sales YoY" value={`${quality.fundamentals.salesYoY > 0 ? '+' : ''}${quality.fundamentals.salesYoY}%`} color={pctColor(quality.fundamentals.salesYoY)} />
           <BoolIndicator label="Earnings Accel." value={quality.fundamentals.earningsAcceleration} />
-          <QualityRow label="Sales Growth 1Y" value={`${quality.fundamentals.salesGrowth1Y > 0 ? '+' : ''}${quality.fundamentals.salesGrowth1Y}%`} color={quality.fundamentals.salesGrowth1Y >= 20 ? "text-[#30d158]" : quality.fundamentals.salesGrowth1Y >= 0 ? "text-white/70" : "text-[#ff453a]/80"} />
+
         </div>
 
         <div className="mb-2 pt-2 border-t border-white/[0.06]">
