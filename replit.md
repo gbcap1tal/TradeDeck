@@ -31,7 +31,7 @@ Preferred communication style: Simple, everyday language.
     - **Market Breadth**: Computes Market Quality Score and various breadth indicators (MA%, H/L, 4% movers) across ~3000 large-cap US stocks using Yahoo Finance screener API. Scheduled twice daily.
     - **Relative Strength (RS) Ratings**: A Python script computes true IBD-style RS ratings (1-99 percentile) for ~3,800+ stocks based on weighted momentum scores, saved to a file for server lookup.
     - **Hourly Scheduler**: Refreshes core data (Finviz, sectors, breadth, megatrend performance) hourly during market hours.
-    - **Overnight Digest Refresh**: Polls Finviz for new daily digest content from midnight to 10 AM ET.
+    - **Overnight Digest Refresh**: Polls Finviz every 15 min from 4:00 AM to 10:00 AM ET for new daily digest. Stops once new content detected.
 - **Authentication**: Replit Auth (OpenID Connect) with PostgreSQL-backed session store.
 
 ### Database

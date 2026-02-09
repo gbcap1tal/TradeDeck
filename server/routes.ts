@@ -710,7 +710,7 @@ function initBackgroundTasks() {
       if (overnightDigestDone) return;
 
       const hours = et.getHours();
-      if (hours >= 10) return;
+      if (hours < 4 || hours >= 10) return;
 
       console.log(`[digest-refresh] Checking for new daily digest...`);
 
