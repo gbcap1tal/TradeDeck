@@ -407,27 +407,27 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
       </div>
 
       {/* GRID: 2 equal rows for SALES and EPS */}
-      <div className="flex-1 min-h-0 grid grid-rows-2 gap-3">
+      <div className="flex-1 min-h-0 grid grid-rows-2 gap-4">
 
         {/* === SALES SECTION === */}
         <div className="flex flex-col min-h-0">
           {/* Header: title + hover tooltip */}
-          <div className="flex items-center flex-shrink-0 h-6 flex-wrap gap-2 mb-1">
+          <div className="flex items-center flex-shrink-0 h-7 flex-wrap gap-2">
             <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold leading-none">Sales</span>
             {hoveredRevIdx !== null && renderHoverTooltip('sales')}
           </div>
-          {/* Chart content: bars fill remaining space, aligned to bottom */}
+          {/* Chart content: bars use percentage heights, aligned to bottom */}
           <div className="flex-1 min-h-0 flex items-end" style={{ gap: `${barGap}px` }} data-testid="bars-revenue">
             {data.map((d, i) => {
               const pct = maxRev > 0 ? Math.abs(d.revenue) / maxRev : 0;
-              const barH = Math.max(pct * BAR_MAX_H, 4);
+              const barPct = Math.max(pct * 100, 4);
               const isHov = hoveredRevIdx === i;
               return (
-                <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0"
+                <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0 h-full"
                   onMouseEnter={() => setHoveredRevIdx(i)} onMouseLeave={() => setHoveredRevIdx(null)}
                   style={{ cursor: 'pointer' }} data-testid={`bar-revenue-${i}`}>
                   <div className="w-full rounded-t-[3px] transition-all duration-150" style={{
-                    height: `${barH}px`,
+                    height: `${barPct}%`,
                     backgroundColor: d.isEstimate
                       ? (isHov ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.15)')
                       : (isHov ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.35)'),
@@ -452,25 +452,25 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
         {/* === EPS SECTION === */}
         <div className="flex flex-col min-h-0 border-t border-white/[0.06] pt-3">
           {/* Header: title + hover tooltip */}
-          <div className="flex items-center flex-shrink-0 h-6 flex-wrap gap-2 mb-1">
+          <div className="flex items-center flex-shrink-0 h-7 flex-wrap gap-2">
             <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold leading-none">EPS</span>
             {hoveredEpsIdx !== null && renderHoverTooltip('eps')}
           </div>
-          {/* Chart content: bars fill remaining space */}
+          {/* Chart content: bars use percentage heights */}
           <div className="flex-1 min-h-0" data-testid="bars-eps">
             {hasNegativeEps && hasPositiveEps ? (
               <div className="flex flex-col justify-end h-full">
                 <div className="flex items-end" style={{ gap: `${barGap}px`, flex: '3 1 0', minHeight: '20px' }}>
                   {data.map((d, i) => {
                     const pct = d.eps >= 0 ? d.eps / maxEpsAbs : 0;
-                    const barH = d.eps > 0 ? Math.max(pct * BAR_MAX_H, 4) : 0;
+                    const barPct = d.eps > 0 ? Math.max(pct * 100, 4) : 0;
                     const isHov = hoveredEpsIdx === i;
                     return (
-                      <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0"
+                      <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0 h-full"
                         onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
                         style={{ cursor: 'pointer' }} data-testid={`bar-eps-${i}`}>
                         <div className="w-full rounded-t-[3px] transition-all duration-150" style={{
-                          height: `${barH}px`,
+                          height: `${barPct}%`,
                           backgroundColor: d.isEstimate
                             ? (isHov ? 'rgba(251,187,4,0.30)' : 'rgba(251,187,4,0.15)')
                             : (isHov ? 'rgba(251,187,4,0.75)' : 'rgba(251,187,4,0.40)'),
@@ -481,17 +481,17 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                   })}
                 </div>
                 <div className="border-t border-white/15" />
-                <div className="flex items-start" style={{ gap: `${barGap}px`, flex: '1 1 0', maxHeight: `${BAR_MAX_H * 0.4}px` }}>
+                <div className="flex items-start" style={{ gap: `${barGap}px`, flex: '1 1 0' }}>
                   {data.map((d, i) => {
                     const pct = d.eps < 0 ? Math.abs(d.eps) / maxEpsAbs : 0;
-                    const barH = d.eps < 0 ? Math.max(pct * BAR_MAX_H * 0.4, 4) : 0;
+                    const barPct = d.eps < 0 ? Math.max(pct * 100, 4) : 0;
                     const isHov = hoveredEpsIdx === i;
                     return (
-                      <div key={i} className="flex-1 flex flex-col items-center min-w-0"
+                      <div key={i} className="flex-1 flex flex-col items-center min-w-0 h-full"
                         onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
                         style={{ cursor: 'pointer' }}>
                         <div className="w-full rounded-b-[3px] transition-all duration-150" style={{
-                          height: `${barH}px`,
+                          height: `${barPct}%`,
                           backgroundColor: d.isEstimate
                             ? (isHov ? 'rgba(255,69,58,0.30)' : 'rgba(255,69,58,0.15)')
                             : (isHov ? 'rgba(255,69,58,0.75)' : 'rgba(255,69,58,0.40)'),
@@ -508,14 +508,14 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                 <div className="flex-1 flex items-start" style={{ gap: `${barGap}px` }}>
                   {data.map((d, i) => {
                     const pct = maxEpsAbs > 0 ? Math.abs(d.eps) / maxEpsAbs : 0;
-                    const barH = Math.max(pct * BAR_MAX_H, 4);
+                    const barPct = Math.max(pct * 100, 4);
                     const isHov = hoveredEpsIdx === i;
                     return (
-                      <div key={i} className="flex-1 flex flex-col items-center min-w-0"
+                      <div key={i} className="flex-1 flex flex-col items-center min-w-0 h-full"
                         onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
                         style={{ cursor: 'pointer' }} data-testid={`bar-eps-${i}`}>
                         <div className="w-full rounded-b-[3px] transition-all duration-150" style={{
-                          height: `${barH}px`,
+                          height: `${barPct}%`,
                           backgroundColor: d.isEstimate
                             ? (isHov ? 'rgba(255,69,58,0.30)' : 'rgba(255,69,58,0.15)')
                             : (isHov ? 'rgba(255,69,58,0.75)' : 'rgba(255,69,58,0.40)'),
@@ -530,14 +530,14 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
               <div className="flex items-end h-full" style={{ gap: `${barGap}px` }}>
                 {data.map((d, i) => {
                   const pct = maxEpsAbs > 0 ? Math.abs(d.eps) / maxEpsAbs : 0;
-                  const barH = Math.max(pct * BAR_MAX_H, 4);
+                  const barPct = Math.max(pct * 100, 4);
                   const isHov = hoveredEpsIdx === i;
                   return (
-                    <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0"
+                    <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0 h-full"
                       onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
                       style={{ cursor: 'pointer' }} data-testid={`bar-eps-${i}`}>
                       <div className="w-full rounded-t-[3px] transition-all duration-150" style={{
-                        height: `${barH}px`,
+                        height: `${barPct}%`,
                         backgroundColor: d.isEstimate
                           ? (isHov ? 'rgba(251,187,4,0.30)' : 'rgba(251,187,4,0.15)')
                           : (isHov ? 'rgba(251,187,4,0.75)' : 'rgba(251,187,4,0.40)'),
@@ -646,16 +646,18 @@ export default function StockDetail() {
                   <div className="flex-[3] min-h-0">
                     <StockChart symbol={symbol} currentPrice={quote.price} compact />
                   </div>
-                  <div className="flex-[3] min-h-0">
+                  <div className="flex-[4] min-h-0">
                     <EarningsSalesChart symbol={symbol} />
-                  </div>
-                  <div className="flex-[2] min-h-0">
-                    <NewsPanel symbol={symbol} />
                   </div>
                 </div>
 
-                <div className="lg:col-span-5 min-h-0" style={{ height: 'calc(100vh - 100px)' }}>
-                  <StockQualityPanel symbol={symbol} />
+                <div className="lg:col-span-5 flex flex-col gap-2 min-h-0" style={{ height: 'calc(100vh - 100px)' }}>
+                  <div className="flex-[5] min-h-0 overflow-auto">
+                    <StockQualityPanel symbol={symbol} />
+                  </div>
+                  <div className="flex-[3] min-h-0">
+                    <NewsPanel symbol={symbol} />
+                  </div>
                 </div>
               </div>
             </>
