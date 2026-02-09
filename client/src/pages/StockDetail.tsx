@@ -51,23 +51,6 @@ function QualityRow({ label, value, color }: { label: string; value: string; col
   );
 }
 
-function pctColor(val: string): string {
-  if (!val || val === '-' || val === '') return 'text-white/60';
-  const num = parseFloat(val.replace('%', ''));
-  if (isNaN(num)) return 'text-white/60';
-  if (num >= 25) return 'text-[#30d158]';
-  if (num > 0) return 'text-[#30d158]/70';
-  if (num === 0) return 'text-white/60';
-  return 'text-[#ff453a]/80';
-}
-
-function smaColor(val: string): string {
-  if (!val || val === '-') return 'text-white/60';
-  const num = parseFloat(val.replace('%', ''));
-  if (isNaN(num)) return 'text-white/60';
-  return num >= 0 ? 'text-[#30d158]' : 'text-[#ff453a]';
-}
-
 function StockQualityPanel({ symbol }: { symbol: string }) {
   const { data: quality, isLoading } = useStockQuality(symbol, 'current');
   const { data: news, isLoading: newsLoading } = useStockNews(symbol);
@@ -88,6 +71,12 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
     '>=7': 'text-[#ff453a]',
   };
 
+  const pctColor = (val: number): string => {
+    if (val >= 25) return 'text-[#30d158]';
+    if (val >= 0) return 'text-white/70';
+    return 'text-[#ff453a]/80';
+  };
+
   return (
     <div className="glass-card rounded-xl px-4 py-3 h-full flex flex-col overflow-hidden" data-testid="card-stock-quality">
       <h2 className="text-[13px] font-semibold text-white/90 mb-2 tracking-wide flex-shrink-0">Stock Quality</h2>
@@ -95,22 +84,22 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
       <div className="flex-1 min-h-0 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
         <div className="mb-2">
           <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Details</div>
-          <QualityRow label="Market Cap" value={quality.details.marketCap || '-'} />
-          <QualityRow label="Float" value={quality.details.floatShares || '-'} />
+          <QualityRow label="Market Cap" value={formatLargeNumber(quality.details.marketCap)} />
+          <QualityRow label="Float" value={formatVolume(quality.details.floatShares)} />
           <QualityRow
             label="RS vs SPY"
-            value={quality.details.rsVsSpy?.toString() || '0'}
+            value={quality.details.rsVsSpy.toString()}
             color={quality.details.rsVsSpy >= 80 ? "text-[#30d158]" : quality.details.rsVsSpy >= 50 ? "text-white/80" : "text-[#ff453a]/80"}
           />
-          <QualityRow label="Volatility" value={quality.details.volatility || quality.details.adr || '-'} />
-          <QualityRow label="Inst. Own" value={quality.details.instOwnership || '-'} />
-          <QualityRow label="Avg Volume" value={quality.details.avgVolume50d || '-'} />
-          <QualityRow label="Rel Volume" value={quality.details.relVolume || '-'} />
-          <QualityRow label="Beta" value={quality.details.beta || '-'} />
-          {quality.details.shortInterest && quality.details.shortInterest !== '0' && (
+          <QualityRow label="ADR %" value={`${quality.details.adr}%`} />
+          <QualityRow label="Inst. Own" value={`${quality.details.instOwnership}%`} />
+          <QualityRow label="# Inst." value={quality.details.numInstitutions.toLocaleString()} />
+          <QualityRow label="Avg Vol 50D" value={formatVolume(quality.details.avgVolume50d)} />
+          {quality.details.shortInterest > 0 && (
             <QualityRow
               label="Short Interest"
-              value={`${quality.details.shortInterest} (${quality.details.shortPercentOfFloat})`}
+              value={`${formatVolume(quality.details.shortInterest)} (${quality.details.shortPercentOfFloat}%)`}
+              color={quality.details.shortPercentOfFloat >= 20 ? "text-[#ff453a]" : quality.details.shortPercentOfFloat >= 10 ? "text-[#ffd60a]" : "text-white/80"}
             />
           )}
           <div className="mt-1 pt-1 border-t border-white/[0.06]">
@@ -119,54 +108,40 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
                 <Calendar className="w-3 h-3 text-white/30" />
                 <span className="text-[12px] text-white/50">Earnings</span>
               </div>
-              <span className="text-[12px] font-mono-nums text-white/80">
-                {quality.details.nextEarningsDate || '-'}
-                {quality.details.daysToEarnings > 0 && ` (${quality.details.daysToEarnings}d)`}
-              </span>
+              <span className="text-[12px] font-mono-nums text-white/80">{quality.details.nextEarningsDate} ({quality.details.daysToEarnings}d)</span>
             </div>
           </div>
         </div>
 
         <div className="mb-2 pt-2 border-t border-white/[0.06]">
           <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Fundamentals</div>
-          <QualityRow label="EPS Q/Q" value={quality.fundamentals.epsQoQ || '-'} color={pctColor(quality.fundamentals.epsQoQ)} />
-          <QualityRow label="Sales Q/Q" value={quality.fundamentals.salesQoQ || '-'} color={pctColor(quality.fundamentals.salesQoQ)} />
-          <QualityRow label="EPS Y/Y TTM" value={quality.fundamentals.epsYoY || '-'} color={pctColor(quality.fundamentals.epsYoY)} />
-          <QualityRow label="Sales Y/Y TTM" value={quality.fundamentals.salesYoY || '-'} color={pctColor(quality.fundamentals.salesYoY)} />
+          <QualityRow label="EPS QoQ" value={`${quality.fundamentals.epsQoQ > 0 ? '+' : ''}${quality.fundamentals.epsQoQ}%`} color={pctColor(quality.fundamentals.epsQoQ)} />
+          <QualityRow label="Sales QoQ" value={`${quality.fundamentals.salesQoQ > 0 ? '+' : ''}${quality.fundamentals.salesQoQ}%`} color={pctColor(quality.fundamentals.salesQoQ)} />
+          <QualityRow label="EPS YoY" value={`${quality.fundamentals.epsYoY > 0 ? '+' : ''}${quality.fundamentals.epsYoY}%`} color={pctColor(quality.fundamentals.epsYoY)} />
+          <QualityRow label="Sales YoY" value={`${quality.fundamentals.salesYoY > 0 ? '+' : ''}${quality.fundamentals.salesYoY}%`} color={pctColor(quality.fundamentals.salesYoY)} />
           <BoolIndicator label="Earnings Accel." value={quality.fundamentals.earningsAcceleration} />
-          <QualityRow label="EPS This Y" value={quality.fundamentals.epsThisY || '-'} color={pctColor(quality.fundamentals.epsThisY)} />
-          <QualityRow label="EPS Next Y" value={quality.fundamentals.epsNextY || '-'} color={pctColor(quality.fundamentals.epsNextY)} />
-          <QualityRow label="EPS Next 5Y" value={quality.fundamentals.epsNext5Y || '-'} color={pctColor(quality.fundamentals.epsNext5Y)} />
+          <QualityRow label="Sales Growth 1Y" value={`${quality.fundamentals.salesGrowth1Y > 0 ? '+' : ''}${quality.fundamentals.salesGrowth1Y}%`} color={quality.fundamentals.salesGrowth1Y >= 20 ? "text-[#30d158]" : quality.fundamentals.salesGrowth1Y >= 0 ? "text-white/70" : "text-[#ff453a]/80"} />
         </div>
 
         <div className="mb-2 pt-2 border-t border-white/[0.06]">
           <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Profitability</div>
-          <QualityRow label="EPS TTM" value={quality.profitability.epsTTM || '-'} color={parseFloat(quality.profitability.epsTTM) >= 0 ? "text-[#30d158]" : "text-[#ff453a]/80"} />
-          <QualityRow label="P/E" value={quality.profitability.peTTM || '-'} />
-          <QualityRow label="Forward P/E" value={quality.profitability.forwardPE || '-'} />
-          <QualityRow label="PEG" value={quality.profitability.peg || '-'} />
-          <QualityRow label="ROA" value={quality.profitability.roa || '-'} color={pctColor(quality.profitability.roa)} />
-          <QualityRow label="ROE" value={quality.profitability.roe || '-'} color={pctColor(quality.profitability.roe)} />
-          <QualityRow label="ROIC" value={quality.profitability.roic || '-'} color={pctColor(quality.profitability.roic)} />
-          <QualityRow label="Gross Margin" value={quality.profitability.grossMargin || '-'} />
-          <QualityRow label="Oper. Margin" value={quality.profitability.operMargin || '-'} />
-          <QualityRow label="Profit Margin" value={quality.profitability.profitMargin || '-'} />
+          <QualityRow label="EPS TTM" value={`$${Math.abs(quality.profitability.epsTTM).toFixed(2)}`} color={quality.profitability.epsTTM >= 0 ? "text-[#30d158]" : "text-[#ff453a]/80"} />
+          <QualityRow label="FCF TTM" value={formatLargeNumber(Math.abs(quality.profitability.fcfTTM))} color={quality.profitability.fcfTTM >= 0 ? "text-[#30d158]" : "text-[#ff453a]/80"} />
         </div>
 
         <div className="mb-2 pt-2 border-t border-white/[0.06]">
           <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Trend</div>
           <QualityRow label="Weinstein Stage" value={`Stage ${quality.trend.weinsteinStage}`} color={stageColors[quality.trend.weinsteinStage]} />
-          <BoolIndicator label="Price > 20 SMA" value={quality.trend.aboveSma20} />
+          <BoolIndicator label="Price > 10 EMA" value={quality.trend.aboveEma10} />
+          <BoolIndicator label="Price > 20 EMA" value={quality.trend.aboveEma20} />
           <BoolIndicator label="Price > 50 SMA" value={quality.trend.aboveSma50} />
           <BoolIndicator label="Price > 200 SMA" value={quality.trend.aboveSma200} />
           <BoolIndicator label="MA Aligned" value={quality.trend.maAlignment} />
-          <QualityRow label="SMA 20" value={quality.trend.sma20 || '-'} color={smaColor(quality.trend.sma20)} />
-          <QualityRow label="SMA 50" value={quality.trend.sma50 || '-'} color={smaColor(quality.trend.sma50)} />
-          <QualityRow label="SMA 200" value={quality.trend.sma200 || '-'} color={smaColor(quality.trend.sma200)} />
-          <QualityRow label="RSI (14)" value={quality.trend.rsi || '-'} color={
-            parseFloat(quality.trend.rsi) >= 70 ? "text-[#ff453a]" : parseFloat(quality.trend.rsi) <= 30 ? "text-[#30d158]" : "text-white/80"
-          } />
-          <QualityRow label="ATR (14)" value={quality.trend.atr || '-'} />
+          <QualityRow
+            label="Dist 50 SMA"
+            value={`${quality.trend.distFromSma50 > 0 ? '+' : ''}${quality.trend.distFromSma50}%`}
+            color={quality.trend.distFromSma50 > 0 ? "text-[#30d158]" : "text-[#ff453a]/80"}
+          />
           <div className="flex items-center justify-between py-[3px]">
             <span className="text-[12px] text-white/50">Overextension</span>
             <div className="flex items-center gap-1.5">

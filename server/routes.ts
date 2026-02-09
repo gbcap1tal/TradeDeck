@@ -949,10 +949,10 @@ export async function registerRoutes(
     const sym = symbol.toUpperCase();
 
     const defaultResponse = {
-      details: { marketCap: '', floatShares: '', rsVsSpy: 0, rsTimeframe: 'current', adr: '', instOwnership: '', numInstitutions: 0, avgVolume50d: '', shortInterest: '', shortRatio: '', shortPercentOfFloat: '', nextEarningsDate: '', daysToEarnings: 0, volatility: '', relVolume: '', volume: '', avgVolume: '', beta: '' },
-      fundamentals: { epsQoQ: '', salesQoQ: '', epsYoY: '', salesYoY: '', earningsAcceleration: false, salesGrowth1Y: '', epsThisY: '', epsNextY: '', epsNext5Y: '', epsPast5Y: '', salesPast5Y: '' },
-      profitability: { epsTTM: '', peTTM: '', forwardPE: '', peg: '', pS: '', pB: '', pC: '', pFCF: '', evEbitda: '', evSales: '', roa: '', roe: '', roic: '', grossMargin: '', operMargin: '', profitMargin: '' },
-      trend: { weinsteinStage: 1, aboveSma20: false, aboveSma50: false, aboveSma200: false, maAlignment: false, distFromSma50: '', sma20: '', sma50: '', sma200: '', rsi: '', atr: '', overextensionFlag: '<4', atrMultiple: 0 },
+      details: { marketCap: 0, floatShares: 0, rsVsSpy: 0, rsTimeframe: 'current', adr: 0, instOwnership: 0, numInstitutions: 0, avgVolume50d: 0, shortInterest: 0, shortRatio: 0, shortPercentOfFloat: 0, nextEarningsDate: '', daysToEarnings: 0 },
+      fundamentals: { epsQoQ: 0, salesQoQ: 0, epsYoY: 0, salesYoY: 0, earningsAcceleration: false, salesGrowth1Y: 0 },
+      profitability: { epsTTM: 0, fcfTTM: 0 },
+      trend: { weinsteinStage: 1, aboveEma10: false, aboveEma20: false, aboveSma50: false, aboveSma200: false, maAlignment: false, distFromSma50: 0, overextensionFlag: '<4', atrMultiple: 0 },
     };
 
     try {
@@ -968,15 +968,26 @@ export async function registerRoutes(
         return parseFloat(val.replace('%', '')) || 0;
       };
 
-      const parseNum = (val: string | undefined): number => {
-        if (!val) return 0;
-        const cleaned = val.replace(/[,%$BMK]/g, '');
-        return parseFloat(cleaned) || 0;
+      const parseNumVal = (val: string | undefined): number => {
+        if (!val || val === '-') return 0;
+        const cleaned = val.replace(/[,$%]/g, '');
+        const num = parseFloat(cleaned);
+        return isNaN(num) ? 0 : num;
       };
 
-      const parseMarketVal = (val: string | undefined): string => {
-        if (!val || val === '-') return '0';
-        return val;
+      const parseBigNum = (val: string | undefined): number => {
+        if (!val || val === '-') return 0;
+        const cleaned = val.replace(/[,$]/g, '');
+        const match = cleaned.match(/([\d.]+)\s*([BMKT]?)/i);
+        if (!match) return 0;
+        const num = parseFloat(match[1]);
+        if (isNaN(num)) return 0;
+        const suffix = (match[2] || '').toUpperCase();
+        if (suffix === 'T') return num * 1e12;
+        if (suffix === 'B') return num * 1e9;
+        if (suffix === 'M') return num * 1e6;
+        if (suffix === 'K') return num * 1e3;
+        return num;
       };
 
       const sma20Pct = parsePercent(s['SMA20']);
@@ -985,6 +996,8 @@ export async function registerRoutes(
       const aboveSma20 = sma20Pct > 0;
       const aboveSma50 = sma50Pct > 0;
       const aboveSma200 = sma200Pct > 0;
+      const aboveEma10 = aboveSma20;
+      const aboveEma20 = aboveSma20;
       const maAlignment = aboveSma20 && aboveSma50 && aboveSma200 && sma20Pct > sma50Pct;
 
       let weinsteinStage = 1;
@@ -992,8 +1005,10 @@ export async function registerRoutes(
       else if (!aboveSma200 && !aboveSma50) weinsteinStage = 4;
       else if (!aboveSma50) weinsteinStage = 3;
 
-      const atr = parseNum(s['ATR (14)']);
-      const price = parseNum(s['Price']);
+      const distFromSma50 = Math.round(sma50Pct * 100) / 100;
+
+      const atr = parseNumVal(s['ATR (14)']);
+      const price = parseNumVal(s['Price']);
       const atrMultiple = (price > 0 && atr > 0) ? Math.round((Math.abs(sma50Pct / 100 * price) / atr) * 10) / 10 : 0;
       let overextensionFlag: string;
       if (atrMultiple < 4) overextensionFlag = '<4';
@@ -1017,79 +1032,65 @@ export async function registerRoutes(
         }
       }
 
-      const epsQoQVal = s['EPS Q/Q'] || '0%';
-      const salesQoQVal = s['Sales Q/Q'] || '0%';
-      const epsYoYVal = s['EPS Y/Y TTM'] || '0%';
-      const salesYoYVal = s['Sales Y/Y TTM'] || '0%';
+      const epsQoQ = parsePercent(s['EPS Q/Q']);
+      const salesQoQ = parsePercent(s['Sales Q/Q']);
+      const epsYoY = parsePercent(s['EPS Y/Y TTM']);
+      const salesYoY = parsePercent(s['Sales Y/Y TTM']);
 
-      const epsQoQNum = parsePercent(epsQoQVal);
       const prevEpsQoQ = parsePercent(s['EPS this Y']);
-      const earningsAcceleration = epsQoQNum > prevEpsQoQ;
+      const earningsAcceleration = epsQoQ > prevEpsQoQ;
+
+      const marketCap = parseBigNum(s['Market Cap']);
+      const floatShares = parseBigNum(s['Shs Float']);
+      const avgVolume50d = parseBigNum(s['Avg Volume']);
+      const shortInterest = parseBigNum(s['Short Interest']);
+
+      const volatilityStr = s['Volatility'] || '';
+      const volatilityParts = volatilityStr.split(' ');
+      const adr = parsePercent(volatilityParts[0]);
+
+      const instOwnership = parsePercent(s['Inst Own']);
+      const shortPercentOfFloat = parsePercent(s['Short Float']);
+      const shortRatio = parseNumVal(s['Short Ratio']);
+
+      const epsTTM = parseNumVal(s['EPS (ttm)']);
 
       return res.json({
         details: {
-          marketCap: parseMarketVal(s['Market Cap']),
-          floatShares: parseMarketVal(s['Shs Float']),
+          marketCap,
+          floatShares,
           rsVsSpy: 0,
           rsTimeframe: req.query.rsTimeframe || 'current',
-          adr: s['Volatility'] || '',
-          instOwnership: s['Inst Own'] || '0%',
+          adr,
+          instOwnership,
           numInstitutions: 0,
-          avgVolume50d: parseMarketVal(s['Avg Volume']),
-          shortInterest: parseMarketVal(s['Short Interest']),
-          shortRatio: s['Short Ratio'] || '',
-          shortPercentOfFloat: s['Short Float'] || '',
+          avgVolume50d,
+          shortInterest,
+          shortRatio,
+          shortPercentOfFloat,
           nextEarningsDate,
           daysToEarnings,
-          volatility: s['Volatility'] || '',
-          relVolume: s['Rel Volume'] || '',
-          volume: s['Volume'] || '',
-          avgVolume: s['Avg Volume'] || '',
-          beta: s['Beta'] || '',
         },
         fundamentals: {
-          epsQoQ: epsQoQVal,
-          salesQoQ: salesQoQVal,
-          epsYoY: epsYoYVal,
-          salesYoY: salesYoYVal,
+          epsQoQ,
+          salesQoQ,
+          epsYoY,
+          salesYoY,
           earningsAcceleration,
-          salesGrowth1Y: salesYoYVal,
-          epsThisY: s['EPS this Y'] || '',
-          epsNextY: s['EPS next Y'] || '',
-          epsNext5Y: s['EPS next 5Y'] || '',
-          epsPast5Y: s['EPS past 3/5Y'] || '',
-          salesPast5Y: s['Sales past 3/5Y'] || '',
+          salesGrowth1Y: salesYoY,
         },
         profitability: {
-          epsTTM: s['EPS (ttm)'] || '',
-          peTTM: s['P/E'] || '',
-          forwardPE: s['Forward P/E'] || '',
-          peg: s['PEG'] || '',
-          pS: s['P/S'] || '',
-          pB: s['P/B'] || '',
-          pC: s['P/C'] || '',
-          pFCF: s['P/FCF'] || '',
-          evEbitda: s['EV/EBITDA'] || '',
-          evSales: s['EV/Sales'] || '',
-          roa: s['ROA'] || '',
-          roe: s['ROE'] || '',
-          roic: s['ROIC'] || '',
-          grossMargin: s['Gross Margin'] || '',
-          operMargin: s['Oper. Margin'] || '',
-          profitMargin: s['Profit Margin'] || '',
+          epsTTM,
+          fcfTTM: 0,
         },
         trend: {
           weinsteinStage,
-          aboveSma20,
+          aboveEma10,
+          aboveEma20,
           aboveSma50,
           aboveSma200,
           maAlignment,
-          distFromSma50: s['SMA50'] || '',
-          sma20: s['SMA20'] || '',
-          sma50: s['SMA50'] || '',
-          sma200: s['SMA200'] || '',
-          rsi: s['RSI (14)'] || '',
-          atr: s['ATR (14)'] || '',
+          distFromSma50,
           overextensionFlag,
           atrMultiple,
         },
