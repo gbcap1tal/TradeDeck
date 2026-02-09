@@ -17,6 +17,7 @@ import { users } from "@shared/models/auth";
 import { eq, sql } from "drizzle-orm";
 import * as fs from 'fs';
 import * as path from 'path';
+import { spawn } from 'child_process';
 
 const INDUSTRY_PERF_PERSIST_PATH = path.join(process.cwd(), '.industry-perf-cache.json');
 
@@ -668,6 +669,58 @@ function initBackgroundTasks() {
       lastScheduledWindow = windowKey;
       runFullDataRefresh(windowKey);
     }
+  }, 60000);
+
+  let lastRSRunKey = '';
+  let rsRunning = false;
+
+  setInterval(() => {
+    if (rsRunning) return;
+
+    const now = new Date();
+    const utcDay = now.getUTCDay();
+    const utcHour = now.getUTCHours();
+
+    if (!(utcDay === 2 || utcDay === 5)) return;
+    if (utcHour !== 23) return;
+
+    const runKey = `${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}`;
+    if (runKey === lastRSRunKey) return;
+    lastRSRunKey = runKey;
+    rsRunning = true;
+
+    console.log(`[rs-scheduler] Starting RS ratings computation (${utcDay === 2 ? 'Tuesday' : 'Friday'})...`);
+
+    const scriptPath = path.join(process.cwd(), 'scripts', 'compute_rs_ratings.py');
+    const child = spawn('python3', [scriptPath], {
+      cwd: process.cwd(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (data: Buffer) => { stdout += data.toString(); });
+    child.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
+
+    child.on('close', (code: number | null) => {
+      rsRunning = false;
+      if (code === 0) {
+        const lines = stdout.trim().split('\n');
+        const lastLine = lines[lines.length - 1] || '';
+        console.log(`[rs-scheduler] RS ratings computation complete: ${lastLine}`);
+      } else {
+        console.error(`[rs-scheduler] RS script exited with code ${code}`);
+        const errLines = stderr.trim().split('\n').slice(-3).join(' | ');
+        console.error(`[rs-scheduler] stderr: ${errLines}`);
+        sendAlert('RS Ratings Computation Failed', `Python RS script exited with code ${code}.\n\nLast stderr: ${errLines}`, 'general');
+      }
+    });
+
+    child.on('error', (err: Error) => {
+      rsRunning = false;
+      console.error(`[rs-scheduler] Failed to spawn RS script: ${err.message}`);
+      sendAlert('RS Ratings Script Spawn Failed', `Could not start RS computation script.\n\nError: ${err.message}`, 'general');
+    });
   }, 60000);
 }
 
