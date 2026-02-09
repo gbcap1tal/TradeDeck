@@ -53,7 +53,6 @@ function QualityRow({ label, value, color }: { label: string; value: string; col
 
 function StockQualityPanel({ symbol }: { symbol: string }) {
   const { data: quality, isLoading } = useStockQuality(symbol, 'current');
-  const { data: news, isLoading: newsLoading } = useStockNews(symbol);
 
   if (isLoading) return <div className="glass-card rounded-xl shimmer h-full" />;
   if (!quality) return null;
@@ -129,7 +128,7 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
           <QualityRow label="FCF TTM" value={formatLargeNumber(Math.abs(quality.profitability.fcfTTM))} color={quality.profitability.fcfTTM >= 0 ? "text-[#30d158]" : "text-[#ff453a]/80"} />
         </div>
 
-        <div className="mb-2 pt-2 border-t border-white/[0.06]">
+        <div className="pt-2 border-t border-white/[0.06]">
           <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Trend</div>
           <QualityRow label="Weinstein Stage" value={`Stage ${quality.trend.weinsteinStage}`} color={stageColors[quality.trend.weinsteinStage]} />
           <BoolIndicator label="Price > 10 EMA" value={quality.trend.aboveEma10} />
@@ -154,52 +153,58 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
             </div>
           </div>
         </div>
-
-        <div className="pt-2 border-t border-white/[0.06]">
-          <div className="flex items-center gap-1.5 mb-1">
-            <Newspaper className="w-3 h-3 text-white/30" />
-            <span className="text-[10px] text-white/30 uppercase tracking-widest font-semibold">Latest News</span>
-          </div>
-          {newsLoading ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => <div key={i} className="shimmer h-6 rounded" />)}
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              {news?.slice(0, 10).map((item: any) => {
-                const itemDate = new Date(item.timestamp);
-                const now = new Date();
-                const diffMs = now.getTime() - itemDate.getTime();
-                const diffHrs = Math.floor(diffMs / 3600000);
-                const diffDays = Math.floor(diffMs / 86400000);
-                let timeLabel: string;
-                if (diffHrs < 1) timeLabel = 'Just now';
-                else if (diffHrs < 24) timeLabel = `${diffHrs}h ago`;
-                else if (diffDays < 7) timeLabel = `${diffDays}d ago`;
-                else timeLabel = format(itemDate, "MMM d");
-
-                return (
-                  <a
-                    key={item.id}
-                    href={item.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="block group"
-                    data-testid={`news-item-${item.id}`}
-                  >
-                    <p className="text-[11px] text-white/50 group-hover:text-white/75 transition-colors leading-snug line-clamp-1">
-                      {item.headline}
-                    </p>
-                    <span className="text-[9px] text-white/25 font-mono">
-                      {timeLabel} · {item.source}
-                    </span>
-                  </a>
-                );
-              })}
-            </div>
-          )}
-        </div>
       </div>
+    </div>
+  );
+}
+
+function NewsPanel({ symbol }: { symbol: string }) {
+  const { data: news, isLoading } = useStockNews(symbol);
+
+  return (
+    <div className="glass-card rounded-xl px-4 py-3 flex-1 min-h-0 flex flex-col overflow-hidden" data-testid="card-news">
+      <div className="flex items-center gap-1.5 mb-2 flex-shrink-0">
+        <Newspaper className="w-3.5 h-3.5 text-white/30" />
+        <span className="text-[13px] font-semibold text-white/90 tracking-wide">Latest News</span>
+      </div>
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => <div key={i} className="shimmer h-7 rounded" />)}
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1 space-y-2" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+          {news?.slice(0, 12).map((item: any) => {
+            const itemDate = new Date(item.timestamp);
+            const now = new Date();
+            const diffMs = now.getTime() - itemDate.getTime();
+            const diffHrs = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            let timeLabel: string;
+            if (diffHrs < 1) timeLabel = 'Just now';
+            else if (diffHrs < 24) timeLabel = `${diffHrs}h ago`;
+            else if (diffDays < 7) timeLabel = `${diffDays}d ago`;
+            else timeLabel = format(itemDate, "MMM d");
+
+            return (
+              <a
+                key={item.id}
+                href={item.url}
+                target="_blank"
+                rel="noreferrer"
+                className="block group"
+                data-testid={`news-item-${item.id}`}
+              >
+                <p className="text-[13px] text-white/60 group-hover:text-white/80 transition-colors leading-snug line-clamp-1">
+                  {item.headline}
+                </p>
+                <span className="text-[11px] text-white/30 font-mono">
+                  {timeLabel} · {item.source}
+                </span>
+              </a>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -235,12 +240,12 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
   const formatRev = (v: number) => `${v.toFixed(1)}B`;
   const formatEps = (v: number) => `$${v.toFixed(2)}`;
 
-  const BAR_MAX_H = 80;
+  const BAR_MAX_H = 60;
 
   return (
     <div className="glass-card rounded-xl px-4 py-3 h-full flex flex-col" data-testid="card-earnings-sales">
       <div className="flex items-center justify-between mb-2 flex-shrink-0 flex-wrap gap-1">
-        <h2 className="text-sm font-semibold text-white/90 tracking-wide">Earnings & Revenue</h2>
+        <h2 className="text-[13px] font-semibold text-white/90 tracking-wide">Earnings & Revenue</h2>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
@@ -280,9 +285,9 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
       <div className="flex-1 min-h-0 flex flex-col gap-2">
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex items-center gap-2 mb-1 flex-shrink-0">
-            <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold">Revenue</span>
+            <span className="text-[12px] text-white/40 uppercase tracking-widest font-semibold">Revenue</span>
             {hoveredRevIdx !== null && (
-              <span className="text-[11px] font-mono-nums text-white/50">
+              <span className="text-[12px] font-mono-nums text-white/50">
                 {data[hoveredRevIdx].quarter}: <span className="text-white/80">{formatRev(data[hoveredRevIdx].revenue)}</span>
                 {data[hoveredRevIdx].isEstimate && data[hoveredRevIdx].salesEstimate != null && (
                   <span className="text-white/30"> est.</span>
@@ -313,13 +318,13 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                 >
                   {growth != null && (
                     <span className={cn(
-                      "text-[8px] font-mono-nums font-semibold leading-none mb-0.5",
+                      "text-[10px] font-mono-nums font-semibold leading-none mb-0.5",
                       growth >= 0 ? "text-[#30d158]/80" : "text-[#ff453a]/80"
                     )}>
                       {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
                     </span>
                   )}
-                  {growth == null && <span className="text-[8px] leading-none mb-0.5 invisible">0%</span>}
+                  {growth == null && <span className="text-[10px] leading-none mb-0.5 invisible">0%</span>}
                   <div
                     className="w-full rounded-t-[2px] transition-all duration-150"
                     style={{
@@ -331,8 +336,8 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                     }}
                   />
                   <span className={cn(
-                    "text-[8px] font-mono-nums leading-tight mt-1 truncate w-full text-center",
-                    d.isEstimate ? "text-white/25" : "text-white/40"
+                    "text-[10px] font-mono-nums leading-tight mt-1 truncate w-full text-center",
+                    d.isEstimate ? "text-white/25" : "text-white/45"
                   )}>
                     {d.quarter}
                   </span>
@@ -346,9 +351,9 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
 
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex items-center gap-2 mb-1 flex-shrink-0">
-            <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold">EPS</span>
+            <span className="text-[12px] text-white/40 uppercase tracking-widest font-semibold">EPS</span>
             {hoveredEpsIdx !== null && (
-              <span className="text-[11px] font-mono-nums text-white/50">
+              <span className="text-[12px] font-mono-nums text-white/50">
                 {data[hoveredEpsIdx].quarter}: <span className="text-[#FBBB04]">{formatEps(data[hoveredEpsIdx].eps)}</span>
                 {!data[hoveredEpsIdx].isEstimate && data[hoveredEpsIdx].epsEstimate != null && (
                   <span className="text-white/30"> est. {formatEps(data[hoveredEpsIdx].epsEstimate!)}</span>
@@ -387,13 +392,13 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                 >
                   {growth != null && (
                     <span className={cn(
-                      "text-[8px] font-mono-nums font-semibold leading-none mb-0.5",
+                      "text-[10px] font-mono-nums font-semibold leading-none mb-0.5",
                       growth >= 0 ? "text-[#30d158]/80" : "text-[#ff453a]/80"
                     )}>
                       {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
                     </span>
                   )}
-                  {growth == null && <span className="text-[8px] leading-none mb-0.5 invisible">0%</span>}
+                  {growth == null && <span className="text-[10px] leading-none mb-0.5 invisible">0%</span>}
                   <div
                     className="w-full rounded-t-[2px] transition-all duration-150"
                     style={{
@@ -405,8 +410,8 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                     }}
                   />
                   <span className={cn(
-                    "text-[8px] font-mono-nums leading-tight mt-1 truncate w-full text-center",
-                    d.isEstimate ? "text-white/25" : "text-white/40"
+                    "text-[10px] font-mono-nums leading-tight mt-1 truncate w-full text-center",
+                    d.isEstimate ? "text-white/25" : "text-white/45"
                   )}>
                     {d.quarter}
                   </span>
@@ -438,7 +443,7 @@ export default function StockDetail() {
     <div className="h-screen bg-background flex flex-col overflow-hidden">
       <Navbar />
       <main className="flex-1 min-h-0 flex flex-col">
-        <div className="max-w-[1440px] w-full mx-auto px-4 py-2 flex-1 min-h-0 flex flex-col gap-2 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+        <div className="max-w-[1440px] w-full mx-auto px-4 py-2 flex-1 min-h-0 flex flex-col gap-2">
           {(isQuoteLoading || (isQuoteFetching && !quote)) ? (
             <div className="flex-1 flex flex-col gap-2">
               <div className="shimmer h-10 rounded-xl" />
@@ -493,18 +498,18 @@ export default function StockDetail() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
-                <div className="lg:col-span-8 flex flex-col gap-2">
-                  <div className="h-[300px]">
+              <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-2">
+                <div className="lg:col-span-7 flex flex-col gap-2 min-h-0">
+                  <div className="h-[260px] flex-shrink-0">
                     <StockChart symbol={symbol} currentPrice={quote.price} compact />
                   </div>
-
-                  <div className="h-[300px]">
+                  <div className="h-[240px] flex-shrink-0">
                     <EarningsSalesChart symbol={symbol} />
                   </div>
+                  <NewsPanel symbol={symbol} />
                 </div>
 
-                <div className="lg:col-span-4">
+                <div className="lg:col-span-5 min-h-0">
                   <StockQualityPanel symbol={symbol} />
                 </div>
               </div>
