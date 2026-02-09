@@ -277,51 +277,60 @@ export async function scrapeBriefingPreMarket(forceRefresh = false): Promise<Pre
     const entries: PreMarketEntry[] = [];
     let updated = '';
 
-    const bodyText = $('body').text();
-    const updatedMatch = bodyText.match(/Updated:\s*([\d\-]+\s+[\d:]+\s+ET)/i);
-    if (updatedMatch) {
-      updated = updatedMatch[1];
+    const updatedEl = $('p.pageDate');
+    if (updatedEl.length) {
+      const m = updatedEl.text().match(/Updated:\s*([\d\-]+\s+[\d:]+\s+ET)/i);
+      if (m) updated = m[1];
     }
 
-    $('table table tr').each((_, row) => {
-      const cells = $(row).find('td');
-      if (cells.length < 2) return;
+    const extractBodyHtml = (el: ReturnType<typeof $>): string => {
+      const lis = el.find('li');
+      if (lis.length > 0) {
+        const bullets: string[] = [];
+        lis.each((_i: number, li: any) => {
+          const text = $(li).text().trim();
+          if (text) bullets.push(text);
+        });
+        return bullets.map(b => `\u2022 ${b}`).join('\n');
+      }
+      return el.text().trim();
+    };
 
-      const firstCell = $(cells[0]).text().trim();
-      const secondCell = $(cells[1]);
+    const allRows = $('table tr');
+    for (let i = 0; i < allRows.length; i++) {
+      const row = $(allRows[i]);
+      const storyTd = row.find('td.storyTitle');
+      if (storyTd.length === 0) continue;
 
-      const timeMatch = firstCell.match(/^(\d{1,2}:\d{2})$/);
-      if (!timeMatch) return;
-
+      const timeTd = row.find('td').first();
+      const timeText = timeTd.text().trim();
+      const timeMatch = timeText.match(/^(\d{1,2}:\d{2})$/);
+      if (!timeMatch) continue;
       const time = timeMatch[1];
 
+      const rawTitle = storyTd.text().trim();
       let ticker = '';
       let headlineText = '';
 
-      const rawText = secondCell.text().trim();
-
-      const tickerMatch = rawText.match(/^([A-Z]{1,6})\s/);
+      const tickerMatch = rawTitle.match(/^([A-Z]{1,6})\s/);
       if (tickerMatch) {
         ticker = tickerMatch[1];
-        headlineText = rawText.substring(ticker.length).trim();
+        headlineText = rawTitle.substring(ticker.length).trim();
       } else {
-        headlineText = rawText;
+        headlineText = rawTitle;
       }
 
-      const priceTrail = headlineText.match(/\s*\(\s*[\d.]+\s*\)\s*$/);
+      const priceTrail = headlineText.match(/\s*\([\d.]+\s*[+\-]?[\d.]*\)\s*$/);
       if (priceTrail) {
         headlineText = headlineText.substring(0, headlineText.length - priceTrail[0].length).trim();
       }
 
       let bodyContent = '';
-      const nextRow = $(row).next('tr');
-      if (nextRow.length > 0) {
-        const nextCells = nextRow.find('td');
-        if (nextCells.length >= 2) {
-          const nextFirstCell = $(nextCells[0]).text().trim();
-          if (!nextFirstCell.match(/^\d{1,2}:\d{2}$/)) {
-            bodyContent = $(nextCells[nextCells.length - 1]).text().trim();
-          }
+      const nextRow = $(allRows[i + 1]);
+      if (nextRow && nextRow.length > 0) {
+        const artTd = nextRow.find('td.st-Art');
+        if (artTd.length > 0) {
+          bodyContent = extractBodyHtml(artTd);
         }
       }
 
@@ -332,59 +341,6 @@ export async function scrapeBriefingPreMarket(forceRefresh = false): Promise<Pre
           headline: headlineText,
           body: bodyContent,
         });
-      }
-    });
-
-    if (entries.length === 0) {
-      const allTds = $('td');
-      let currentTime = '';
-      let currentTicker = '';
-      let buffer: string[] = [];
-
-      const pushEntry = (time: string, ticker: string, joined: string) => {
-        let headline = joined;
-        if (ticker && headline.startsWith(ticker + ' ')) {
-          headline = headline.substring(ticker.length + 1).trim();
-        } else if (ticker && headline.startsWith(ticker)) {
-          headline = headline.substring(ticker.length).trim();
-        }
-        const priceTrail = headline.match(/\s*\(\s*[\d.]+\s*\)\s*$/);
-        if (priceTrail) {
-          headline = headline.substring(0, headline.length - priceTrail[0].length).trim();
-        }
-        entries.push({
-          time,
-          ticker,
-          headline: headline.substring(0, 500),
-          body: headline.length > 500 ? headline.substring(500) : (joined.length > headline.length + ticker.length + 1 ? joined.substring(headline.length + ticker.length + 1) : ''),
-        });
-      };
-
-      allTds.each((_, td) => {
-        const text = $(td).text().trim();
-        const tMatch = text.match(/^(\d{1,2}:\d{2})$/);
-        if (tMatch) {
-          if (currentTime && buffer.length > 0) {
-            const joined = buffer.join(' ');
-            const tkMatch = joined.match(/^([A-Z]{1,6}X?)\s/);
-            pushEntry(currentTime, currentTicker || (tkMatch ? tkMatch[1] : ''), joined);
-          }
-          currentTime = tMatch[1];
-          currentTicker = '';
-          buffer = [];
-        } else if (currentTime) {
-          if (!currentTicker) {
-            const tkMatch = text.match(/^([A-Z]{1,6}X?)\b/);
-            if (tkMatch) currentTicker = tkMatch[1];
-          }
-          if (text.length > 3) buffer.push(text);
-        }
-      });
-
-      if (currentTime && buffer.length > 0) {
-        const joined = buffer.join(' ');
-        const tkMatch = joined.match(/^([A-Z]{1,6}X?)\s/);
-        pushEntry(currentTime, currentTicker || (tkMatch ? tkMatch[1] : ''), joined);
       }
     }
 

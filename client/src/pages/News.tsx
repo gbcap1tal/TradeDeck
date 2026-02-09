@@ -162,7 +162,7 @@ export default function News() {
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <Newspaper className="w-4 h-4 text-[#0a84ff]" />
-                <div className="section-title" data-testid="text-digest-title">Daily Digest</div>
+                <div className="section-title" data-testid="text-digest-title">Headlines That Matter</div>
               </div>
               <div className="glass-card rounded-xl p-6" data-testid="card-daily-digest">
                 {digestLoading ? (
@@ -221,7 +221,7 @@ export default function News() {
             <div className="flex flex-col">
               <div className="flex items-center gap-2 mb-4">
                 <TrendingUp className="w-4 h-4 text-[#30d158]" />
-                <div className="section-title" data-testid="text-premarket-title">Pre-Market Briefing</div>
+                <div className="section-title" data-testid="text-premarket-title">Corporate Developments</div>
                 {premarket?.updated && (
                   <span className="text-[10px] text-white/25 font-mono ml-auto" data-testid="text-premarket-updated">
                     {premarket.updated}
@@ -316,9 +316,22 @@ export default function News() {
                                 {highlightTickers(entry.headline, goToStock)}
                               </p>
                               {entry.body && (
-                                <div className="mt-2 text-[11px] text-white/40 leading-relaxed whitespace-pre-wrap" data-testid={`premarket-body-${i}`}>
-                                  {highlightTickers(entry.body.substring(0, 800), goToStock)}
-                                  {entry.body.length > 800 && '...'}
+                                <div className="mt-2 space-y-1.5" data-testid={`premarket-body-${i}`}>
+                                  {entry.body.split('\n').filter(Boolean).map((line, li) => {
+                                    const isBullet = line.startsWith('\u2022 ');
+                                    const text = isBullet ? line.substring(2) : line;
+                                    return (
+                                      <div key={li} className={`flex gap-2 ${isBullet ? '' : ''}`}>
+                                        {isBullet && (
+                                          <span className="w-1 h-1 rounded-full bg-white/20 mt-[7px] flex-shrink-0" />
+                                        )}
+                                        <span className="text-[11px] text-white/40 leading-relaxed">
+                                          {highlightTickers(text.substring(0, 600), goToStock)}
+                                          {text.length > 600 && '...'}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
@@ -330,8 +343,8 @@ export default function News() {
                 ) : (
                   <div className="flex flex-col items-center justify-center py-12 text-white/20">
                     <AlertCircle className="w-8 h-8 mb-3" />
-                    <p className="text-[13px]">Pre-market briefing not available</p>
-                    <p className="text-[11px] mt-1">Available 4:00 AM - 9:00 AM ET</p>
+                    <p className="text-[13px]">Corporate developments not available</p>
+                    <p className="text-[11px] mt-1">Updated throughout the trading day</p>
                   </div>
                 )}
               </div>
