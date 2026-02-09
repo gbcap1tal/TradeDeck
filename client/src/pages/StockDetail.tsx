@@ -301,53 +301,49 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
     const idx = type === 'sales' ? hoveredRevIdx : hoveredEpsIdx;
     if (idx === null) return null;
     const d = data[idx];
+    const isSales = type === 'sales';
 
-    if (type === 'sales') {
-      return (
-        <div className="flex items-center gap-2.5 flex-wrap ml-1">
-          <span className="text-[11px] font-mono-nums text-white/60">{d.quarter}</span>
-          <span className="text-[12px] font-mono-nums text-white/90 font-medium">{formatRev(d.revenue)}</span>
-          {d.isEstimate && <span className="text-[10px] text-white/30 italic">est.</span>}
-          {!d.isEstimate && d.salesEstimate != null && (
-            <span className="text-[10px] text-white/35">est. {formatRev(d.salesEstimate)}</span>
-          )}
-          {d.revenueYoY != null && (
-            <span className={cn("text-[11px] font-mono-nums font-semibold",
-              d.revenueYoY >= 0 ? "text-[#30d158]" : "text-[#ff453a]")}>
-              {d.revenueYoY > 0 ? '+' : ''}{d.revenueYoY.toFixed(1)}% YoY
-            </span>
-          )}
-          {d.numAnalysts != null && d.numAnalysts > 0 && (
-            <span className="text-[9px] text-white/20">{d.numAnalysts} analysts</span>
-          )}
-        </div>
-      );
+    const mainValue = isSales ? formatRev(d.revenue) : formatEps(d.eps);
+    const yoy = isSales ? d.revenueYoY : d.epsYoY;
+    const estimate = isSales ? (d.salesEstimate != null ? formatRev(d.salesEstimate) : null) : (d.epsEstimate != null ? formatEps(d.epsEstimate) : null);
+
+    const rows: { label: string; value: string; colorClass?: string }[] = [];
+    rows.push({
+      label: isSales ? 'Revenue' : 'EPS',
+      value: mainValue,
+      colorClass: isSales ? "text-white/90" : (d.eps >= 0 ? "text-[#FBBB04]" : "text-[#ff453a]"),
+    });
+    if (!d.isEstimate && estimate != null) {
+      rows.push({ label: 'Estimate', value: estimate, colorClass: "text-white/50" });
+    }
+    if (!isSales && d.epsSurprise != null && !d.isEstimate) {
+      rows.push({
+        label: 'Surprise',
+        value: `${d.epsSurprise > 0 ? '+' : ''}${d.epsSurprise.toFixed(1)}%`,
+        colorClass: d.epsSurprise >= 0 ? "text-[#30d158]" : "text-[#ff453a]",
+      });
+    }
+    if (yoy != null) {
+      rows.push({
+        label: 'YoY',
+        value: `${yoy > 0 ? '+' : ''}${yoy.toFixed(1)}%`,
+        colorClass: yoy >= 0 ? "text-[#30d158]" : "text-[#ff453a]",
+      });
+    }
+    if (d.numAnalysts != null && d.numAnalysts > 0) {
+      rows.push({ label: 'Analysts', value: `${d.numAnalysts}`, colorClass: "text-white/40" });
     }
 
     return (
-      <div className="flex items-center gap-2.5 flex-wrap ml-1">
-        <span className="text-[11px] font-mono-nums text-white/60">{d.quarter}</span>
-        <span className={cn("text-[12px] font-mono-nums font-medium",
-          d.eps >= 0 ? "text-[#FBBB04]" : "text-[#ff453a]")}>{formatEps(d.eps)}</span>
-        {d.isEstimate && <span className="text-[10px] text-white/30 italic">est.</span>}
-        {!d.isEstimate && d.epsEstimate != null && (
-          <span className="text-[10px] text-white/35">est. {formatEps(d.epsEstimate)}</span>
-        )}
-        {d.epsSurprise != null && !d.isEstimate && (
-          <span className={cn("text-[10px] font-mono-nums font-medium",
-            d.epsSurprise >= 0 ? "text-[#30d158]/80" : "text-[#ff453a]/80")}>
-            surp. {d.epsSurprise > 0 ? '+' : ''}{d.epsSurprise.toFixed(1)}%
+      <div className="ml-3 inline-flex items-center gap-4 flex-wrap" data-testid="tooltip-earnings">
+        <span className="text-[13px] font-mono-nums text-white/80 font-semibold">{d.quarter}</span>
+        {d.isEstimate && <span className="text-[11px] text-white/30 italic">Est.</span>}
+        {rows.map((r, ri) => (
+          <span key={ri} className="inline-flex items-center gap-1.5">
+            <span className="text-[11px] text-white/35">{r.label}</span>
+            <span className={cn("text-[13px] font-mono-nums font-semibold", r.colorClass)}>{r.value}</span>
           </span>
-        )}
-        {d.epsYoY != null && (
-          <span className={cn("text-[11px] font-mono-nums font-semibold",
-            d.epsYoY >= 0 ? "text-[#30d158]" : "text-[#ff453a]")}>
-            {d.epsYoY > 0 ? '+' : ''}{d.epsYoY.toFixed(1)}% YoY
-          </span>
-        )}
-        {d.numAnalysts != null && d.numAnalysts > 0 && (
-          <span className="text-[9px] text-white/20">{d.numAnalysts} analysts</span>
-        )}
+        ))}
       </div>
     );
   };
@@ -411,7 +407,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
 
       <div className="flex-1 min-h-0 flex flex-col gap-0 overflow-hidden">
         <div className="flex-1 min-h-0 flex flex-col justify-end">
-          <div className="flex items-end flex-shrink-0 mb-1.5">
+          <div className="flex items-end flex-shrink-0 mb-1.5 flex-wrap gap-1">
             <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold leading-none">Sales</span>
             {hoveredRevIdx !== null && renderHoverTooltip('sales')}
           </div>
@@ -451,7 +447,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
         <div className="border-t border-white/[0.06] my-0.5" />
 
         <div className="flex-1 min-h-0 flex flex-col">
-          <div className="flex items-end flex-shrink-0 mb-1.5">
+          <div className="flex items-end flex-shrink-0 mb-1.5 flex-wrap gap-1">
             <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold leading-none">EPS</span>
             {hoveredEpsIdx !== null && renderHoverTooltip('eps')}
           </div>
