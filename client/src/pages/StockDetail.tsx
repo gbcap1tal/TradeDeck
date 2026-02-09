@@ -352,35 +352,33 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
     );
   };
 
-  const LABEL_H = isQuarterly ? 42 : 46;
-
   const labelRow = (quarter: string, value: string, growth: number | null, isEst: boolean, colorClass?: string) => {
     return (
-      <div className="flex flex-col items-center gap-[3px] w-full" style={{ height: `${LABEL_H}px` }}>
+      <div className="flex flex-col items-center gap-[4px] w-full py-[3px]">
         <span className={cn(
-          "font-mono-nums leading-tight truncate w-full text-center font-semibold",
-          isQuarterly ? "text-[10px]" : "text-[11px]",
+          "font-mono-nums leading-none truncate w-full text-center font-semibold",
+          isQuarterly ? "text-[11px]" : "text-[12px]",
           isEst ? "text-white/30" : "text-white/70"
         )}>
           {quarter}
         </span>
         <span className={cn(
-          "font-mono-nums leading-tight truncate w-full text-center font-medium",
-          isQuarterly ? "text-[9px]" : "text-[10px]",
-          colorClass || "text-white/40"
+          "font-mono-nums leading-none truncate w-full text-center font-medium",
+          isQuarterly ? "text-[10px]" : "text-[11px]",
+          colorClass || "text-white/45"
         )}>
           {value}
         </span>
         {growth != null ? (
           <span className={cn(
-            "font-mono-nums font-bold leading-tight",
-            isQuarterly ? "text-[9px]" : "text-[10px]",
+            "font-mono-nums font-bold leading-none",
+            isQuarterly ? "text-[10px]" : "text-[11px]",
             growth >= 0 ? "text-[#30d158]" : "text-[#ff453a]"
           )}>
             {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
           </span>
         ) : (
-          <span className="text-[9px] leading-tight invisible">0%</span>
+          <span className={cn("leading-none invisible", isQuarterly ? "text-[10px]" : "text-[11px]")}>0%</span>
         )}
       </div>
     );
@@ -438,7 +436,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                 );
               })}
             </div>
-            <div className="flex items-start mt-1" style={{ gap: `${barGap}px`, height: `${LABEL_H}px` }}>
+            <div className="flex items-start mt-1 flex-shrink-0" style={{ gap: `${barGap}px` }}>
               {data.map((d, i) => (
                 <div key={i} className="flex-1 min-w-0"
                   onMouseEnter={() => setHoveredRevIdx(i)} onMouseLeave={() => setHoveredRevIdx(null)}
@@ -501,7 +499,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                     );
                   })}
                 </div>
-                <div className="flex items-start mt-1" style={{ gap: `${barGap}px`, height: `${LABEL_H}px` }}>
+                <div className="flex items-start mt-1 flex-shrink-0" style={{ gap: `${barGap}px` }}>
                   {data.map((d, i) => (
                     <div key={i} className="flex-1 min-w-0"
                       onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
@@ -535,7 +533,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                     );
                   })}
                 </div>
-                <div className="flex items-start mt-1" style={{ gap: `${barGap}px`, height: `${LABEL_H}px` }}>
+                <div className="flex items-start mt-1 flex-shrink-0" style={{ gap: `${barGap}px` }}>
                   {data.map((d, i) => (
                     <div key={i} className="flex-1 min-w-0"
                       onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
@@ -567,7 +565,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                     );
                   })}
                 </div>
-                <div className="flex items-start mt-1" style={{ gap: `${barGap}px`, height: `${LABEL_H}px` }}>
+                <div className="flex items-start mt-1 flex-shrink-0" style={{ gap: `${barGap}px` }}>
                   {data.map((d, i) => (
                     <div key={i} className="flex-1 min-w-0"
                       onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
