@@ -106,7 +106,7 @@ export default function StockListPage({
             </div>
           ) : hasData ? (
             <div className="space-y-4">
-              <div className="glass-card rounded-xl px-5 py-4">
+              <div className="rounded-xl px-5 py-4 border border-white/[0.06]" style={{ background: 'rgba(255,255,255,0.04)' }}>
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-4 min-w-0 flex-wrap">
                     <h1 className="text-lg font-semibold tracking-tight text-white whitespace-nowrap" data-testid="text-page-title">{title}</h1>
