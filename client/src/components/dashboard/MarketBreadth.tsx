@@ -105,23 +105,27 @@ function getSPYTrend(tiers: any): string {
 
 function SMABar({
   label,
+  rightLabel,
   aboveCount,
   belowCount,
 }: {
   label: string;
+  rightLabel?: string;
   aboveCount: number;
   belowCount: number;
 }) {
   const total = aboveCount + belowCount;
   const abovePct = total > 0 ? (aboveCount / total) * 100 : 50;
   const belowPct = total > 0 ? (belowCount / total) * 100 : 50;
+  const leftText = rightLabel ? label : `Above`;
+  const rightText = rightLabel || `Below`;
 
   return (
     <div data-testid={`breadth-bar-${label.replace(/\s+/g, '').toLowerCase()}`}>
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-white/30 uppercase tracking-wider font-medium">Above</span>
-          <span className="text-[10px] text-white/30 uppercase tracking-wider font-medium">{label}</span>
+          <span className="text-[10px] text-white/30 uppercase tracking-wider font-medium">{leftText}</span>
+          {!rightLabel && <span className="text-[10px] text-white/30 uppercase tracking-wider font-medium">{label}</span>}
           <span className="text-[11px] font-mono-nums font-medium text-white/50">
             {abovePct.toFixed(1)}%
           </span>
@@ -132,8 +136,8 @@ function SMABar({
           <span className="text-[11px] font-mono-nums font-medium text-white/50">
             {belowPct.toFixed(1)}%
           </span>
-          <span className="text-[10px] text-white/30 uppercase tracking-wider font-medium">Below</span>
-          <span className="text-[10px] text-white/30 uppercase tracking-wider font-medium">{label}</span>
+          <span className="text-[10px] text-white/30 uppercase tracking-wider font-medium">{rightText}</span>
+          {!rightLabel && <span className="text-[10px] text-white/30 uppercase tracking-wider font-medium">{label}</span>}
         </div>
       </div>
       <div className="flex h-1 rounded-full overflow-hidden gap-[1px]">
@@ -187,6 +191,9 @@ export function MarketBreadth() {
 
   const spyTrend = getSPYTrend(t);
 
+  const bulls4 = t.momentum?.components?.fourPercentRatio?.bulls ?? 0;
+  const bears4 = t.momentum?.components?.fourPercentRatio?.bears ?? 0;
+
   const above50 = t.breadth?.components?.above50ma?.above ?? 0;
   const below50 = t.breadth?.components?.above50ma?.below ?? 0;
 
@@ -224,6 +231,12 @@ export function MarketBreadth() {
 
       <div className="glass-card rounded-xl p-5 mt-2">
         <div className="flex flex-col gap-3.5">
+          <SMABar
+            label="Strength"
+            rightLabel="Weakness"
+            aboveCount={bulls4}
+            belowCount={bears4}
+          />
           <SMABar
             label="SMA 50"
             aboveCount={above50}
