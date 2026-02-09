@@ -741,3 +741,50 @@ export async function getBroadMarketData(): Promise<{
     return { movers: { bulls4: [], bears4: [] }, universe: [] };
   }
 }
+
+export async function getEMAIndicators(symbol: string): Promise<{ aboveEma10: boolean; aboveEma20: boolean }> {
+  const cacheKey = `ema_ind_${symbol}`;
+  const cached = getCached<{ aboveEma10: boolean; aboveEma20: boolean }>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const period1 = new Date(Date.now() - 60 * 86400000);
+    const result = await throttledYahooCall(() => yf.chart(symbol, {
+      period1,
+      interval: '1d' as const,
+    }));
+
+    if (!result?.quotes?.length) return { aboveEma10: false, aboveEma20: false };
+
+    const closes = result.quotes
+      .filter((q: any) => q.close != null)
+      .map((q: any) => q.close as number);
+
+    if (closes.length < 20) return { aboveEma10: false, aboveEma20: false };
+
+    const computeEMA = (data: number[], period: number): number => {
+      const sma = data.slice(0, period).reduce((a, b) => a + b, 0) / period;
+      const alpha = 2 / (period + 1);
+      let ema = sma;
+      for (let i = period; i < data.length; i++) {
+        ema = alpha * data[i] + (1 - alpha) * ema;
+      }
+      return ema;
+    };
+
+    const currentPrice = closes[closes.length - 1];
+    const ema10 = computeEMA(closes, 10);
+    const ema20 = computeEMA(closes, 20);
+
+    const indicators = {
+      aboveEma10: currentPrice > ema10,
+      aboveEma20: currentPrice > ema20,
+    };
+
+    setCache(cacheKey, indicators, CACHE_TTL.HISTORY);
+    return indicators;
+  } catch (e: any) {
+    console.error(`EMA calc error for ${symbol}:`, e.message);
+    return { aboveEma10: false, aboveEma20: false };
+  }
+}

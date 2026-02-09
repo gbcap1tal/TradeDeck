@@ -1177,9 +1177,10 @@ export async function registerRoutes(
       const aboveSma20 = sma20Pct > 0;
       const aboveSma50 = sma50Pct > 0;
       const aboveSma200 = sma200Pct > 0;
-      const aboveEma10 = aboveSma20;
-      const aboveEma20 = aboveSma20;
-      const maAlignment = aboveSma20 && aboveSma50 && aboveSma200 && sma20Pct > sma50Pct;
+      const emaIndicators = await yahoo.getEMAIndicators(sym);
+      const aboveEma10 = emaIndicators.aboveEma10;
+      const aboveEma20 = emaIndicators.aboveEma20;
+      const maAlignment = aboveEma10 && aboveEma20 && aboveSma50 && aboveSma200 && sma20Pct > sma50Pct;
 
       let weinsteinStage = 1;
       if (aboveSma200 && aboveSma50) weinsteinStage = 2;
