@@ -1,9 +1,9 @@
 import { useRoute, Link } from "wouter";
 import { Navbar } from "@/components/layout/Navbar";
-import { useStockQuote, useStockQuality, useStockEarnings, useStockNews } from "@/hooks/use-stocks";
+import { useStockQuote, useStockQuality, useStockEarnings, useStockNews, useInsiderBuying } from "@/hooks/use-stocks";
 import { StockChart } from "@/components/stock/StockChart";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Plus, TrendingDown, TrendingUp, Check, X, AlertTriangle, Calendar, Newspaper, Flame, Zap } from "lucide-react";
+import { ChevronRight, Plus, TrendingDown, TrendingUp, Check, X, AlertTriangle, Calendar, Newspaper, Flame, Zap, Info, Building2 } from "lucide-react";
 import { useAddToWatchlist, useWatchlists } from "@/hooks/use-watchlists";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 
 function formatLargeNumber(n: number): string {
   if (Math.abs(n) >= 1e12) return `$${(n / 1e12).toFixed(1)}T`;
@@ -47,6 +48,93 @@ function QualityRow({ label, value, color }: { label: string; value: string; col
     <div className="flex items-center justify-between py-[3px]">
       <span className="text-[12px] text-white/50">{label}</span>
       <span className={cn("text-[12px] font-mono-nums font-medium", color || "text-white/80")}>{value}</span>
+    </div>
+  );
+}
+
+function SmartMoneyIndicator({ symbol }: { symbol: string }) {
+  const { data, isLoading } = useInsiderBuying(symbol);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-between py-[3px]">
+        <span className="text-[12px] text-white/50">Smart Money</span>
+        <span className="text-[11px] text-white/30">...</span>
+      </div>
+    );
+  }
+
+  if (!data || !data.hasBuying) {
+    return (
+      <div className="flex items-center justify-between py-[3px]">
+        <span className="text-[12px] text-white/50">Smart Money</span>
+        <X className="w-3.5 h-3.5 text-[#ff453a]/60" />
+      </div>
+    );
+  }
+
+  const transactions = data.transactions || [];
+  const hasFundBuying = transactions.some((t: any) => t.isFund);
+
+  const formatVal = (v: number) => {
+    if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
+    if (v >= 1e3) return `$${(v / 1e3).toFixed(0)}K`;
+    return `$${v.toLocaleString()}`;
+  };
+
+  return (
+    <div className="flex items-center justify-between py-[3px]">
+      <span className="text-[12px] text-white/50">Smart Money</span>
+      <div className="flex items-center gap-1.5">
+        <Check className="w-3.5 h-3.5 text-[#30d158]" />
+        {hasFundBuying && (
+          <Building2 className="w-3 h-3 text-[#0a84ff]" data-testid="icon-fund-buying" />
+        )}
+        <Popover>
+          <PopoverTrigger asChild>
+            <button className="p-0 bg-transparent border-0 cursor-pointer" data-testid="button-smart-money-info">
+              <Info className="w-3.5 h-3.5 text-white/40 hover:text-white/70 transition-colors" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            side="left"
+            align="start"
+            className="w-80 p-0 bg-[#1a1a1a] border-white/10"
+            data-testid="popover-insider-transactions"
+          >
+            <div className="p-3 border-b border-white/[0.06]">
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] font-semibold text-white/90">Insider Buying (12M)</span>
+                <span className="text-[11px] text-white/40">{transactions.length} transaction{transactions.length !== 1 ? 's' : ''}</span>
+              </div>
+            </div>
+            <div className="max-h-[240px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+              {transactions.map((tx: any, i: number) => (
+                <div
+                  key={i}
+                  className="px-3 py-2 border-b border-white/[0.04] last:border-0"
+                  data-testid={`insider-tx-${i}`}
+                >
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    {tx.isFund && <Building2 className="w-3 h-3 text-[#0a84ff] flex-shrink-0" />}
+                    <span className="text-[12px] font-medium text-white/80 truncate">{tx.owner}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-white/40">{tx.relationship || 'Officer'}</span>
+                    <span className="text-[11px] text-white/40">{tx.date}</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-0.5">
+                    <span className="text-[11px] font-mono-nums text-[#30d158]">
+                      {tx.shares.toLocaleString()} shares @ ${tx.cost.toFixed(2)}
+                    </span>
+                    <span className="text-[11px] font-mono-nums text-white/60">{formatVal(tx.value)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
     </div>
   );
 }
@@ -107,6 +195,7 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
               color={quality.details.shortPercentOfFloat >= 20 ? "text-[#ff453a]" : quality.details.shortPercentOfFloat >= 10 ? "text-[#ffd60a]" : "text-white/80"}
             />
           )}
+          <SmartMoneyIndicator symbol={symbol} />
           <div className="mt-1 pt-1 border-t border-white/[0.06]">
             <div className="flex items-center justify-between py-[3px]">
               <div className="flex items-center gap-1.5">

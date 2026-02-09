@@ -66,6 +66,18 @@ export function useStockNews(symbol: string) {
   });
 }
 
+export function useInsiderBuying(symbol: string) {
+  return useQuery({
+    queryKey: ['/api/stocks', symbol, 'insider-buying'],
+    queryFn: async () => {
+      const res = await fetch(`/api/stocks/${symbol}/insider-buying`, { credentials: "include" });
+      if (!res.ok) return { transactions: [], hasBuying: false };
+      return res.json();
+    },
+    enabled: !!symbol,
+  });
+}
+
 export function useStockSnapshot(symbol: string) {
   return useQuery({
     queryKey: ['/api/stocks', symbol, 'snapshot'],

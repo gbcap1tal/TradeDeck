@@ -7,7 +7,7 @@ import * as yahoo from "./api/yahoo";
 import * as fmp from "./api/fmp";
 import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
-import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, scrapeIndustryRS, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote } from "./api/finviz";
+import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, scrapeIndustryRS, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe } from "./api/breadth";
 import { getRSScore, getCachedRS } from "./api/rs";
 import { sendAlert, clearFailures } from "./api/alerts";
@@ -1319,6 +1319,19 @@ export async function registerRoutes(
     } catch (e: any) {
       console.error(`Quality error for ${symbol}:`, e.message);
       return res.json(defaultResponse);
+    }
+  });
+
+  app.get('/api/stocks/:symbol/insider-buying', async (req, res) => {
+    const { symbol } = req.params;
+    const sym = symbol.toUpperCase();
+
+    try {
+      const transactions = await scrapeFinvizInsiderBuying(sym);
+      return res.json({ transactions, hasBuying: transactions.length > 0 });
+    } catch (e: any) {
+      console.error(`Insider buying error for ${symbol}:`, e.message);
+      return res.json({ transactions: [], hasBuying: false });
     }
   });
 

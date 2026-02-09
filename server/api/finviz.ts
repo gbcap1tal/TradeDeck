@@ -794,6 +794,112 @@ export async function scrapeFinvizQuote(symbol: string): Promise<FinvizQuoteData
   }
 }
 
+export interface InsiderTransaction {
+  owner: string;
+  relationship: string;
+  date: string;
+  transaction: string;
+  cost: number;
+  shares: number;
+  value: number;
+  sharesTotal: number;
+  isFund: boolean;
+}
+
+const INSIDER_CACHE_TTL = 21600;
+
+export async function scrapeFinvizInsiderBuying(symbol: string): Promise<InsiderTransaction[]> {
+  const cacheKey = `finviz_insider_buying_${symbol}`;
+  const cached = getCached<InsiderTransaction[]>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const url = `https://finviz.com/insidertrading.ashx?tc=1&t=${encodeURIComponent(symbol)}`;
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': USER_AGENT,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Connection': 'keep-alive',
+      },
+      redirect: 'follow',
+    });
+    if (!response.ok) return [];
+    const html = await response.text();
+    if (!html) return [];
+
+    const $ = cheerio.load(html);
+    const transactions: InsiderTransaction[] = [];
+    const now = new Date();
+    const oneYearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+
+    $('tr.fv-insider-row').each((_, row) => {
+      const cells = $(row).find('td');
+      if (cells.length < 10) return;
+
+      const ticker = cells.eq(0).find('a').first().text().trim().toUpperCase();
+      if (ticker !== symbol.toUpperCase()) return;
+
+      const owner = cells.eq(1).find('a').first().text().trim() || cells.eq(1).text().trim();
+      const relationship = cells.eq(2).text().trim();
+      const dateStr = cells.eq(3).text().trim();
+      const txType = cells.eq(4).text().trim();
+
+      if (txType !== 'Buy') return;
+
+      const dateMatch = dateStr.match(/([A-Za-z]+)\s+(\d{1,2})\s+'(\d{2})/);
+      if (!dateMatch) return;
+
+      const [, mon, day, yr] = dateMatch;
+      const fullYear = 2000 + parseInt(yr);
+      const txDate = new Date(`${mon} ${day}, ${fullYear}`);
+      if (isNaN(txDate.getTime()) || txDate < oneYearAgo) return;
+
+      const costStr = cells.eq(5).text().trim().replace(/[$,]/g, '');
+      const sharesStr = cells.eq(6).text().trim().replace(/,/g, '');
+      const valueStr = cells.eq(7).text().trim().replace(/[$,]/g, '');
+      const sharesTotalStr = cells.eq(8).text().trim().replace(/,/g, '');
+
+      const cost = parseFloat(costStr) || 0;
+      const shares = parseInt(sharesStr) || 0;
+      const value = parseInt(valueStr) || 0;
+      const sharesTotal = parseInt(sharesTotalStr) || 0;
+
+      const relLower = relationship.toLowerCase();
+      const ownerLower = owner.toLowerCase();
+      const isFund = relLower.includes('10% owner') ||
+                     relLower.includes('beneficial owner') ||
+                     ownerLower.includes('inc.') ||
+                     ownerLower.includes('llc') ||
+                     ownerLower.includes('corp') ||
+                     ownerLower.includes('fund') ||
+                     ownerLower.includes('capital') ||
+                     ownerLower.includes('partners') ||
+                     ownerLower.includes('management') ||
+                     ownerLower.includes('holdings') ||
+                     ownerLower.includes('investment');
+
+      transactions.push({
+        owner,
+        relationship,
+        date: `${mon} ${day} '${yr}`,
+        transaction: txType,
+        cost,
+        shares,
+        value,
+        sharesTotal,
+        isFund,
+      });
+    });
+
+    setCache(cacheKey, transactions, INSIDER_CACHE_TTL);
+    return transactions;
+  } catch (e: any) {
+    console.error(`[finviz] Insider buying scrape error for ${symbol}: ${e.message}`);
+    return [];
+  }
+}
+
 export function getAllIndustriesWithStockCount(): Array<{ name: string; sector: string; stockCount: number }> {
   const data = getFinvizDataSync();
   if (!data) return [];
