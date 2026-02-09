@@ -1,7 +1,10 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { useQuery } from "@tanstack/react-query";
-import { Newspaper, Clock, TrendingUp, AlertCircle } from "lucide-react";
+import { Newspaper, Clock, TrendingUp, AlertCircle, Search, X } from "lucide-react";
 import { useLocation } from "wouter";
+import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 interface DailyDigest {
   headline: string;
@@ -136,9 +139,19 @@ export default function News() {
     refetchInterval: 300000,
   });
 
+  const [premarketSearch, setPremarketSearch] = useState('');
+
   const goToStock = (symbol: string) => {
     setLocation(`/stocks/${symbol}`);
   };
+
+  const filteredEntries = premarket?.entries?.filter(entry => {
+    if (!premarketSearch.trim()) return true;
+    const q = premarketSearch.trim().toUpperCase();
+    return entry.ticker?.toUpperCase().includes(q) ||
+      entry.headline?.toUpperCase().includes(q) ||
+      entry.body?.toUpperCase().includes(q);
+  }) || [];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -215,6 +228,32 @@ export default function News() {
                   </span>
                 )}
               </div>
+              <div className="relative mb-3">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 z-10" />
+                <Input
+                  placeholder="Filter by ticker or keyword..."
+                  className="pl-8 pr-8 h-8 text-[13px] bg-white/5 border-white/10 text-white placeholder:text-white/30 focus-visible:ring-white/20"
+                  value={premarketSearch}
+                  onChange={(e) => setPremarketSearch(e.target.value)}
+                  data-testid="input-premarket-search"
+                />
+                {premarketSearch && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+                    onClick={() => setPremarketSearch('')}
+                    data-testid="button-clear-premarket-search"
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                )}
+              </div>
+              {premarketSearch && premarket && premarket.entries.length > 0 && (
+                <div className="text-[11px] text-white/30 mb-2 font-mono" data-testid="text-premarket-filter-count">
+                  {filteredEntries.length} of {premarket.entries.length} entries
+                </div>
+              )}
               <div
                 className="glass-card rounded-xl p-4 flex-1 max-h-[700px] overflow-y-auto custom-scrollbar"
                 data-testid="card-premarket-briefing"
@@ -231,7 +270,12 @@ export default function News() {
                   </div>
                 ) : premarket && premarket.entries.length > 0 ? (
                   <div className="space-y-1">
-                    {premarket.entries.map((entry, i) => {
+                    {filteredEntries.length === 0 && premarketSearch ? (
+                      <div className="flex flex-col items-center justify-center py-8 text-white/20">
+                        <Search className="w-6 h-6 mb-2" />
+                        <p className="text-[12px]">No results for "{premarketSearch}"</p>
+                      </div>
+                    ) : filteredEntries.map((entry, i) => {
                       const isSummary = ['BONDX', 'SCANX', 'SUMRX'].includes(entry.ticker);
                       const typeLabel = getEntryTypeLabel(entry.ticker);
 
