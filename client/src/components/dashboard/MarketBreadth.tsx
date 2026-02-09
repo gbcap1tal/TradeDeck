@@ -43,10 +43,10 @@ function ScoreRing({ score, label }: { score: number; label: string }) {
           transform="rotate(-90 64 64)"
           style={{ transition: 'stroke-dashoffset 1s ease-out', filter: `drop-shadow(0 0 8px ${color}40)` }}
         />
-        <text x="64" y="58" textAnchor="middle" dominantBaseline="central" fill="white" fontSize="32" fontWeight="600" fontFamily="var(--font-mono)">
+        <text x="64" y="59" textAnchor="middle" dominantBaseline="central" fill="white" fontSize="30" fontWeight="600" fontFamily="var(--font-mono)">
           {score}
         </text>
-        <text x="64" y="78" textAnchor="middle" dominantBaseline="central" fill="white" fillOpacity="0.2" fontSize="9" fontWeight="500" letterSpacing="1">
+        <text x="64" y="77" textAnchor="middle" dominantBaseline="central" fill="white" fillOpacity="0.25" fontSize="12" fontWeight="500" letterSpacing="0.5">
           / 100
         </text>
       </svg>
