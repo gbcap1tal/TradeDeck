@@ -948,151 +948,155 @@ export async function registerRoutes(
     const { symbol } = req.params;
     const sym = symbol.toUpperCase();
 
+    const defaultResponse = {
+      details: { marketCap: '', floatShares: '', rsVsSpy: 0, rsTimeframe: 'current', adr: '', instOwnership: '', numInstitutions: 0, avgVolume50d: '', shortInterest: '', shortRatio: '', shortPercentOfFloat: '', nextEarningsDate: '', daysToEarnings: 0, volatility: '', relVolume: '', volume: '', avgVolume: '', beta: '' },
+      fundamentals: { epsQoQ: '', salesQoQ: '', epsYoY: '', salesYoY: '', earningsAcceleration: false, salesGrowth1Y: '', epsThisY: '', epsNextY: '', epsNext5Y: '', epsPast5Y: '', salesPast5Y: '' },
+      profitability: { epsTTM: '', peTTM: '', forwardPE: '', peg: '', pS: '', pB: '', pC: '', pFCF: '', evEbitda: '', evSales: '', roa: '', roe: '', roic: '', grossMargin: '', operMargin: '', profitMargin: '' },
+      trend: { weinsteinStage: 1, aboveSma20: false, aboveSma50: false, aboveSma200: false, maAlignment: false, distFromSma50: '', sma20: '', sma50: '', sma200: '', rsi: '', atr: '', overextensionFlag: '<4', atrMultiple: 0 },
+    };
+
     try {
-      const [summary, quote, incomeData, cashflowData] = await Promise.allSettled([
-        yahoo.getStockSummary(sym),
-        yahoo.getQuote(sym),
-        fmp.getIncomeStatement(sym, 'quarter', 5),
-        fmp.getCashFlowStatement(sym),
-      ]);
-
-      const sum = summary.status === 'fulfilled' ? summary.value : null;
-      const q = quote.status === 'fulfilled' ? quote.value : null;
-      const income = incomeData.status === 'fulfilled' ? incomeData.value : null;
-      const cf = cashflowData.status === 'fulfilled' ? cashflowData.value : null;
-
-      const price = q?.price ?? 0;
-      const prevClose = q?.prevClose ?? price;
-      const marketCap = q?.marketCap ?? 0;
-
-      let epsQoQ = 0, salesQoQ = 0, epsYoY = 0, salesYoY = 0;
-      let earningsAcceleration = false;
-      let salesGrowth1Y = 0;
-      let epsTTM = 0;
-
-      if (income && income.length >= 2) {
-        const sorted = [...income].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        const latest = sorted[0];
-        const prev = sorted[1];
-
-        if (latest && prev) {
-          epsQoQ = prev.epsDiluted ? Math.round(((latest.epsDiluted - prev.epsDiluted) / Math.abs(prev.epsDiluted)) * 100 * 10) / 10 : 0;
-          salesQoQ = prev.revenue ? Math.round(((latest.revenue - prev.revenue) / Math.abs(prev.revenue)) * 100 * 10) / 10 : 0;
-        }
-
-        if (sorted.length >= 5) {
-          const yearAgo = sorted[4];
-          epsYoY = yearAgo?.epsDiluted ? Math.round(((sorted[0].epsDiluted - yearAgo.epsDiluted) / Math.abs(yearAgo.epsDiluted)) * 100 * 10) / 10 : 0;
-          salesYoY = yearAgo?.revenue ? Math.round(((sorted[0].revenue - yearAgo.revenue) / Math.abs(yearAgo.revenue)) * 100 * 10) / 10 : 0;
-        }
-
-        const recentGrowths = [];
-        for (let i = 0; i < Math.min(4, sorted.length - 1); i++) {
-          if (sorted[i + 1].epsDiluted && sorted[i + 1].epsDiluted !== 0) {
-            recentGrowths.push((sorted[i].epsDiluted - sorted[i + 1].epsDiluted) / Math.abs(sorted[i + 1].epsDiluted));
-          }
-        }
-        if (recentGrowths.length >= 2) {
-          earningsAcceleration = recentGrowths[0] > recentGrowths[1];
-        }
-
-        if (sorted.length >= 5) {
-          const recentRevenue = sorted[0].revenue;
-          const yearAgoRevenue = sorted[4]?.revenue;
-          salesGrowth1Y = yearAgoRevenue ? Math.round(((recentRevenue - yearAgoRevenue) / Math.abs(yearAgoRevenue)) * 100 * 10) / 10 : 0;
-        }
-
-        epsTTM = sorted.slice(0, 4).reduce((acc: number, s: any) => acc + (s.epsDiluted || 0), 0);
-        epsTTM = Math.round(epsTTM * 100) / 100;
+      const snap = await scrapeFinvizQuote(sym);
+      if (!snap || !snap.snapshot || Object.keys(snap.snapshot).length === 0) {
+        return res.json(defaultResponse);
       }
 
-      let fcfTTM = 0;
-      if (cf && cf.length > 0) {
-        fcfTTM = cf.slice(0, 4).reduce((acc: number, s: any) => acc + (s.freeCashFlow || 0), 0);
-      }
+      const s = snap.snapshot;
 
-      const sma50 = price * (1 + (seededRandom(sym + 'sma50') - 0.45) * 0.1);
-      const sma200 = price * (1 + (seededRandom(sym + 'sma200') - 0.4) * 0.15);
-      const ema10 = price * (1 + (seededRandom(sym + 'ema10') - 0.55) * 0.04);
-      const ema20 = price * (1 + (seededRandom(sym + 'ema20') - 0.5) * 0.06);
+      const parsePercent = (val: string | undefined): number => {
+        if (!val) return 0;
+        return parseFloat(val.replace('%', '')) || 0;
+      };
 
-      const aboveEma10 = price > ema10;
-      const aboveEma20 = price > ema20;
-      const aboveSma50 = price > sma50;
-      const aboveSma200 = price > sma200;
-      const maAlignment = ema10 > ema20 && ema20 > sma50 && sma50 > sma200;
-      const distFromSma50 = Math.round(((price - sma50) / sma50) * 100 * 100) / 100;
+      const parseNum = (val: string | undefined): number => {
+        if (!val) return 0;
+        const cleaned = val.replace(/[,%$BMK]/g, '');
+        return parseFloat(cleaned) || 0;
+      };
+
+      const parseMarketVal = (val: string | undefined): string => {
+        if (!val || val === '-') return '0';
+        return val;
+      };
+
+      const sma20Pct = parsePercent(s['SMA20']);
+      const sma50Pct = parsePercent(s['SMA50']);
+      const sma200Pct = parsePercent(s['SMA200']);
+      const aboveSma20 = sma20Pct > 0;
+      const aboveSma50 = sma50Pct > 0;
+      const aboveSma200 = sma200Pct > 0;
+      const maAlignment = aboveSma20 && aboveSma50 && aboveSma200 && sma20Pct > sma50Pct;
 
       let weinsteinStage = 1;
-      if (price > sma200 && price > sma50) weinsteinStage = 2;
-      else if (price < sma200 && price < sma50) weinsteinStage = 4;
-      else if (price < sma50) weinsteinStage = 3;
+      if (aboveSma200 && aboveSma50) weinsteinStage = 2;
+      else if (!aboveSma200 && !aboveSma50) weinsteinStage = 4;
+      else if (!aboveSma50) weinsteinStage = 3;
 
-      const high = q?.high ?? 0;
-      const low = q?.low ?? 0;
-      const adr = (high > 0 && low > 0 && price > 0) ? Math.round((Math.abs(high - low) / price) * 100 * 100) / 100 : 2.5;
-      const atrMultiple = Math.round((1 + seededRandom(sym + 'atr') * 8) * 10) / 10;
+      const atr = parseNum(s['ATR (14)']);
+      const price = parseNum(s['Price']);
+      const atrMultiple = (price > 0 && atr > 0) ? Math.round((Math.abs(sma50Pct / 100 * price) / atr) * 10) / 10 : 0;
       let overextensionFlag: string;
       if (atrMultiple < 4) overextensionFlag = '<4';
       else if (atrMultiple <= 6) overextensionFlag = '4-6';
       else overextensionFlag = '>=7';
 
       let daysToEarnings = 0;
-      let nextEarningsDate = '';
-      if (sum?.earningsDate) {
-        const ed = new Date(sum.earningsDate);
-        daysToEarnings = Math.max(0, Math.ceil((ed.getTime() - Date.now()) / 86400000));
-        nextEarningsDate = sum.earningsDate;
+      let nextEarningsDate = s['Earnings'] || '';
+      if (nextEarningsDate && nextEarningsDate !== '-') {
+        const parts = nextEarningsDate.split(' ');
+        if (parts.length >= 2) {
+          const earningsDateStr = parts.slice(0, 2).join(' ');
+          const currentYear = new Date().getFullYear();
+          const ed = new Date(`${earningsDateStr}, ${currentYear}`);
+          if (ed.getTime() < Date.now() - 86400000 * 30) {
+            ed.setFullYear(currentYear + 1);
+          }
+          if (!isNaN(ed.getTime())) {
+            daysToEarnings = Math.max(0, Math.ceil((ed.getTime() - Date.now()) / 86400000));
+          }
+        }
       }
+
+      const epsQoQVal = s['EPS Q/Q'] || '0%';
+      const salesQoQVal = s['Sales Q/Q'] || '0%';
+      const epsYoYVal = s['EPS Y/Y TTM'] || '0%';
+      const salesYoYVal = s['Sales Y/Y TTM'] || '0%';
+
+      const epsQoQNum = parsePercent(epsQoQVal);
+      const prevEpsQoQ = parsePercent(s['EPS this Y']);
+      const earningsAcceleration = epsQoQNum > prevEpsQoQ;
 
       return res.json({
         details: {
-          marketCap,
-          floatShares: sum?.floatShares ?? 0,
+          marketCap: parseMarketVal(s['Market Cap']),
+          floatShares: parseMarketVal(s['Shs Float']),
           rsVsSpy: 0,
           rsTimeframe: req.query.rsTimeframe || 'current',
-          adr,
-          instOwnership: sum?.institutionPercentHeld ?? 0,
-          numInstitutions: sum?.numberOfInstitutions ?? 0,
-          avgVolume50d: sum?.avgVolume50d ?? q?.avgVolume ?? 0,
-          shortInterest: sum?.shortInterest ?? 0,
-          shortRatio: sum?.shortRatio ?? 0,
-          shortPercentOfFloat: sum?.shortPercentOfFloat ?? 0,
+          adr: s['Volatility'] || '',
+          instOwnership: s['Inst Own'] || '0%',
+          numInstitutions: 0,
+          avgVolume50d: parseMarketVal(s['Avg Volume']),
+          shortInterest: parseMarketVal(s['Short Interest']),
+          shortRatio: s['Short Ratio'] || '',
+          shortPercentOfFloat: s['Short Float'] || '',
           nextEarningsDate,
           daysToEarnings,
+          volatility: s['Volatility'] || '',
+          relVolume: s['Rel Volume'] || '',
+          volume: s['Volume'] || '',
+          avgVolume: s['Avg Volume'] || '',
+          beta: s['Beta'] || '',
         },
         fundamentals: {
-          epsQoQ,
-          salesQoQ,
-          epsYoY,
-          salesYoY,
+          epsQoQ: epsQoQVal,
+          salesQoQ: salesQoQVal,
+          epsYoY: epsYoYVal,
+          salesYoY: salesYoYVal,
           earningsAcceleration,
-          salesGrowth1Y,
+          salesGrowth1Y: salesYoYVal,
+          epsThisY: s['EPS this Y'] || '',
+          epsNextY: s['EPS next Y'] || '',
+          epsNext5Y: s['EPS next 5Y'] || '',
+          epsPast5Y: s['EPS past 3/5Y'] || '',
+          salesPast5Y: s['Sales past 3/5Y'] || '',
         },
         profitability: {
-          epsTTM,
-          fcfTTM,
+          epsTTM: s['EPS (ttm)'] || '',
+          peTTM: s['P/E'] || '',
+          forwardPE: s['Forward P/E'] || '',
+          peg: s['PEG'] || '',
+          pS: s['P/S'] || '',
+          pB: s['P/B'] || '',
+          pC: s['P/C'] || '',
+          pFCF: s['P/FCF'] || '',
+          evEbitda: s['EV/EBITDA'] || '',
+          evSales: s['EV/Sales'] || '',
+          roa: s['ROA'] || '',
+          roe: s['ROE'] || '',
+          roic: s['ROIC'] || '',
+          grossMargin: s['Gross Margin'] || '',
+          operMargin: s['Oper. Margin'] || '',
+          profitMargin: s['Profit Margin'] || '',
         },
         trend: {
           weinsteinStage,
-          aboveEma10,
-          aboveEma20,
+          aboveSma20,
           aboveSma50,
           aboveSma200,
           maAlignment,
-          distFromSma50,
+          distFromSma50: s['SMA50'] || '',
+          sma20: s['SMA20'] || '',
+          sma50: s['SMA50'] || '',
+          sma200: s['SMA200'] || '',
+          rsi: s['RSI (14)'] || '',
+          atr: s['ATR (14)'] || '',
           overextensionFlag,
           atrMultiple,
         },
       });
     } catch (e: any) {
       console.error(`Quality error for ${symbol}:`, e.message);
-      return res.json({
-        details: { marketCap: 0, floatShares: 0, rsVsSpy: 0, rsTimeframe: 'current', adr: 0, instOwnership: 0, numInstitutions: 0, avgVolume50d: 0, shortInterest: 0, shortRatio: 0, shortPercentOfFloat: 0, nextEarningsDate: '', daysToEarnings: 0 },
-        fundamentals: { epsQoQ: 0, salesQoQ: 0, epsYoY: 0, salesYoY: 0, earningsAcceleration: false, salesGrowth1Y: 0 },
-        profitability: { epsTTM: 0, fcfTTM: 0 },
-        trend: { weinsteinStage: 1, aboveEma10: false, aboveEma20: false, aboveSma50: false, aboveSma200: false, maAlignment: false, distFromSma50: 0, overextensionFlag: '<4', atrMultiple: 0 },
-      });
+      return res.json(defaultResponse);
     }
   });
 

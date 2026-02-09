@@ -1,6 +1,6 @@
 import { useRoute, Link } from "wouter";
 import { Navbar } from "@/components/layout/Navbar";
-import { useStockQuote, useStockQuality, useStockEarnings, useStockNews, useStockSnapshot } from "@/hooks/use-stocks";
+import { useStockQuote, useStockQuality, useStockEarnings, useStockNews } from "@/hooks/use-stocks";
 import { StockChart } from "@/components/stock/StockChart";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, Plus, TrendingDown, TrendingUp, Check, X, AlertTriangle, Calendar, Newspaper } from "lucide-react";
@@ -51,63 +51,21 @@ function QualityRow({ label, value, color }: { label: string; value: string; col
   );
 }
 
-function SnapshotTable({ symbol }: { symbol: string }) {
-  const { data: snapshot, isLoading } = useStockSnapshot(symbol);
+function pctColor(val: string): string {
+  if (!val || val === '-' || val === '') return 'text-white/60';
+  const num = parseFloat(val.replace('%', ''));
+  if (isNaN(num)) return 'text-white/60';
+  if (num >= 25) return 'text-[#30d158]';
+  if (num > 0) return 'text-[#30d158]/70';
+  if (num === 0) return 'text-white/60';
+  return 'text-[#ff453a]/80';
+}
 
-  if (isLoading) return <div className="glass-card rounded-xl shimmer h-20" />;
-  if (!snapshot || Object.keys(snapshot).length === 0) return null;
-
-  const layout: Array<[string, string, string, string, string, string]> = [
-    ['P/E', 'Forward P/E', 'PEG', 'EPS (ttm)', 'EPS next Y', 'EPS next Q'],
-    ['Market Cap', 'Enterprise Value', 'Income', 'Sales', 'Book/sh', 'Cash/sh'],
-    ['P/S', 'P/B', 'P/C', 'P/FCF', 'EV/EBITDA', 'EV/Sales'],
-    ['ROA', 'ROE', 'ROIC', 'Gross Margin', 'Oper. Margin', 'Profit Margin'],
-    ['Inst Own', 'Insider Own', 'Short Float', 'Short Ratio', 'Short Interest', 'Shs Outstand'],
-    ['Perf Week', 'Perf Month', 'Perf Quarter', 'Perf Half Y', 'Perf YTD', 'Perf Year'],
-    ['SMA20', 'SMA50', 'SMA200', 'RSI (14)', 'Beta', 'ATR (14)'],
-    ['52W High', '52W Low', 'Volatility', 'Rel Volume', 'Avg Volume', 'Volume'],
-    ['Dividend Est.', 'Dividend TTM', 'Earnings', 'Target Price', 'Recom', 'Employees'],
-  ];
-
-  const colorValue = (label: string, val: string): string => {
-    if (!val || val === '-') return 'text-white/60';
-    const isPerf = label.startsWith('Perf') || label.startsWith('SMA');
-    if (isPerf) {
-      const num = parseFloat(val);
-      if (!isNaN(num)) return num >= 0 ? 'text-[#30d158]' : 'text-[#ff453a]';
-    }
-    if (label === 'RSI (14)') {
-      const num = parseFloat(val);
-      if (!isNaN(num)) {
-        if (num >= 70) return 'text-[#ff453a]';
-        if (num <= 30) return 'text-[#30d158]';
-      }
-    }
-    return 'text-white/80';
-  };
-
-  return (
-    <div className="glass-card rounded-xl px-3 py-2.5" data-testid="card-snapshot">
-      <h2 className="text-[13px] font-semibold text-white/90 mb-2 tracking-wide">Snapshot</h2>
-      <div className="space-y-0">
-        {layout.map((row, ri) => (
-          <div key={ri} className="grid grid-cols-6 gap-x-2 border-b border-white/[0.04] last:border-0">
-            {row.map((label) => {
-              const val = snapshot[label] || '-';
-              return (
-                <div key={label} className="py-[3px] min-w-0 overflow-hidden">
-                  <div className="text-[8px] text-white/30 truncate leading-tight">{label}</div>
-                  <div className={cn("text-[10px] font-mono-nums font-medium truncate leading-tight", colorValue(label, val))} data-testid={`snapshot-${label.replace(/[^a-zA-Z0-9]/g, '-')}`}>
-                    {val}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+function smaColor(val: string): string {
+  if (!val || val === '-') return 'text-white/60';
+  const num = parseFloat(val.replace('%', ''));
+  if (isNaN(num)) return 'text-white/60';
+  return num >= 0 ? 'text-[#30d158]' : 'text-[#ff453a]';
 }
 
 function StockQualityPanel({ symbol }: { symbol: string }) {
@@ -137,22 +95,22 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
       <div className="flex-1 min-h-0 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
         <div className="mb-2">
           <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Details</div>
-          <QualityRow label="Market Cap" value={formatLargeNumber(quality.details.marketCap)} />
-          <QualityRow label="Float" value={formatVolume(quality.details.floatShares)} />
+          <QualityRow label="Market Cap" value={quality.details.marketCap || '-'} />
+          <QualityRow label="Float" value={quality.details.floatShares || '-'} />
           <QualityRow
             label="RS vs SPY"
-            value={quality.details.rsVsSpy.toString()}
+            value={quality.details.rsVsSpy?.toString() || '0'}
             color={quality.details.rsVsSpy >= 80 ? "text-[#30d158]" : quality.details.rsVsSpy >= 50 ? "text-white/80" : "text-[#ff453a]/80"}
           />
-          <QualityRow label="ADR %" value={`${quality.details.adr}%`} />
-          <QualityRow label="Inst. Own" value={`${quality.details.instOwnership}%`} />
-          <QualityRow label="# Inst." value={quality.details.numInstitutions.toLocaleString()} />
-          <QualityRow label="Avg Vol 50D" value={formatVolume(quality.details.avgVolume50d)} />
-          {quality.details.shortInterest > 0 && (
+          <QualityRow label="Volatility" value={quality.details.volatility || quality.details.adr || '-'} />
+          <QualityRow label="Inst. Own" value={quality.details.instOwnership || '-'} />
+          <QualityRow label="Avg Volume" value={quality.details.avgVolume50d || '-'} />
+          <QualityRow label="Rel Volume" value={quality.details.relVolume || '-'} />
+          <QualityRow label="Beta" value={quality.details.beta || '-'} />
+          {quality.details.shortInterest && quality.details.shortInterest !== '0' && (
             <QualityRow
               label="Short Interest"
-              value={`${formatVolume(quality.details.shortInterest)} (${quality.details.shortPercentOfFloat}%)`}
-              color={quality.details.shortPercentOfFloat >= 20 ? "text-[#ff453a]" : quality.details.shortPercentOfFloat >= 10 ? "text-[#ffd60a]" : "text-white/80"}
+              value={`${quality.details.shortInterest} (${quality.details.shortPercentOfFloat})`}
             />
           )}
           <div className="mt-1 pt-1 border-t border-white/[0.06]">
@@ -161,40 +119,54 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
                 <Calendar className="w-3 h-3 text-white/30" />
                 <span className="text-[12px] text-white/50">Earnings</span>
               </div>
-              <span className="text-[12px] font-mono-nums text-white/80">{quality.details.nextEarningsDate} ({quality.details.daysToEarnings}d)</span>
+              <span className="text-[12px] font-mono-nums text-white/80">
+                {quality.details.nextEarningsDate || '-'}
+                {quality.details.daysToEarnings > 0 && ` (${quality.details.daysToEarnings}d)`}
+              </span>
             </div>
           </div>
         </div>
 
         <div className="mb-2 pt-2 border-t border-white/[0.06]">
           <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Fundamentals</div>
-          <QualityRow label="EPS QoQ" value={`${quality.fundamentals.epsQoQ > 0 ? '+' : ''}${quality.fundamentals.epsQoQ}%`} color={quality.fundamentals.epsQoQ >= 25 ? "text-[#30d158]" : quality.fundamentals.epsQoQ >= 0 ? "text-white/70" : "text-[#ff453a]/80"} />
-          <QualityRow label="Sales QoQ" value={`${quality.fundamentals.salesQoQ > 0 ? '+' : ''}${quality.fundamentals.salesQoQ}%`} color={quality.fundamentals.salesQoQ >= 25 ? "text-[#30d158]" : quality.fundamentals.salesQoQ >= 0 ? "text-white/70" : "text-[#ff453a]/80"} />
-          <QualityRow label="EPS YoY" value={`${quality.fundamentals.epsYoY > 0 ? '+' : ''}${quality.fundamentals.epsYoY}%`} color={quality.fundamentals.epsYoY >= 25 ? "text-[#30d158]" : quality.fundamentals.epsYoY >= 0 ? "text-white/70" : "text-[#ff453a]/80"} />
-          <QualityRow label="Sales YoY" value={`${quality.fundamentals.salesYoY > 0 ? '+' : ''}${quality.fundamentals.salesYoY}%`} color={quality.fundamentals.salesYoY >= 25 ? "text-[#30d158]" : quality.fundamentals.salesYoY >= 0 ? "text-white/70" : "text-[#ff453a]/80"} />
+          <QualityRow label="EPS Q/Q" value={quality.fundamentals.epsQoQ || '-'} color={pctColor(quality.fundamentals.epsQoQ)} />
+          <QualityRow label="Sales Q/Q" value={quality.fundamentals.salesQoQ || '-'} color={pctColor(quality.fundamentals.salesQoQ)} />
+          <QualityRow label="EPS Y/Y TTM" value={quality.fundamentals.epsYoY || '-'} color={pctColor(quality.fundamentals.epsYoY)} />
+          <QualityRow label="Sales Y/Y TTM" value={quality.fundamentals.salesYoY || '-'} color={pctColor(quality.fundamentals.salesYoY)} />
           <BoolIndicator label="Earnings Accel." value={quality.fundamentals.earningsAcceleration} />
-          <QualityRow label="Sales Growth 1Y" value={`${quality.fundamentals.salesGrowth1Y > 0 ? '+' : ''}${quality.fundamentals.salesGrowth1Y}%`} color={quality.fundamentals.salesGrowth1Y >= 20 ? "text-[#30d158]" : quality.fundamentals.salesGrowth1Y >= 0 ? "text-white/70" : "text-[#ff453a]/80"} />
+          <QualityRow label="EPS This Y" value={quality.fundamentals.epsThisY || '-'} color={pctColor(quality.fundamentals.epsThisY)} />
+          <QualityRow label="EPS Next Y" value={quality.fundamentals.epsNextY || '-'} color={pctColor(quality.fundamentals.epsNextY)} />
+          <QualityRow label="EPS Next 5Y" value={quality.fundamentals.epsNext5Y || '-'} color={pctColor(quality.fundamentals.epsNext5Y)} />
         </div>
 
         <div className="mb-2 pt-2 border-t border-white/[0.06]">
           <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Profitability</div>
-          <QualityRow label="EPS TTM" value={`$${Math.abs(quality.profitability.epsTTM).toFixed(2)}`} color={quality.profitability.epsTTM >= 0 ? "text-[#30d158]" : "text-[#ff453a]/80"} />
-          <QualityRow label="FCF TTM" value={formatLargeNumber(Math.abs(quality.profitability.fcfTTM))} color={quality.profitability.fcfTTM >= 0 ? "text-[#30d158]" : "text-[#ff453a]/80"} />
+          <QualityRow label="EPS TTM" value={quality.profitability.epsTTM || '-'} color={parseFloat(quality.profitability.epsTTM) >= 0 ? "text-[#30d158]" : "text-[#ff453a]/80"} />
+          <QualityRow label="P/E" value={quality.profitability.peTTM || '-'} />
+          <QualityRow label="Forward P/E" value={quality.profitability.forwardPE || '-'} />
+          <QualityRow label="PEG" value={quality.profitability.peg || '-'} />
+          <QualityRow label="ROA" value={quality.profitability.roa || '-'} color={pctColor(quality.profitability.roa)} />
+          <QualityRow label="ROE" value={quality.profitability.roe || '-'} color={pctColor(quality.profitability.roe)} />
+          <QualityRow label="ROIC" value={quality.profitability.roic || '-'} color={pctColor(quality.profitability.roic)} />
+          <QualityRow label="Gross Margin" value={quality.profitability.grossMargin || '-'} />
+          <QualityRow label="Oper. Margin" value={quality.profitability.operMargin || '-'} />
+          <QualityRow label="Profit Margin" value={quality.profitability.profitMargin || '-'} />
         </div>
 
         <div className="mb-2 pt-2 border-t border-white/[0.06]">
           <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Trend</div>
           <QualityRow label="Weinstein Stage" value={`Stage ${quality.trend.weinsteinStage}`} color={stageColors[quality.trend.weinsteinStage]} />
-          <BoolIndicator label="Price > 10 EMA" value={quality.trend.aboveEma10} />
-          <BoolIndicator label="Price > 20 EMA" value={quality.trend.aboveEma20} />
+          <BoolIndicator label="Price > 20 SMA" value={quality.trend.aboveSma20} />
           <BoolIndicator label="Price > 50 SMA" value={quality.trend.aboveSma50} />
           <BoolIndicator label="Price > 200 SMA" value={quality.trend.aboveSma200} />
           <BoolIndicator label="MA Aligned" value={quality.trend.maAlignment} />
-          <QualityRow
-            label="Dist 50 SMA"
-            value={`${quality.trend.distFromSma50 > 0 ? '+' : ''}${quality.trend.distFromSma50}%`}
-            color={quality.trend.distFromSma50 > 0 ? "text-[#30d158]" : "text-[#ff453a]/80"}
-          />
+          <QualityRow label="SMA 20" value={quality.trend.sma20 || '-'} color={smaColor(quality.trend.sma20)} />
+          <QualityRow label="SMA 50" value={quality.trend.sma50 || '-'} color={smaColor(quality.trend.sma50)} />
+          <QualityRow label="SMA 200" value={quality.trend.sma200 || '-'} color={smaColor(quality.trend.sma200)} />
+          <QualityRow label="RSI (14)" value={quality.trend.rsi || '-'} color={
+            parseFloat(quality.trend.rsi) >= 70 ? "text-[#ff453a]" : parseFloat(quality.trend.rsi) <= 30 ? "text-[#30d158]" : "text-white/80"
+          } />
+          <QualityRow label="ATR (14)" value={quality.trend.atr || '-'} />
           <div className="flex items-center justify-between py-[3px]">
             <span className="text-[12px] text-white/50">Overextension</span>
             <div className="flex items-center gap-1.5">
@@ -288,26 +260,28 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
   const formatRev = (v: number) => `${v.toFixed(1)}B`;
   const formatEps = (v: number) => `$${v.toFixed(2)}`;
 
+  const BAR_MAX_H = 80;
+
   return (
     <div className="glass-card rounded-xl px-4 py-3 h-full flex flex-col" data-testid="card-earnings-sales">
-      <div className="flex items-center justify-between mb-3 flex-shrink-0">
-        <h2 className="text-[13px] font-semibold text-white/90 tracking-wide">Earnings & Revenue</h2>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-3 mr-3">
+      <div className="flex items-center justify-between mb-2 flex-shrink-0 flex-wrap gap-1">
+        <h2 className="text-sm font-semibold text-white/90 tracking-wide">Earnings & Revenue</h2>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-sm bg-white/45" />
-              <span className="text-[9px] text-white/30">Actual</span>
+              <div className="w-2.5 h-2.5 rounded-sm bg-white/40" />
+              <span className="text-[10px] text-white/35">Actual</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-sm border border-dashed border-white/30" />
-              <span className="text-[9px] text-white/30">Estimate</span>
+              <div className="w-2.5 h-2.5 rounded-sm border border-dashed border-white/30" />
+              <span className="text-[10px] text-white/35">Estimate</span>
             </div>
           </div>
           <div className="flex bg-white/[0.06] rounded-md p-0.5">
             <button
               onClick={() => setView('quarterly')}
               className={cn(
-                "text-[9px] px-2 py-0.5 rounded transition-colors font-medium",
+                "text-[10px] px-2.5 py-0.5 rounded transition-colors font-medium",
                 view === 'quarterly' ? "bg-white/10 text-white/80" : "text-white/30 hover:text-white/50"
               )}
               data-testid="button-view-quarterly"
@@ -317,7 +291,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
             <button
               onClick={() => setView('annual')}
               className={cn(
-                "text-[9px] px-2 py-0.5 rounded transition-colors font-medium",
+                "text-[10px] px-2.5 py-0.5 rounded transition-colors font-medium",
                 view === 'annual' ? "bg-white/10 text-white/80" : "text-white/30 hover:text-white/50"
               )}
               data-testid="button-view-annual"
@@ -328,12 +302,12 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col gap-1.5">
+      <div className="flex-1 min-h-0 flex flex-col gap-2">
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex items-center gap-2 mb-1 flex-shrink-0">
-            <span className="text-[10px] text-white/30 uppercase tracking-widest font-semibold">Revenue</span>
+            <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold">Revenue</span>
             {hoveredRevIdx !== null && (
-              <span className="text-[10px] font-mono-nums text-white/50">
+              <span className="text-[11px] font-mono-nums text-white/50">
                 {data[hoveredRevIdx].quarter}: <span className="text-white/80">{formatRev(data[hoveredRevIdx].revenue)}</span>
                 {data[hoveredRevIdx].isEstimate && data[hoveredRevIdx].salesEstimate != null && (
                   <span className="text-white/30"> est.</span>
@@ -346,16 +320,17 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
               </span>
             )}
           </div>
-          <div className="flex-1 min-h-0 flex items-end gap-[2px]" data-testid="bars-revenue">
+          <div className="flex-1 flex items-end gap-[3px]" data-testid="bars-revenue">
             {data.map((d, i) => {
-              const pct = maxRev > 0 ? (Math.abs(d.revenue) / maxRev) * 100 : 0;
+              const pct = maxRev > 0 ? Math.abs(d.revenue) / maxRev : 0;
+              const barH = Math.max(pct * BAR_MAX_H, 4);
               const isHov = hoveredRevIdx === i;
               const growth = d.revenueYoY;
 
               return (
                 <div
                   key={i}
-                  className="flex-1 flex flex-col items-center min-w-0 gap-0"
+                  className="flex-1 flex flex-col items-center justify-end min-w-0"
                   onMouseEnter={() => setHoveredRevIdx(i)}
                   onMouseLeave={() => setHoveredRevIdx(null)}
                   style={{ cursor: 'pointer' }}
@@ -363,29 +338,26 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                 >
                   {growth != null && (
                     <span className={cn(
-                      "text-[7px] font-mono-nums font-semibold leading-none mb-0.5",
+                      "text-[8px] font-mono-nums font-semibold leading-none mb-0.5",
                       growth >= 0 ? "text-[#30d158]/80" : "text-[#ff453a]/80"
                     )}>
                       {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
                     </span>
                   )}
-                  {growth == null && <span className="text-[7px] leading-none mb-0.5">&nbsp;</span>}
-                  <div className="w-full flex-1 min-h-[20px] flex flex-col justify-end">
-                    <div
-                      className="w-full rounded-t-[2px] transition-all duration-150"
-                      style={{
-                        height: `${Math.max(pct, 4)}%`,
-                        minHeight: '4px',
-                        backgroundColor: d.isEstimate
-                          ? (isHov ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.12)')
-                          : (isHov ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.35)'),
-                        border: d.isEstimate ? '1px dashed rgba(255,255,255,0.25)' : 'none',
-                      }}
-                    />
-                  </div>
+                  {growth == null && <span className="text-[8px] leading-none mb-0.5 invisible">0%</span>}
+                  <div
+                    className="w-full rounded-t-[2px] transition-all duration-150"
+                    style={{
+                      height: `${barH}px`,
+                      backgroundColor: d.isEstimate
+                        ? (isHov ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.15)')
+                        : (isHov ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.35)'),
+                      border: d.isEstimate ? '1px dashed rgba(255,255,255,0.25)' : 'none',
+                    }}
+                  />
                   <span className={cn(
-                    "text-[7px] font-mono-nums leading-tight mt-0.5 truncate w-full text-center",
-                    d.isEstimate ? "text-white/20" : "text-white/35"
+                    "text-[8px] font-mono-nums leading-tight mt-1 truncate w-full text-center",
+                    d.isEstimate ? "text-white/25" : "text-white/40"
                   )}>
                     {d.quarter}
                   </span>
@@ -399,9 +371,9 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
 
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex items-center gap-2 mb-1 flex-shrink-0">
-            <span className="text-[10px] text-white/30 uppercase tracking-widest font-semibold">EPS</span>
+            <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold">EPS</span>
             {hoveredEpsIdx !== null && (
-              <span className="text-[10px] font-mono-nums text-white/50">
+              <span className="text-[11px] font-mono-nums text-white/50">
                 {data[hoveredEpsIdx].quarter}: <span className="text-[#FBBB04]">{formatEps(data[hoveredEpsIdx].eps)}</span>
                 {!data[hoveredEpsIdx].isEstimate && data[hoveredEpsIdx].epsEstimate != null && (
                   <span className="text-white/30"> est. {formatEps(data[hoveredEpsIdx].epsEstimate!)}</span>
@@ -422,16 +394,17 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
               </span>
             )}
           </div>
-          <div className="flex-1 min-h-0 flex items-end gap-[2px]" data-testid="bars-eps">
+          <div className="flex-1 flex items-end gap-[3px]" data-testid="bars-eps">
             {data.map((d, i) => {
-              const pct = maxEps > 0 ? (Math.abs(d.eps) / maxEps) * 100 : 0;
+              const pct = maxEps > 0 ? Math.abs(d.eps) / maxEps : 0;
+              const barH = Math.max(pct * BAR_MAX_H, 4);
               const isHov = hoveredEpsIdx === i;
               const growth = d.epsYoY;
 
               return (
                 <div
                   key={i}
-                  className="flex-1 flex flex-col items-center min-w-0 gap-0"
+                  className="flex-1 flex flex-col items-center justify-end min-w-0"
                   onMouseEnter={() => setHoveredEpsIdx(i)}
                   onMouseLeave={() => setHoveredEpsIdx(null)}
                   style={{ cursor: 'pointer' }}
@@ -439,29 +412,26 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                 >
                   {growth != null && (
                     <span className={cn(
-                      "text-[7px] font-mono-nums font-semibold leading-none mb-0.5",
+                      "text-[8px] font-mono-nums font-semibold leading-none mb-0.5",
                       growth >= 0 ? "text-[#30d158]/80" : "text-[#ff453a]/80"
                     )}>
                       {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
                     </span>
                   )}
-                  {growth == null && <span className="text-[7px] leading-none mb-0.5">&nbsp;</span>}
-                  <div className="w-full flex-1 min-h-[20px] flex flex-col justify-end">
-                    <div
-                      className="w-full rounded-t-[2px] transition-all duration-150"
-                      style={{
-                        height: `${Math.max(pct, 4)}%`,
-                        minHeight: '4px',
-                        backgroundColor: d.isEstimate
-                          ? (isHov ? 'rgba(251,187,4,0.35)' : 'rgba(251,187,4,0.12)')
-                          : (isHov ? 'rgba(251,187,4,0.75)' : 'rgba(251,187,4,0.40)'),
-                        border: d.isEstimate ? '1px dashed rgba(251,187,4,0.3)' : 'none',
-                      }}
-                    />
-                  </div>
+                  {growth == null && <span className="text-[8px] leading-none mb-0.5 invisible">0%</span>}
+                  <div
+                    className="w-full rounded-t-[2px] transition-all duration-150"
+                    style={{
+                      height: `${barH}px`,
+                      backgroundColor: d.isEstimate
+                        ? (isHov ? 'rgba(251,187,4,0.30)' : 'rgba(251,187,4,0.15)')
+                        : (isHov ? 'rgba(251,187,4,0.75)' : 'rgba(251,187,4,0.40)'),
+                      border: d.isEstimate ? '1px dashed rgba(251,187,4,0.3)' : 'none',
+                    }}
+                  />
                   <span className={cn(
-                    "text-[7px] font-mono-nums leading-tight mt-0.5 truncate w-full text-center",
-                    d.isEstimate ? "text-white/20" : "text-white/35"
+                    "text-[8px] font-mono-nums leading-tight mt-1 truncate w-full text-center",
+                    d.isEstimate ? "text-white/25" : "text-white/40"
                   )}>
                     {d.quarter}
                   </span>
@@ -550,15 +520,13 @@ export default function StockDetail() {
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-2">
                 <div className="lg:col-span-8 flex flex-col gap-2">
-                  <div className="h-[280px]">
+                  <div className="h-[300px]">
                     <StockChart symbol={symbol} currentPrice={quote.price} compact />
                   </div>
 
-                  <div className="h-[280px]">
+                  <div className="h-[300px]">
                     <EarningsSalesChart symbol={symbol} />
                   </div>
-
-                  <SnapshotTable symbol={symbol} />
                 </div>
 
                 <div className="lg:col-span-4">
