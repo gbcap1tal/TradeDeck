@@ -158,77 +158,78 @@ export default function News() {
       <Navbar />
       <main className="flex-1">
         <div className="max-w-[1400px] mx-auto px-6 py-8">
-          <div className="grid lg:grid-cols-2 gap-6">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <Newspaper className="w-4 h-4 text-[#0a84ff]" />
-                <div className="section-title" data-testid="text-digest-title">Headlines That Matter</div>
-              </div>
-              <div className="glass-card rounded-xl p-6" data-testid="card-daily-digest">
-                {digestLoading ? (
-                  <div className="space-y-4">
-                    <div className="shimmer h-8 w-3/4 rounded" />
-                    <div className="space-y-3">
-                      {[1, 2, 3, 4, 5].map(i => (
-                        <div key={i} className="shimmer h-4 w-full rounded" />
+
+          {/* Headlines That Matter - centered top section */}
+          <div className="mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <Newspaper className="w-4 h-4 text-[#0a84ff]" />
+              <div className="section-title" data-testid="text-digest-title">Headlines That Matter</div>
+              {digest?.timestamp && (
+                <span className="text-[10px] text-white/25 font-mono ml-auto">
+                  {digest.timestamp}
+                </span>
+              )}
+            </div>
+            <div className="glass-card rounded-xl p-6" data-testid="card-daily-digest">
+              {digestLoading ? (
+                <div className="space-y-4 max-w-3xl mx-auto">
+                  <div className="shimmer h-7 w-3/4 rounded" />
+                  <div className="space-y-3">
+                    {[1, 2, 3, 4, 5].map(i => (
+                      <div key={i} className="shimmer h-4 w-full rounded" />
+                    ))}
+                  </div>
+                </div>
+              ) : digest && digest.headline ? (
+                <div className="max-w-3xl mx-auto">
+                  <h2
+                    className="text-[17px] leading-snug font-semibold text-white/90 mb-5"
+                    data-testid="text-digest-headline"
+                  >
+                    {highlightTickers(digest.headline, goToStock)}
+                  </h2>
+                  {digest.bullets.length > 0 && (
+                    <ul className="space-y-3">
+                      {digest.bullets.map((bullet, i) => (
+                        <li key={i} className="flex gap-3" data-testid={`text-digest-bullet-${i}`}>
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#0a84ff]/40 mt-2 flex-shrink-0" />
+                          <span className="text-[13px] text-white/55 leading-relaxed">
+                            {highlightTickers(bullet, goToStock)}
+                          </span>
+                        </li>
                       ))}
-                    </div>
-                  </div>
-                ) : digest && digest.headline ? (
-                  <div>
-                    {digest.timestamp && (
-                      <div className="flex items-center gap-1.5 mb-4">
-                        <Clock className="w-3 h-3 text-white/30" />
-                        <span className="text-[10px] text-white/30 font-mono" data-testid="text-digest-timestamp">
-                          Today, {digest.timestamp}
-                        </span>
-                      </div>
-                    )}
-                    <h2
-                      className="text-[18px] leading-tight font-semibold text-white/90 mb-5"
-                      data-testid="text-digest-headline"
-                    >
+                    </ul>
+                  )}
+                  {digest.bullets.length === 0 && (
+                    <p className="text-[13px] text-white/50 leading-relaxed">
                       {highlightTickers(digest.headline, goToStock)}
-                    </h2>
-                    {digest.bullets.length > 0 && (
-                      <ul className="space-y-3">
-                        {digest.bullets.map((bullet, i) => (
-                          <li key={i} className="flex gap-3" data-testid={`text-digest-bullet-${i}`}>
-                            <span className="w-1.5 h-1.5 rounded-full bg-white/20 mt-2 flex-shrink-0" />
-                            <span className="text-[13px] text-white/60 leading-relaxed">
-                              {highlightTickers(bullet, goToStock)}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {digest.bullets.length === 0 && (
-                      <p className="text-[13px] text-white/50 leading-relaxed">
-                        {highlightTickers(digest.headline, goToStock)}
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-12 text-white/20">
-                    <AlertCircle className="w-8 h-8 mb-3" />
-                    <p className="text-[13px]">Digest not available yet</p>
-                    <p className="text-[11px] mt-1">Check back during market hours</p>
-                  </div>
-                )}
-              </div>
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-white/20">
+                  <AlertCircle className="w-8 h-8 mb-3" />
+                  <p className="text-[13px]">Digest not available yet</p>
+                  <p className="text-[11px] mt-1">Check back during market hours</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Corporate Developments - full width below */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp className="w-4 h-4 text-[#30d158]" />
+              <div className="section-title" data-testid="text-premarket-title">Corporate Developments</div>
+              {premarket?.updated && (
+                <span className="text-[10px] text-white/25 font-mono ml-auto" data-testid="text-premarket-updated">
+                  {premarket.updated}
+                </span>
+              )}
             </div>
 
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 mb-4">
-                <TrendingUp className="w-4 h-4 text-[#30d158]" />
-                <div className="section-title" data-testid="text-premarket-title">Corporate Developments</div>
-                {premarket?.updated && (
-                  <span className="text-[10px] text-white/25 font-mono ml-auto" data-testid="text-premarket-updated">
-                    {premarket.updated}
-                  </span>
-                )}
-              </div>
-              <div className="relative mb-3">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="relative flex-1 max-w-sm">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 z-10" />
                 <Input
                   placeholder="Filter by ticker or keyword..."
@@ -250,108 +251,116 @@ export default function News() {
                 )}
               </div>
               {premarketSearch && premarket && premarket.entries.length > 0 && (
-                <div className="text-[11px] text-white/30 mb-2 font-mono" data-testid="text-premarket-filter-count">
-                  {filteredEntries.length} of {premarket.entries.length} entries
-                </div>
+                <span className="text-[11px] text-white/30 font-mono" data-testid="text-premarket-filter-count">
+                  {filteredEntries.length} of {premarket.entries.length}
+                </span>
               )}
-              <div
-                className="glass-card rounded-xl p-4 flex-1 max-h-[700px] overflow-y-auto custom-scrollbar"
-                data-testid="card-premarket-briefing"
-              >
-                {premarketLoading ? (
-                  <div className="space-y-4">
-                    {[1, 2, 3, 4, 5, 6].map(i => (
-                      <div key={i} className="space-y-2">
-                        <div className="shimmer h-3 w-16 rounded" />
-                        <div className="shimmer h-5 w-3/4 rounded" />
-                        <div className="shimmer h-3 w-full rounded" />
-                      </div>
-                    ))}
-                  </div>
-                ) : premarket && premarket.entries.length > 0 ? (
-                  <div className="space-y-1">
-                    {filteredEntries.length === 0 && premarketSearch ? (
-                      <div className="flex flex-col items-center justify-center py-8 text-white/20">
-                        <Search className="w-6 h-6 mb-2" />
-                        <p className="text-[12px]">No results for "{premarketSearch}"</p>
-                      </div>
-                    ) : filteredEntries.map((entry, i) => {
-                      const isSummary = ['BONDX', 'SCANX', 'SUMRX'].includes(entry.ticker);
-                      const typeLabel = getEntryTypeLabel(entry.ticker);
+            </div>
 
-                      return (
-                        <div
-                          key={i}
-                          className={`p-3 rounded-lg transition-colors ${
-                            isSummary
-                              ? 'bg-white/[0.03] border border-white/[0.04]'
-                              : 'hover:bg-white/[0.02]'
-                          }`}
-                          data-testid={`premarket-entry-${i}`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0 mt-0.5">
-                              <span className="text-[10px] font-mono text-white/25" data-testid={`premarket-time-${i}`}>
-                                {entry.time}
-                              </span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                {entry.ticker && !isSummary && (
-                                  <span
-                                    className="text-[11px] font-bold text-[#0a84ff] cursor-pointer hover:underline"
-                                    onClick={() => goToStock(entry.ticker)}
-                                    data-testid={`premarket-ticker-${entry.ticker}`}
-                                  >
-                                    {entry.ticker}
-                                  </span>
-                                )}
-                                {typeLabel && (
-                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.06] text-white/40 font-semibold uppercase tracking-wider">
-                                    {typeLabel}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[12px] text-white/70 leading-relaxed" data-testid={`premarket-headline-${i}`}>
-                                {highlightTickers(entry.headline, goToStock)}
-                              </p>
-                              {entry.body && (
-                                <div className="mt-2 space-y-1.5" data-testid={`premarket-body-${i}`}>
-                                  {entry.body.split('\n').filter(Boolean).map((line, li) => {
-                                    const isBullet = line.startsWith('\u2022 ');
-                                    const text = isBullet ? line.substring(2) : line;
-                                    return (
-                                      <div key={li} className={`flex gap-2 ${isBullet ? '' : ''}`}>
-                                        {isBullet && (
-                                          <span className="w-1 h-1 rounded-full bg-white/20 mt-[7px] flex-shrink-0" />
-                                        )}
-                                        <span className="text-[11px] text-white/40 leading-relaxed">
-                                          {highlightTickers(text.substring(0, 600), goToStock)}
-                                          {text.length > 600 && '...'}
-                                        </span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
+            <div
+              className="glass-card rounded-xl p-4 max-h-[calc(100vh-280px)] overflow-y-auto news-scroll"
+              data-testid="card-premarket-briefing"
+            >
+              {premarketLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                    <div key={i} className="space-y-2 p-3">
+                      <div className="flex items-center gap-3">
+                        <div className="shimmer h-3 w-10 rounded" />
+                        <div className="shimmer h-4 w-12 rounded" />
+                      </div>
+                      <div className="shimmer h-5 w-4/5 rounded ml-[52px]" />
+                      <div className="shimmer h-3 w-3/5 rounded ml-[52px]" />
+                    </div>
+                  ))}
+                </div>
+              ) : premarket && premarket.entries.length > 0 ? (
+                <div className="divide-y divide-white/[0.04]">
+                  {filteredEntries.length === 0 && premarketSearch ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-white/20">
+                      <Search className="w-6 h-6 mb-2" />
+                      <p className="text-[12px]">No results for "{premarketSearch}"</p>
+                    </div>
+                  ) : filteredEntries.map((entry, i) => {
+                    const isSummary = ['BONDX', 'SCANX', 'SUMRX'].includes(entry.ticker);
+                    const typeLabel = getEntryTypeLabel(entry.ticker);
+
+                    return (
+                      <div
+                        key={i}
+                        className={`py-3 px-3 ${
+                          isSummary
+                            ? 'bg-white/[0.02]'
+                            : ''
+                        }`}
+                        data-testid={`premarket-entry-${i}`}
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className="flex-shrink-0 w-[40px] pt-0.5">
+                            <span className="text-[10px] font-mono text-white/25" data-testid={`premarket-time-${i}`}>
+                              {entry.time}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              {entry.ticker && !isSummary && (
+                                <span
+                                  className="text-[11px] font-bold text-[#0a84ff] cursor-pointer hover:underline"
+                                  onClick={() => goToStock(entry.ticker)}
+                                  data-testid={`premarket-ticker-${entry.ticker}`}
+                                >
+                                  {entry.ticker}
+                                </span>
+                              )}
+                              {typeLabel && (
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.06] text-white/40 font-semibold uppercase tracking-wider">
+                                  {typeLabel}
+                                </span>
                               )}
                             </div>
+                            <p className="text-[12px] text-white/70 leading-relaxed" data-testid={`premarket-headline-${i}`}>
+                              {highlightTickers(entry.headline, goToStock)}
+                            </p>
+                            {entry.body && (
+                              <div className="mt-2 space-y-1.5" data-testid={`premarket-body-${i}`}>
+                                {entry.body.split('\n').filter(Boolean).map((line, li) => {
+                                  const isBullet = line.startsWith('\u2022 ');
+                                  const text = isBullet ? line.substring(2) : line;
+                                  return (
+                                    <div key={li} className="flex gap-2">
+                                      {isBullet && (
+                                        <span className="w-1 h-1 rounded-full bg-white/20 mt-[7px] flex-shrink-0" />
+                                      )}
+                                      <span className="text-[11px] text-white/40 leading-relaxed">
+                                        {highlightTickers(text.substring(0, 600), goToStock)}
+                                        {text.length > 600 && '...'}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-12 text-white/20">
-                    <AlertCircle className="w-8 h-8 mb-3" />
-                    <p className="text-[13px]">Corporate developments not available</p>
-                    <p className="text-[11px] mt-1">Updated throughout the trading day</p>
-                  </div>
-                )}
-              </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-white/20">
+                  <AlertCircle className="w-8 h-8 mb-3" />
+                  <p className="text-[13px]">Corporate developments not available</p>
+                  <p className="text-[11px] mt-1">Updated throughout the trading day</p>
+                </div>
+              )}
             </div>
           </div>
+
         </div>
       </main>
+      <footer className="border-t border-white/5 py-6 px-6 text-center">
+        <p className="text-[11px] text-white/20">TradeDeck &middot; Data provided by Briefing.com &amp; Finviz</p>
+      </footer>
     </div>
   );
 }
