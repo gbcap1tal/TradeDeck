@@ -1132,7 +1132,7 @@ export async function registerRoutes(
     const defaultResponse = {
       details: { marketCap: 0, floatShares: 0, rsVsSpy: 0, rsTimeframe: 'current', adr: 0, instOwnership: 0, numInstitutions: 0, avgVolume50d: 0, shortInterest: 0, shortRatio: 0, shortPercentOfFloat: 0, nextEarningsDate: '', daysToEarnings: 0 },
       fundamentals: { epsQoQ: 0, salesQoQ: 0, epsYoY: 0, salesYoY: 0, earningsAcceleration: 0, salesGrowth1Y: 0 },
-      profitability: { epsTTM: 0, fcfTTM: 0 },
+      profitability: { epsTTM: 0, fcfTTM: 0, operMarginPositive: false, fcfPositive: false },
       trend: { weinsteinStage: 1, aboveEma10: false, aboveEma20: false, aboveSma50: false, aboveSma200: false, maAlignment: false, distFromSma50: 0, overextensionFlag: '<4', atrMultiple: 0 },
     };
 
@@ -1262,6 +1262,11 @@ export async function registerRoutes(
       const shortRatio = parseNumVal(s['Short Ratio']);
 
       const epsTTM = parseNumVal(s['EPS (ttm)']);
+      const operMargin = parsePercent(s['Oper. Margin']);
+      const operMarginPositive = operMargin > 0;
+
+      const pFcf = parseNumVal(s['P/FCF']);
+      const fcfPositive = pFcf > 0;
 
       return res.json({
         details: {
@@ -1290,6 +1295,8 @@ export async function registerRoutes(
         profitability: {
           epsTTM,
           fcfTTM: 0,
+          operMarginPositive,
+          fcfPositive,
         },
         trend: {
           weinsteinStage,

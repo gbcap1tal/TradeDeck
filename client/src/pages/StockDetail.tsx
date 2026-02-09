@@ -147,8 +147,8 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
 
         <div className="mb-2 pt-2 border-t border-white/[0.06]">
           <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Profitability</div>
-          <QualityRow label="EPS TTM" value={`$${Math.abs(quality.profitability.epsTTM).toFixed(2)}`} color={quality.profitability.epsTTM >= 0 ? "text-[#30d158]" : "text-[#ff453a]/80"} />
-          <QualityRow label="FCF TTM" value={formatLargeNumber(Math.abs(quality.profitability.fcfTTM))} color={quality.profitability.fcfTTM >= 0 ? "text-[#30d158]" : "text-[#ff453a]/80"} />
+          <BoolIndicator label="Oper. Margin > 0" value={quality.profitability.operMarginPositive} />
+          <BoolIndicator label="FCF > 0" value={quality.profitability.fcfPositive} />
         </div>
 
         <div className="pt-2 border-t border-white/[0.06]">
