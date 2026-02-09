@@ -405,13 +405,13 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
         </div>
       </div>
 
-      {/* SALES SECTION */}
-      <div className="flex-[5] min-h-0 flex flex-col">
-        <div className="flex items-center flex-shrink-0 min-h-[24px] flex-wrap gap-2">
+      {/* SALES SECTION — flex-1 fills half, justify-end pushes content to bottom */}
+      <div className="flex-1 min-h-0 flex flex-col justify-end">
+        <div className="flex items-center flex-shrink-0 mb-1 flex-wrap gap-2">
           <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold leading-none">Sales</span>
           {hoveredRevIdx !== null && renderHoverTooltip('sales')}
         </div>
-        <div className="flex-1 min-h-0 flex items-end" style={{ gap: `${barGap}px` }} data-testid="bars-revenue">
+        <div className="flex items-end flex-shrink-0" style={{ gap: `${barGap}px`, height: `${BAR_MAX_H}px` }} data-testid="bars-revenue">
           {data.map((d, i) => {
             const pct = maxRev > 0 ? Math.abs(d.revenue) / maxRev : 0;
             const barH = Math.max(pct * BAR_MAX_H, 4);
@@ -444,15 +444,15 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
 
       <div className="border-t border-white/[0.06] my-1 flex-shrink-0" />
 
-      {/* EPS SECTION */}
-      <div className="flex-[5] min-h-0 flex flex-col">
-        <div className="flex items-center flex-shrink-0 min-h-[24px] flex-wrap gap-2">
+      {/* EPS SECTION — flex-1 fills half, justify-end pushes content to bottom */}
+      <div className="flex-1 min-h-0 flex flex-col justify-end">
+        <div className="flex items-center flex-shrink-0 mb-1 flex-wrap gap-2">
           <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold leading-none">EPS</span>
           {hoveredEpsIdx !== null && renderHoverTooltip('eps')}
         </div>
-        <div className="flex-1 min-h-0 flex flex-col" data-testid="bars-eps">
+        <div className="flex-shrink-0" style={{ height: `${BAR_MAX_H}px` }} data-testid="bars-eps">
           {hasNegativeEps && hasPositiveEps ? (
-            <div className="flex-1 flex flex-col justify-end">
+            <div className="flex flex-col justify-end h-full">
               <div className="flex items-end" style={{ gap: `${barGap}px`, flex: '3 1 0', minHeight: '20px' }}>
                 {data.map((d, i) => {
                   const pct = d.eps >= 0 ? d.eps / maxEpsAbs : 0;
@@ -496,7 +496,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
               </div>
             </div>
           ) : hasNegativeEps ? (
-            <div className="flex-1 flex flex-col">
+            <div className="flex flex-col h-full">
               <div className="border-t border-white/15" />
               <div className="flex-1 flex items-start" style={{ gap: `${barGap}px` }}>
                 {data.map((d, i) => {
@@ -520,27 +520,25 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col justify-end">
-              <div className="flex items-end flex-1" style={{ gap: `${barGap}px` }}>
-                {data.map((d, i) => {
-                  const pct = maxEpsAbs > 0 ? Math.abs(d.eps) / maxEpsAbs : 0;
-                  const barH = Math.max(pct * BAR_MAX_H, 4);
-                  const isHov = hoveredEpsIdx === i;
-                  return (
-                    <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0"
-                      onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
-                      style={{ cursor: 'pointer' }} data-testid={`bar-eps-${i}`}>
-                      <div className="w-full rounded-t-[3px] transition-all duration-150" style={{
-                        height: `${barH}px`,
-                        backgroundColor: d.isEstimate
-                          ? (isHov ? 'rgba(251,187,4,0.30)' : 'rgba(251,187,4,0.15)')
-                          : (isHov ? 'rgba(251,187,4,0.75)' : 'rgba(251,187,4,0.40)'),
-                        border: d.isEstimate ? '1px dashed rgba(251,187,4,0.3)' : 'none',
-                      }} />
-                    </div>
-                  );
-                })}
-              </div>
+            <div className="flex items-end h-full" style={{ gap: `${barGap}px` }}>
+              {data.map((d, i) => {
+                const pct = maxEpsAbs > 0 ? Math.abs(d.eps) / maxEpsAbs : 0;
+                const barH = Math.max(pct * BAR_MAX_H, 4);
+                const isHov = hoveredEpsIdx === i;
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0"
+                    onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
+                    style={{ cursor: 'pointer' }} data-testid={`bar-eps-${i}`}>
+                    <div className="w-full rounded-t-[3px] transition-all duration-150" style={{
+                      height: `${barH}px`,
+                      backgroundColor: d.isEstimate
+                        ? (isHov ? 'rgba(251,187,4,0.30)' : 'rgba(251,187,4,0.15)')
+                        : (isHov ? 'rgba(251,187,4,0.75)' : 'rgba(251,187,4,0.40)'),
+                      border: d.isEstimate ? '1px dashed rgba(251,187,4,0.3)' : 'none',
+                    }} />
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
