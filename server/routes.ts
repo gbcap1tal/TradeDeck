@@ -464,8 +464,14 @@ function initBackgroundTasks() {
     console.log('[bg] Starting background data pre-computation...');
     const bgStart = Date.now();
 
-    console.log('[bg] Loading Finviz data (needed for sectors/industries/performance)...');
-    const finvizData = await getFinvizData();
+    const now = new Date();
+    const etNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const etDay = etNow.getDay();
+    const etMinutes = etNow.getHours() * 60 + etNow.getMinutes();
+    const isDuringMarket = etDay >= 1 && etDay <= 5 && etMinutes >= 540 && etMinutes <= 965;
+
+    console.log(`[bg] Loading Finviz data (needed for sectors/industries/performance)... ${isDuringMarket ? '(market hours — force refresh)' : '(off hours — using cache)'}`);
+    const finvizData = await getFinvizData(isDuringMarket);
     if (finvizData) {
       let totalStocks = 0;
       let totalIndustries = 0;
