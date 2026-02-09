@@ -1131,7 +1131,7 @@ export async function registerRoutes(
 
     const defaultResponse = {
       details: { marketCap: 0, floatShares: 0, rsVsSpy: 0, rsTimeframe: 'current', adr: 0, instOwnership: 0, numInstitutions: 0, avgVolume50d: 0, shortInterest: 0, shortRatio: 0, shortPercentOfFloat: 0, nextEarningsDate: '', daysToEarnings: 0 },
-      fundamentals: { epsQoQ: 0, salesQoQ: 0, epsYoY: 0, salesYoY: 0, earningsAcceleration: false, salesGrowth1Y: 0 },
+      fundamentals: { epsQoQ: 0, salesQoQ: 0, epsYoY: 0, salesYoY: 0, earningsAcceleration: 0, salesGrowth1Y: 0 },
       profitability: { epsTTM: 0, fcfTTM: 0 },
       trend: { weinsteinStage: 1, aboveEma10: false, aboveEma20: false, aboveSma50: false, aboveSma200: false, maAlignment: false, distFromSma50: 0, overextensionFlag: '<4', atrMultiple: 0 },
     };
@@ -1218,8 +1218,34 @@ export async function registerRoutes(
       const epsYoY = parsePercent(s['EPS Y/Y TTM']);
       const salesYoY = parsePercent(s['Sales Y/Y TTM']);
 
-      const prevEpsQoQ = parsePercent(s['EPS this Y']);
-      const earningsAcceleration = epsQoQ > prevEpsQoQ;
+      let epsGrowthStreak = 0;
+      if (snap && snap.earnings && snap.earnings.length > 0) {
+        const entries = [...snap.earnings]
+          .filter(e => e.epsActual != null)
+          .sort((a, b) => a.fiscalEndDate.localeCompare(b.fiscalEndDate));
+        
+        const qMap = new Map<string, number>();
+        for (const e of entries) {
+          const m = e.fiscalPeriod.match(/(\d{4})Q(\d)/);
+          if (m) qMap.set(`${m[1]}Q${m[2]}`, e.epsActual!);
+        }
+        
+        for (let i = entries.length - 1; i >= 0; i--) {
+          const m = entries[i].fiscalPeriod.match(/(\d{4})Q(\d)/);
+          if (!m || entries[i].epsActual == null) break;
+          const yr = parseInt(m[1]);
+          const q = parseInt(m[2]);
+          const prevKey = `${yr - 1}Q${q}`;
+          const prevEps = qMap.get(prevKey);
+          if (prevEps == null) break;
+          if (entries[i].epsActual! > prevEps) {
+            epsGrowthStreak++;
+          } else {
+            break;
+          }
+        }
+      }
+      const earningsAcceleration = epsGrowthStreak;
 
       const marketCap = parseBigNum(s['Market Cap']);
       const floatShares = parseBigNum(s['Shs Float']);
