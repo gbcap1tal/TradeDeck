@@ -231,7 +231,40 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
   if (isLoading) return <div className="glass-card rounded-xl shimmer h-full" />;
   if (!rawData || !Array.isArray(rawData) || rawData.length === 0) return null;
 
-  const data = rawData as EarningsQuarterData[];
+  const rawArr = rawData as EarningsQuarterData[];
+
+  const data = rawArr.map((d, i) => {
+    const patched = { ...d };
+    if (view === 'quarterly') {
+      if (patched.revenueYoY == null && i >= 4) {
+        const prev = rawArr[i - 4];
+        if (prev && prev.revenue !== 0) {
+          patched.revenueYoY = Math.round(((d.revenue - prev.revenue) / Math.abs(prev.revenue)) * 1000) / 10;
+        }
+      }
+      if (patched.epsYoY == null && i >= 4) {
+        const prev = rawArr[i - 4];
+        if (prev && prev.eps !== 0) {
+          patched.epsYoY = Math.round(((d.eps - prev.eps) / Math.abs(prev.eps)) * 1000) / 10;
+        }
+      }
+    } else {
+      if (patched.revenueYoY == null && i >= 1) {
+        const prev = rawArr[i - 1];
+        if (prev && prev.revenue !== 0) {
+          patched.revenueYoY = Math.round(((d.revenue - prev.revenue) / Math.abs(prev.revenue)) * 1000) / 10;
+        }
+      }
+      if (patched.epsYoY == null && i >= 1) {
+        const prev = rawArr[i - 1];
+        if (prev && prev.eps !== 0) {
+          patched.epsYoY = Math.round(((d.eps - prev.eps) / Math.abs(prev.eps)) * 1000) / 10;
+        }
+      }
+    }
+    return patched;
+  });
+
   const revValues = data.map(d => Math.abs(d.revenue));
   const epsValues = data.map(d => d.eps);
   const maxRev = Math.max(...revValues, 0.01);
@@ -319,35 +352,35 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
     );
   };
 
+  const LABEL_H = isQuarterly ? 42 : 46;
+
   const labelRow = (quarter: string, value: string, growth: number | null, isEst: boolean, colorClass?: string) => {
-    const hasGrowth = growth != null;
-    const totalLines = hasGrowth ? 3 : 2;
-    const lineH = isQuarterly ? 11 : 13;
-    const fixedH = totalLines * lineH + 4;
     return (
-      <div className="flex flex-col items-center gap-[2px] w-full" style={{ height: `${fixedH}px` }}>
+      <div className="flex flex-col items-center gap-[3px] w-full" style={{ height: `${LABEL_H}px` }}>
         <span className={cn(
-          "font-mono-nums leading-tight truncate w-full text-center font-medium",
-          isQuarterly ? "text-[9px]" : "text-[11px]",
-          isEst ? "text-white/25" : "text-white/60"
+          "font-mono-nums leading-tight truncate w-full text-center font-semibold",
+          isQuarterly ? "text-[10px]" : "text-[11px]",
+          isEst ? "text-white/30" : "text-white/70"
         )}>
           {quarter}
         </span>
         <span className={cn(
-          "font-mono-nums leading-tight truncate w-full text-center",
-          isQuarterly ? "text-[8px]" : "text-[10px]",
-          colorClass || "text-white/35"
+          "font-mono-nums leading-tight truncate w-full text-center font-medium",
+          isQuarterly ? "text-[9px]" : "text-[10px]",
+          colorClass || "text-white/40"
         )}>
           {value}
         </span>
-        {hasGrowth && (
+        {growth != null ? (
           <span className={cn(
             "font-mono-nums font-bold leading-tight",
-            isQuarterly ? "text-[8px]" : "text-[10px]",
-            growth >= 0 ? "text-[#30d158]/80" : "text-[#ff453a]/80"
+            isQuarterly ? "text-[9px]" : "text-[10px]",
+            growth >= 0 ? "text-[#30d158]" : "text-[#ff453a]"
           )}>
             {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
           </span>
+        ) : (
+          <span className="text-[9px] leading-tight invisible">0%</span>
         )}
       </div>
     );
@@ -380,8 +413,8 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
 
       <div className="flex-1 min-h-0 flex flex-col gap-0 overflow-hidden">
         <div className="flex-1 min-h-0 flex flex-col">
-          <div className="flex items-center flex-shrink-0 min-h-[18px] mb-0.5">
-            <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold">Sales</span>
+          <div className="flex items-center flex-shrink-0 h-[20px] mb-0.5">
+            <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold leading-none">Sales</span>
             {hoveredRevIdx !== null && renderHoverTooltip('sales')}
           </div>
           <div className="flex-1 min-h-0 flex flex-col justify-end">
@@ -405,7 +438,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                 );
               })}
             </div>
-            <div className="flex items-start mt-1.5" style={{ gap: `${barGap}px` }}>
+            <div className="flex items-start mt-1" style={{ gap: `${barGap}px`, height: `${LABEL_H}px` }}>
               {data.map((d, i) => (
                 <div key={i} className="flex-1 min-w-0"
                   onMouseEnter={() => setHoveredRevIdx(i)} onMouseLeave={() => setHoveredRevIdx(null)}
@@ -417,11 +450,11 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
           </div>
         </div>
 
-        <div className="border-t border-white/[0.06] my-1" />
+        <div className="border-t border-white/[0.06] my-0.5" />
 
         <div className="flex-1 min-h-0 flex flex-col">
-          <div className="flex items-center flex-shrink-0 min-h-[18px] mb-0.5">
-            <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold">EPS</span>
+          <div className="flex items-center flex-shrink-0 h-[20px] mb-0.5">
+            <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold leading-none">EPS</span>
             {hoveredEpsIdx !== null && renderHoverTooltip('eps')}
           </div>
           <div className="flex-1 min-h-0 flex flex-col" data-testid="bars-eps">
@@ -468,7 +501,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                     );
                   })}
                 </div>
-                <div className="flex items-start mt-1.5" style={{ gap: `${barGap}px` }}>
+                <div className="flex items-start mt-1" style={{ gap: `${barGap}px`, height: `${LABEL_H}px` }}>
                   {data.map((d, i) => (
                     <div key={i} className="flex-1 min-w-0"
                       onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
@@ -502,7 +535,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                     );
                   })}
                 </div>
-                <div className="flex items-start mt-1.5" style={{ gap: `${barGap}px` }}>
+                <div className="flex items-start mt-1" style={{ gap: `${barGap}px`, height: `${LABEL_H}px` }}>
                   {data.map((d, i) => (
                     <div key={i} className="flex-1 min-w-0"
                       onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
@@ -534,7 +567,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                     );
                   })}
                 </div>
-                <div className="flex items-start mt-1.5" style={{ gap: `${barGap}px` }}>
+                <div className="flex items-start mt-1" style={{ gap: `${barGap}px`, height: `${LABEL_H}px` }}>
                   {data.map((d, i) => (
                     <div key={i} className="flex-1 min-w-0"
                       onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
