@@ -454,7 +454,7 @@ async function fetchCustomScreenerPage(offset: number, size: number, retryCount:
       operator: 'AND',
       operands: [
         { operator: 'eq', operands: ['region', 'us'] },
-        { operator: 'gt', operands: ['intradaymarketcap', 1_000_000_000] },
+        { operator: 'gt', operands: ['intradaymarketcap', 100_000_000] },
       ],
     },
     userId: '',
@@ -517,7 +517,7 @@ export async function getAllUSEquities(): Promise<any[]> {
       const pageSize = 250;
       const allQuotes: any[] = [];
       let offset = 0;
-      const maxPages = 12;
+      const maxPages = 28;
 
       for (let page = 0; page < maxPages; page++) {
         const quotes = await fetchCustomScreenerPage(offset, pageSize);
@@ -545,7 +545,7 @@ export async function getAllUSEquities(): Promise<any[]> {
         if (quotes.length < pageSize) break;
       }
 
-      console.log(`[yahoo] Custom screener fetched ${allQuotes.length} US equities ($1B+ market cap)`);
+      console.log(`[yahoo] Custom screener fetched ${allQuotes.length} US equities ($100M+ market cap)`);
 
       if (allQuotes.length > 0) {
         setCache(key, allQuotes, 1800);
