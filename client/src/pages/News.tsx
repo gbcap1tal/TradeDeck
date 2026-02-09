@@ -258,7 +258,7 @@ export default function News() {
             </div>
 
             <div
-              className="glass-card rounded-xl p-4 max-h-[calc(100vh-280px)] overflow-y-auto news-scroll"
+              className="glass-card rounded-xl p-5 max-h-[calc(100vh-280px)] overflow-y-auto news-scroll"
               data-testid="card-premarket-briefing"
             >
               {premarketLoading ? (
@@ -288,7 +288,7 @@ export default function News() {
                     return (
                       <div
                         key={i}
-                        className={`py-3 px-3 ${
+                        className={`py-4 px-3 ${
                           isSummary
                             ? 'bg-white/[0.02]'
                             : ''
@@ -296,16 +296,16 @@ export default function News() {
                         data-testid={`premarket-entry-${i}`}
                       >
                         <div className="flex items-start gap-4">
-                          <div className="flex-shrink-0 w-[40px] pt-0.5">
-                            <span className="text-[10px] font-mono text-white/25" data-testid={`premarket-time-${i}`}>
+                          <div className="flex-shrink-0 w-[44px] pt-0.5">
+                            <span className="text-[11px] font-mono text-white/30" data-testid={`premarket-time-${i}`}>
                               {entry.time}
                             </span>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                               {entry.ticker && !isSummary && (
                                 <span
-                                  className="text-[11px] font-bold text-[#0a84ff] cursor-pointer hover:underline"
+                                  className="text-[12px] font-bold text-[#0a84ff] cursor-pointer hover:underline"
                                   onClick={() => goToStock(entry.ticker)}
                                   data-testid={`premarket-ticker-${entry.ticker}`}
                                 >
@@ -313,25 +313,25 @@ export default function News() {
                                 </span>
                               )}
                               {typeLabel && (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.06] text-white/40 font-semibold uppercase tracking-wider">
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/[0.06] text-white/40 font-semibold uppercase tracking-wider">
                                   {typeLabel}
                                 </span>
                               )}
                             </div>
-                            <p className="text-[12px] text-white/70 leading-relaxed" data-testid={`premarket-headline-${i}`}>
+                            <p className="text-[13px] text-white/75 leading-relaxed" data-testid={`premarket-headline-${i}`}>
                               {highlightTickers(entry.headline, goToStock)}
                             </p>
                             {entry.body && (
-                              <div className="mt-2 space-y-1.5" data-testid={`premarket-body-${i}`}>
+                              <div className="mt-2.5 space-y-2" data-testid={`premarket-body-${i}`}>
                                 {entry.body.split('\n').filter(Boolean).map((line, li) => {
                                   const isBullet = line.startsWith('\u2022 ');
                                   const text = isBullet ? line.substring(2) : line;
                                   return (
-                                    <div key={li} className="flex gap-2">
+                                    <div key={li} className="flex gap-2.5">
                                       {isBullet && (
-                                        <span className="w-1 h-1 rounded-full bg-white/20 mt-[7px] flex-shrink-0" />
+                                        <span className="w-1.5 h-1.5 rounded-full bg-white/20 mt-[7px] flex-shrink-0" />
                                       )}
-                                      <span className="text-[11px] text-white/40 leading-relaxed">
+                                      <span className="text-[12px] text-white/45 leading-relaxed">
                                         {highlightTickers(text.substring(0, 600), goToStock)}
                                         {text.length > 600 && '...'}
                                       </span>
