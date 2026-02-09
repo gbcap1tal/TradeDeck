@@ -11,6 +11,7 @@ import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForI
 import { computeMarketBreadth, loadPersistedBreadthData } from "./api/breadth";
 import { getRSScore, getCachedRS } from "./api/rs";
 import { sendAlert, clearFailures } from "./api/alerts";
+import { scrapeFinvizDigest, scrapeBriefingPreMarket } from "./api/news-scrapers";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripe/stripeClient";
 import { db } from "./db";
 import { users } from "@shared/models/auth";
@@ -637,6 +638,20 @@ function initBackgroundTasks() {
         sendAlert('Megatrend Performance Refresh Failed', `Megatrend performance computation failed during ${windowLabel} refresh.\n\nError: ${(err as any).message}`, 'megatrend_perf');
     }
 
+    try {
+      const digest = await scrapeFinvizDigest(true);
+      console.log(`[scheduler] News digest refreshed: ${digest ? 'ok' : 'empty'}`);
+    } catch (err: any) {
+      console.log(`[scheduler] News digest error: ${err.message}`);
+    }
+
+    try {
+      const premarket = await scrapeBriefingPreMarket(true);
+      console.log(`[scheduler] Pre-market briefing refreshed: ${premarket?.entries?.length ?? 0} entries`);
+    } catch (err: any) {
+      console.log(`[scheduler] Pre-market briefing error: ${err.message}`);
+    }
+
     console.log(`[scheduler] === Full data refresh complete: ${windowLabel} in ${((Date.now() - start) / 1000).toFixed(1)}s ===`);
   }
 
@@ -839,6 +854,32 @@ export async function registerRoutes(
     const isWeekday = day >= 1 && day <= 5;
     const isOpen = isWeekday && totalMinutes >= 14 * 60 + 30 && totalMinutes < 21 * 60;
     res.json({ isOpen });
+  });
+
+  app.get('/api/news/digest', async (req, res) => {
+    try {
+      const digest = await scrapeFinvizDigest();
+      if (!digest) {
+        return res.json({ headline: '', bullets: [], timestamp: '', fetchedAt: 0 });
+      }
+      res.json(digest);
+    } catch (err: any) {
+      console.error(`[news] Digest endpoint error: ${err.message}`);
+      res.json({ headline: '', bullets: [], timestamp: '', fetchedAt: 0 });
+    }
+  });
+
+  app.get('/api/news/premarket', async (req, res) => {
+    try {
+      const data = await scrapeBriefingPreMarket();
+      if (!data) {
+        return res.json({ updated: '', entries: [], fetchedAt: 0 });
+      }
+      res.json(data);
+    } catch (err: any) {
+      console.error(`[news] PreMarket endpoint error: ${err.message}`);
+      res.json({ updated: '', entries: [], fetchedAt: 0 });
+    }
   });
 
   app.get('/api/sectors/:sectorName', async (req, res) => {

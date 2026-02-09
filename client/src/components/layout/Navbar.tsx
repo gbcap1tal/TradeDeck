@@ -106,6 +106,7 @@ export function Navbar() {
   const navItems = [
     { label: "Capital Flow", href: "/" },
     { label: "Megatrends", href: "/markets" },
+    { label: "News", href: "/news" },
   ];
 
   return (

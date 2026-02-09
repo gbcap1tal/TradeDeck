@@ -11,6 +11,7 @@ import IndustryDetail from "@/pages/IndustryDetail";
 import Login from "@/pages/Login";
 import Market from "@/pages/Market";
 import MegatrendDetail from "@/pages/MegatrendDetail";
+import News from "@/pages/News";
 import Payment from "@/pages/Payment";
 import PaymentSuccess from "@/pages/PaymentSuccess";
 import PaymentCancel from "@/pages/PaymentCancel";
@@ -47,6 +48,7 @@ function ProtectedSectorDetail() { return <PaymentGate><SectorDetail /></Payment
 function ProtectedIndustryDetail() { return <PaymentGate><IndustryDetail /></PaymentGate>; }
 function ProtectedMarket() { return <PaymentGate><Market /></PaymentGate>; }
 function ProtectedMegatrendDetail() { return <PaymentGate><MegatrendDetail /></PaymentGate>; }
+function ProtectedNews() { return <PaymentGate><News /></PaymentGate>; }
 
 function Router() {
   return (
@@ -61,6 +63,7 @@ function Router() {
       <Route path="/sectors/:sectorName" component={ProtectedSectorDetail} />
       <Route path="/megatrends/:id" component={ProtectedMegatrendDetail} />
       <Route path="/markets" component={ProtectedMarket} />
+      <Route path="/news" component={ProtectedNews} />
       <Route component={NotFound} />
     </Switch>
   );
