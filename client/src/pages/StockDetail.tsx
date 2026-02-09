@@ -382,27 +382,33 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
 
   return (
     <div className="glass-card rounded-xl px-5 py-4 h-full flex flex-col" data-testid="card-earnings-sales">
-      {/* TOP BAR: Legend + Q/Y toggle */}
-      <div className="flex items-center justify-end mb-2 flex-shrink-0 flex-wrap gap-2">
+      {/* TOP BAR: Sales title + Legend + Q/Y toggle */}
+      <div className="flex items-center justify-between mb-2 flex-shrink-0 flex-wrap gap-2">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-sm bg-white/40" />
-            <span className="text-[9px] text-white/30">Actual</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-sm border border-dashed border-white/25" />
-            <span className="text-[9px] text-white/30">Est.</span>
-          </div>
+          <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold leading-none">Sales</span>
+          {hoveredRevIdx !== null && renderHoverTooltip('sales')}
         </div>
-        <div className="flex bg-white/[0.06] rounded-md p-0.5">
-          <button onClick={() => setView('quarterly')}
-            className={cn("text-[10px] px-2.5 py-0.5 rounded transition-colors font-medium",
-              view === 'quarterly' ? "bg-white/10 text-white/80" : "text-white/30 hover:text-white/50")}
-            data-testid="button-view-quarterly">Q</button>
-          <button onClick={() => setView('annual')}
-            className={cn("text-[10px] px-2.5 py-0.5 rounded transition-colors font-medium",
-              view === 'annual' ? "bg-white/10 text-white/80" : "text-white/30 hover:text-white/50")}
-            data-testid="button-view-annual">Y</button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-sm bg-white/40" />
+              <span className="text-[9px] text-white/30">Actual</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-sm border border-dashed border-white/25" />
+              <span className="text-[9px] text-white/30">Est.</span>
+            </div>
+          </div>
+          <div className="flex bg-white/[0.06] rounded-md p-0.5">
+            <button onClick={() => setView('quarterly')}
+              className={cn("text-[10px] px-2.5 py-0.5 rounded transition-colors font-medium",
+                view === 'quarterly' ? "bg-white/10 text-white/80" : "text-white/30 hover:text-white/50")}
+              data-testid="button-view-quarterly">Q</button>
+            <button onClick={() => setView('annual')}
+              className={cn("text-[10px] px-2.5 py-0.5 rounded transition-colors font-medium",
+                view === 'annual' ? "bg-white/10 text-white/80" : "text-white/30 hover:text-white/50")}
+              data-testid="button-view-annual">Y</button>
+          </div>
         </div>
       </div>
 
@@ -411,11 +417,6 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
 
         {/* === SALES SECTION === */}
         <div className="flex flex-col min-h-0">
-          {/* Header: title + hover tooltip */}
-          <div className="flex items-center flex-shrink-0 h-7 flex-wrap gap-2">
-            <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold leading-none">Sales</span>
-            {hoveredRevIdx !== null && renderHoverTooltip('sales')}
-          </div>
           {/* Chart content: relative wrapper so absolute children get percentage heights */}
           <div className="flex-1 min-h-0 relative" data-testid="bars-revenue">
             <div className="absolute inset-0 flex items-end" style={{ gap: `${barGap}px` }}>
