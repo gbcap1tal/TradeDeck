@@ -80,9 +80,9 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
     <div className="glass-card rounded-xl px-4 py-3 h-full flex flex-col overflow-hidden" data-testid="card-stock-quality">
       <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
         <h2 className="text-[13px] font-semibold text-white/90 tracking-wide">Stock Quality</h2>
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.08)' }} data-testid="badge-stock-quality-score">
-          <span className="text-[13px] font-bold text-white leading-none font-mono-nums">0</span>
-          <span className="text-[10px] text-white/30 leading-none">/10</span>
+        <div className="flex items-center gap-1 px-3 py-1.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }} data-testid="badge-stock-quality-score">
+          <span className="text-[15px] font-bold text-white leading-none font-mono-nums">0</span>
+          <span className="text-[11px] text-white/40 leading-none font-medium">/10</span>
         </div>
       </div>
 
