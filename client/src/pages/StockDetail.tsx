@@ -7,7 +7,7 @@ import { ChevronRight, Plus, TrendingDown, TrendingUp, Check, X, AlertTriangle, 
 import { useAddToWatchlist, useWatchlists } from "@/hooks/use-watchlists";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState } from "react";
 import { format } from "date-fns";
 import {
   DropdownMenu,
@@ -198,153 +198,163 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
   );
 }
 
-function EarningsSalesChart({ symbol }: { symbol: string }) {
-  const { data: earnings, isLoading } = useStockEarnings(symbol);
-  const [hovered, setHovered] = useState<number | null>(null);
-  const [dims, setDims] = useState({ w: 0, h: 0 });
-  const svgRef = useRef<SVGSVGElement | null>(null);
+interface EarningsQuarterData {
+  quarter: string;
+  revenue: number;
+  eps: number;
+  revenueYoY: number | null;
+  epsYoY: number | null;
+  isEstimate: boolean;
+  epsEstimate?: number;
+  epsSurprise?: number;
+}
 
-  useEffect(() => {
-    const el = svgRef.current;
-    if (!el) return;
-    const obs = new ResizeObserver((entries) => {
-      const r = entries[0]?.contentRect;
-      if (r) setDims({ w: r.width, h: r.height });
-    });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [!!earnings]);
+function CompactBarRow({
+  label,
+  data,
+  valueKey,
+  growthKey,
+  color,
+  formatValue,
+  unit,
+}: {
+  label: string;
+  data: EarningsQuarterData[];
+  valueKey: 'revenue' | 'eps';
+  growthKey: 'revenueYoY' | 'epsYoY';
+  color: string;
+  formatValue: (v: number) => string;
+  unit: string;
+}) {
+  const values = data.map(d => Math.abs(d[valueKey]));
+  const maxVal = Math.max(...values, 0.01);
+  const [hovered, setHovered] = useState<number | null>(null);
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col">
+      <div className="flex items-center gap-2 mb-1.5 flex-shrink-0">
+        <span className="text-[10px] text-white/30 uppercase tracking-widest font-semibold">{label}</span>
+        {hovered !== null && (
+          <span className="text-[10px] font-mono-nums text-white/50">
+            {data[hovered].quarter}: <span style={{ color }}>{formatValue(data[hovered][valueKey])}{unit}</span>
+            {data[hovered][growthKey] != null && (
+              <span className={data[hovered][growthKey]! >= 0 ? "text-[#30d158]" : "text-[#ff453a]"}>
+                {' '}{data[hovered][growthKey]! > 0 ? '+' : ''}{data[hovered][growthKey]!.toFixed(1)}% YoY
+              </span>
+            )}
+            {valueKey === 'eps' && data[hovered].epsSurprise != null && !data[hovered].isEstimate && (
+              <span className={data[hovered].epsSurprise! >= 0 ? "text-[#30d158]/70" : "text-[#ff453a]/70"}>
+                {' '}({data[hovered].epsSurprise! > 0 ? '+' : ''}{data[hovered].epsSurprise!.toFixed(1)}% surp.)
+              </span>
+            )}
+          </span>
+        )}
+      </div>
+      <div className="flex-1 min-h-0 flex items-end gap-[3px]" data-testid={`bars-${valueKey}`}>
+        {data.map((d, i) => {
+          const val = Math.abs(d[valueKey]);
+          const pct = maxVal > 0 ? (val / maxVal) * 100 : 0;
+          const isEst = d.isEstimate;
+          const isHov = hovered === i;
+          const growth = d[growthKey];
+
+          return (
+            <div
+              key={i}
+              className="flex-1 flex flex-col items-center min-w-0 gap-0.5"
+              onMouseEnter={() => setHovered(i)}
+              onMouseLeave={() => setHovered(null)}
+              style={{ cursor: 'pointer' }}
+              data-testid={`bar-${valueKey}-${i}`}
+            >
+              {growth != null && (
+                <span className={cn(
+                  "text-[8px] font-mono-nums font-semibold leading-none",
+                  growth >= 0 ? "text-[#30d158]" : "text-[#ff453a]"
+                )}>
+                  {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
+                </span>
+              )}
+              {growth == null && <span className="text-[8px] leading-none">&nbsp;</span>}
+              <div className="w-full flex-1 min-h-0 flex flex-col justify-end">
+                <div
+                  className="w-full rounded-sm transition-all duration-150"
+                  style={{
+                    height: `${Math.max(pct, 3)}%`,
+                    backgroundColor: isEst
+                      ? (isHov ? color : `${color}40`)
+                      : (isHov ? color : `${color}B3`),
+                    border: isEst ? `1px dashed ${color}80` : 'none',
+                    opacity: isHov ? 1 : 0.85,
+                  }}
+                />
+              </div>
+              <div className="flex flex-col items-center gap-0">
+                <span className={cn(
+                  "text-[8px] font-mono-nums leading-tight",
+                  isEst ? "text-white/25" : "text-white/40"
+                )}>
+                  {d.quarter}
+                </span>
+                <span className={cn(
+                  "text-[8px] font-mono-nums leading-tight",
+                  isEst ? "text-white/20 italic" : "text-white/35"
+                )}>
+                  {formatValue(d[valueKey])}{unit}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function EarningsSalesChart({ symbol }: { symbol: string }) {
+  const { data: rawData, isLoading } = useStockEarnings(symbol);
 
   if (isLoading) return <div className="glass-card rounded-xl shimmer h-full" />;
-  if (!earnings) return null;
+  if (!rawData || !Array.isArray(rawData) || rawData.length === 0) return null;
 
-  const allValues = [...earnings.sales, ...earnings.earnings.map(Math.abs)];
-  const maxVal = Math.max(...allValues);
-  const topPad = 8;
-  const labelH = 40;
-  const maxBarPct = 0.82;
-  const barAreaH = Math.max(dims.h - labelH - topPad, 0);
-  const n = earnings.quarters.length;
-  const groupGap = dims.w > 0 ? Math.max(dims.w * 0.04, 8) : 8;
-  const groupW = n > 0 ? (dims.w - groupGap * (n - 1)) / n : 0;
-  const barGap = 3;
-  const barW = (groupW - barGap) / 2;
+  const data = rawData as EarningsQuarterData[];
 
   return (
     <div className="glass-card rounded-xl px-4 py-3 h-full flex flex-col" data-testid="card-earnings-sales">
-      <div className="flex items-center justify-between mb-1 flex-shrink-0">
-        <h2 className="text-[13px] font-semibold text-white/90 tracking-wide">Earnings & Sales</h2>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: 'rgba(255,255,255,0.35)' }} />
-            <span className="text-[11px] text-white/40">Sales</span>
+      <div className="flex items-center justify-between mb-2 flex-shrink-0">
+        <h2 className="text-[13px] font-semibold text-white/90 tracking-wide">Earnings & Revenue</h2>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: 'rgba(255,255,255,0.45)' }} />
+            <span className="text-[9px] text-white/30">Actual</span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: '#FBBB04' }} />
-            <span className="text-[11px] text-white/40">EPS</span>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-sm border border-dashed border-white/30" />
+            <span className="text-[9px] text-white/30">Estimate</span>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 relative">
-        {hovered !== null && (
-          <div
-            className="absolute top-0 left-1/2 -translate-x-1/2 z-10 rounded-xl border border-white/10 px-5 py-3 pointer-events-none"
-            style={{ background: 'rgba(18,18,18,0.97)', backdropFilter: 'blur(20px)' }}
-            data-testid="tooltip-earnings"
-          >
-            <p className="text-[12px] text-white/50 mb-2 text-center font-semibold">{earnings.quarters[hovered]}</p>
-            <div className="flex items-start gap-5">
-              <div className="text-center">
-                <span className="text-[10px] text-white/35 block mb-1">Sales</span>
-                <p className="text-[15px] font-mono-nums font-bold text-white/80">${earnings.sales[hovered].toFixed(1)}B</p>
-                {hovered > 0 && (
-                  <span className={cn("text-[11px] font-mono-nums font-medium", earnings.salesGrowth[hovered] >= 0 ? "text-[#30d158]" : "text-[#ff453a]")}>
-                    {earnings.salesGrowth[hovered] > 0 ? '+' : ''}{earnings.salesGrowth[hovered].toFixed(1)}%
-                  </span>
-                )}
-              </div>
-              <div className="w-px self-stretch bg-white/10" />
-              <div className="text-center">
-                <span className="text-[10px] text-white/35 block mb-1">EPS</span>
-                <p className="text-[15px] font-mono-nums font-bold" style={{ color: '#FBBB04' }}>${earnings.earnings[hovered].toFixed(2)}</p>
-                {hovered > 0 && (
-                  <span className={cn("text-[11px] font-mono-nums font-medium", earnings.earningsGrowth[hovered] >= 0 ? "text-[#30d158]" : "text-[#ff453a]")}>
-                    {earnings.earningsGrowth[hovered] > 0 ? '+' : ''}{earnings.earningsGrowth[hovered].toFixed(1)}%
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        <svg
-          ref={svgRef}
-          width="100%"
-          height="100%"
-          style={{ overflow: 'visible' }}
-        >
-          {dims.w > 0 && dims.h > 0 && earnings.quarters.map((q: string, i: number) => {
-            const salesPct = maxVal > 0 ? earnings.sales[i] / maxVal : 0;
-            const epsPct = maxVal > 0 ? Math.abs(earnings.earnings[i]) / maxVal : 0;
-            const sBarH = Math.max(salesPct * maxBarPct * barAreaH, 4);
-            const eBarH = Math.max(epsPct * maxBarPct * barAreaH, 4);
-            const x = i * (groupW + groupGap);
-            const isHov = hovered === i;
-            const eGrowth = earnings.earningsGrowth[i];
-
-            return (
-              <g
-                key={q}
-                onMouseEnter={() => setHovered(i)}
-                onMouseLeave={() => setHovered(null)}
-                style={{ cursor: 'pointer' }}
-                data-testid={`earnings-bar-${i}`}
-              >
-                <rect x={x} y={0} width={groupW} height={dims.h} fill="transparent" />
-                <rect
-                  x={x}
-                  y={topPad + barAreaH - sBarH}
-                  width={barW}
-                  height={sBarH}
-                  rx={2}
-                  fill={isHov ? 'rgba(255,255,255,0.50)' : 'rgba(255,255,255,0.30)'}
-                />
-                <rect
-                  x={x + barW + barGap}
-                  y={topPad + barAreaH - eBarH}
-                  width={barW}
-                  height={eBarH}
-                  rx={2}
-                  fill={isHov ? '#FBBB04' : 'rgba(251,187,4,0.75)'}
-                />
-                <text
-                  x={x + groupW / 2}
-                  y={topPad + barAreaH + 16}
-                  textAnchor="middle"
-                  fill="rgba(255,255,255,0.40)"
-                  fontSize="10"
-                  fontFamily="monospace"
-                >
-                  {q}
-                </text>
-                {i > 0 && (
-                  <text
-                    x={x + groupW / 2}
-                    y={topPad + barAreaH + 30}
-                    textAnchor="middle"
-                    fill={eGrowth >= 0 ? 'rgba(48,209,88,0.85)' : 'rgba(255,69,58,0.75)'}
-                    fontSize="10"
-                    fontWeight="600"
-                    fontFamily="monospace"
-                  >
-                    {eGrowth > 0 ? '+' : ''}{eGrowth.toFixed(0)}%
-                  </text>
-                )}
-              </g>
-            );
-          })}
-        </svg>
+      <div className="flex-1 min-h-0 flex flex-col gap-2">
+        <CompactBarRow
+          label="Revenue"
+          data={data}
+          valueKey="revenue"
+          growthKey="revenueYoY"
+          color="#ffffff"
+          formatValue={(v) => v.toFixed(1)}
+          unit="B"
+        />
+        <div className="border-t border-white/[0.06]" />
+        <CompactBarRow
+          label="EPS"
+          data={data}
+          valueKey="eps"
+          growthKey="epsYoY"
+          color="#FBBB04"
+          formatValue={(v) => `$${v.toFixed(2)}`}
+          unit=""
+        />
       </div>
     </div>
   );

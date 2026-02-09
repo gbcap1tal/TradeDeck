@@ -561,36 +561,78 @@ export async function getAllUSEquities(): Promise<any[]> {
   return [];
 }
 
+interface EarningsQuarter {
+  quarter: string;
+  revenue: number;
+  eps: number;
+  revenueYoY: number | null;
+  epsYoY: number | null;
+  isEstimate: boolean;
+  epsEstimate?: number;
+  epsSurprise?: number;
+}
+
 export async function getEarningsData(symbol: string): Promise<{ quarters: string[]; sales: number[]; earnings: number[]; salesGrowth: number[]; earningsGrowth: number[] } | null> {
-  const key = `yf_earnings_${symbol}`;
-  const cached = getCached<any>(key);
+  const enhanced = await getEnhancedEarningsData(symbol);
+  if (!enhanced || enhanced.length === 0) return null;
+
+  const actuals = enhanced.filter(q => !q.isEstimate);
+  if (actuals.length === 0) return null;
+
+  const quarters = actuals.map(q => q.quarter);
+  const sales = actuals.map(q => q.revenue);
+  const earnings = actuals.map(q => q.eps);
+  const salesGrowth = actuals.map(q => q.revenueYoY ?? 0);
+  const earningsGrowth = actuals.map(q => q.epsYoY ?? 0);
+
+  return { quarters, sales, earnings, salesGrowth, earningsGrowth };
+}
+
+export async function getEnhancedEarningsData(symbol: string): Promise<EarningsQuarter[] | null> {
+  const key = `yf_enhanced_earnings_${symbol}`;
+  const cached = getCached<EarningsQuarter[]>(key);
   if (cached) return cached;
 
   try {
     const data = await throttledYahooCall(() =>
-      yf.quoteSummary(symbol, { modules: ['earnings', 'earningsHistory'] })
+      yf.quoteSummary(symbol, { modules: ['earnings', 'earningsHistory', 'earningsTrend'] })
     );
 
     const earningsChart = data?.earnings?.financialsChart?.quarterly;
     const earningsHistory = data?.earningsHistory?.history;
+    const earningsChartQ = data?.earnings?.earningsChart?.quarterly;
+    const earningsTrend = data?.earningsTrend?.trend;
 
     if (!earningsChart || earningsChart.length === 0) return null;
 
-    const epsMap = new Map<string, number>();
+    const epsMap = new Map<string, { actual: number; estimate?: number }>();
     if (earningsHistory) {
       for (const h of earningsHistory) {
         if (h.quarter && h.epsActual != null) {
           const d = new Date(h.quarter);
           const q = Math.ceil((d.getMonth() + 1) / 3);
           const yr = d.getFullYear();
-          epsMap.set(`${q}Q${yr}`, h.epsActual);
+          epsMap.set(`${q}Q${yr}`, { actual: h.epsActual, estimate: h.epsEstimate });
+        }
+      }
+    }
+    if (earningsChartQ) {
+      for (const eq of earningsChartQ) {
+        const m = (eq.date || '').match(/(\d)Q(\d{4})/);
+        if (m) {
+          const k = `${m[1]}Q${m[2]}`;
+          const existing = epsMap.get(k);
+          if (existing) {
+            if (eq.estimate != null) existing.estimate = eq.estimate;
+          } else if (eq.actual != null) {
+            epsMap.set(k, { actual: eq.actual, estimate: eq.estimate });
+          }
         }
       }
     }
 
-    const quarters: string[] = [];
-    const sales: number[] = [];
-    const earnings: number[] = [];
+    const result: EarningsQuarter[] = [];
+    const qKeyToIdx = new Map<string, number>();
 
     for (const item of earningsChart) {
       const label = item.date || item.fiscalQuarter || '';
@@ -598,29 +640,76 @@ export async function getEarningsData(symbol: string): Promise<{ quarters: strin
       if (!qMatch) continue;
       const [, qNum, yearStr] = qMatch;
       const shortLabel = `Q${qNum} '${yearStr.slice(-2)}`;
-      quarters.push(shortLabel);
 
-      const rev = item.revenue || 0;
-      sales.push(Math.round(rev / 1e9 * 10) / 10);
+      const rev = Math.round((item.revenue || 0) / 1e9 * 10) / 10;
+      const epsData = epsMap.get(`${qNum}Q${yearStr}`);
+      const eps = epsData?.actual ?? Math.round((item.earnings || 0) / 1e9 * 100) / 100;
 
-      const eps = epsMap.get(`${qNum}Q${yearStr}`) ?? Math.round((item.earnings || 0) / 1e9 * 100) / 100;
-      earnings.push(Math.round(eps * 100) / 100);
+      qKeyToIdx.set(`${qNum}Q${yearStr}`, result.length);
+      result.push({
+        quarter: shortLabel,
+        revenue: rev,
+        eps: Math.round(eps * 100) / 100,
+        revenueYoY: null,
+        epsYoY: null,
+        isEstimate: false,
+        epsEstimate: epsData?.estimate != null ? Math.round(epsData.estimate * 100) / 100 : undefined,
+        epsSurprise: epsData?.estimate != null && epsData?.actual != null
+          ? Math.round(((epsData.actual - epsData.estimate) / Math.abs(epsData.estimate || 0.01)) * 1000) / 10
+          : undefined,
+      });
     }
 
-    if (quarters.length === 0) return null;
+    if (earningsTrend) {
+      for (const t of earningsTrend) {
+        if (t.period !== '0q' && t.period !== '+1q') continue;
+        if (!t.endDate) continue;
+        const d = new Date(t.endDate);
+        const qNum = Math.ceil((d.getMonth() + 1) / 3);
+        const yr = d.getFullYear();
+        const k = `${qNum}Q${yr}`;
+        if (qKeyToIdx.has(k)) continue;
 
-    const salesGrowth = sales.map((s, i) =>
-      i === 0 ? 0 : Math.round(((s - sales[i - 1]) / Math.abs(sales[i - 1] || 1) * 100) * 10) / 10
-    );
-    const earningsGrowth = earnings.map((e, i) =>
-      i === 0 ? 0 : Math.round(((e - earnings[i - 1]) / Math.abs(earnings[i - 1] || 1) * 100) * 10) / 10
-    );
+        const shortLabel = `Q${qNum} '${String(yr).slice(-2)}`;
+        const estEps = t.earningsEstimate?.avg != null ? Math.round(t.earningsEstimate.avg * 100) / 100 : 0;
+        const estRev = t.revenueEstimate?.avg != null ? Math.round(t.revenueEstimate.avg / 1e9 * 10) / 10 : 0;
 
-    const result = { quarters, sales, earnings, salesGrowth, earningsGrowth };
+        qKeyToIdx.set(k, result.length);
+        result.push({
+          quarter: shortLabel,
+          revenue: estRev,
+          eps: estEps,
+          revenueYoY: null,
+          epsYoY: null,
+          isEstimate: true,
+        });
+      }
+    }
+
+    for (let i = 0; i < result.length; i++) {
+      const m = result[i].quarter.match(/Q(\d)\s+'(\d{2})/);
+      if (!m) continue;
+      const qNum = parseInt(m[1]);
+      const yr = 2000 + parseInt(m[2]);
+      const prevK = `${qNum}Q${yr - 1}`;
+      const prevIdx = qKeyToIdx.get(prevK);
+      if (prevIdx != null) {
+        const prevRev = result[prevIdx].revenue;
+        const prevEps = result[prevIdx].eps;
+        if (prevRev !== 0) {
+          result[i].revenueYoY = Math.round(((result[i].revenue - prevRev) / Math.abs(prevRev)) * 1000) / 10;
+        }
+        if (prevEps !== 0) {
+          result[i].epsYoY = Math.round(((result[i].eps - prevEps) / Math.abs(prevEps)) * 1000) / 10;
+        }
+      }
+    }
+
+    if (result.length === 0) return null;
     setCache(key, result, CACHE_TTL.EARNINGS);
     return result;
   } catch (e: any) {
-    console.error(`[yahoo] Earnings data error for ${symbol}:`, e.message?.substring(0, 100));
+    console.error(`[yahoo] Enhanced earnings data error for ${symbol}:`, e.message?.substring(0, 100));
     return null;
   }
 }

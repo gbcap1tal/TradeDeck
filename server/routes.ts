@@ -1100,22 +1100,30 @@ export async function registerRoutes(
     const { symbol } = req.params;
     const sym = symbol.toUpperCase();
     try {
+      const enhanced = await yahoo.getEnhancedEarningsData(sym);
+      if (enhanced && enhanced.length > 0) {
+        return res.json(enhanced);
+      }
+    } catch (e: any) {
+      console.error(`Yahoo enhanced earnings error for ${sym}:`, e.message);
+    }
+    try {
       const data = await fmp.getEarningsData(sym);
       if (data && data.quarters.length > 0) {
-        return res.json(data);
+        const mapped = data.quarters.map((q: string, i: number) => ({
+          quarter: q,
+          revenue: data.sales[i],
+          eps: data.earnings[i],
+          revenueYoY: data.salesGrowth[i] || null,
+          epsYoY: data.earningsGrowth[i] || null,
+          isEstimate: false,
+        }));
+        return res.json(mapped);
       }
     } catch (e: any) {
       console.error(`FMP earnings error for ${sym}:`, e.message);
     }
-    try {
-      const yahooData = await yahoo.getEarningsData(sym);
-      if (yahooData && yahooData.quarters.length > 0) {
-        return res.json(yahooData);
-      }
-    } catch (e: any) {
-      console.error(`Yahoo earnings error for ${sym}:`, e.message);
-    }
-    return res.json({ quarters: [], sales: [], earnings: [], salesGrowth: [], earningsGrowth: [] });
+    return res.json([]);
   });
 
   app.get('/api/stocks/:symbol/news', async (req, res) => {
