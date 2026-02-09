@@ -41,6 +41,13 @@ Preferred communication style: Simple, everyday language.
 - **Tables**: `sessions`, `users`, `watchlists`, `watchlistItems`, `megatrends`.
 - **Megatrends**: Stores custom industry baskets; performance is dynamically computed using market-cap weighted averages of constituent stocks.
 
+### Production Hardening
+- **Cache System**: `node-cache` with maxKeys (5000), 3-day TTL on stale cache, auto-timeout (120s) for stuck refresh keys, `finally` blocks to ensure cleanup.
+- **Background Scheduler**: Mutex lock (`isFullRefreshRunning`) prevents overlapping full data refreshes; `try/finally` guarantees flag release. Hourly scheduler, overnight digest polling.
+- **Env Var Validation**: Startup checks for required (`DATABASE_URL`, `SESSION_SECRET`) and optional (`FMP_KEY`, `ALPHA_VANTAGE_KEY`, `ADMIN_USER_ID`) environment variables.
+- **API Logging**: Truncated response bodies (200 chars max), only logs errors (4xx/5xx) and slow requests (>5s).
+- **Error Boundary**: React class component wraps entire app, catches render errors with reload fallback.
+
 ### Shared Code
 - Centralized Zod schemas for database and API validation, and API contract types.
 

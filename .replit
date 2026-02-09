@@ -41,3 +41,8 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_log_in_with_replit:2.0.0", "resend:1.0.0", "stripe:2.0.0"]
+
+[userenv]
+
+[userenv.shared]
+ADMIN_USER_ID = "54198443"

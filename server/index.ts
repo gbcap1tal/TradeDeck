@@ -6,6 +6,19 @@ import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from "./stripe/stripeClient";
 import { WebhookHandlers } from "./stripe/webhookHandlers";
 
+const requiredEnvVars = ['DATABASE_URL', 'SESSION_SECRET'] as const;
+const missingVars = requiredEnvVars.filter(v => !process.env[v]);
+if (missingVars.length > 0) {
+  console.error(`[startup] Missing required environment variables: ${missingVars.join(', ')}`);
+  process.exit(1);
+}
+
+const optionalEnvVars = ['FMP_KEY', 'ALPHA_VANTAGE_KEY', 'ADMIN_USER_ID'] as const;
+const missingOptional = optionalEnvVars.filter(v => !process.env[v]);
+if (missingOptional.length > 0) {
+  console.warn(`[startup] Missing optional environment variables: ${missingOptional.join(', ')} — some features may be limited`);
+}
+
 const app = express();
 const httpServer = createServer(app);
 
@@ -107,10 +120,13 @@ app.use((req, res, next) => {
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        const jsonStr = JSON.stringify(capturedJsonResponse);
+        logLine += ` :: ${jsonStr.length > 200 ? jsonStr.slice(0, 200) + '...' : jsonStr}`;
       }
 
-      log(logLine);
+      if (res.statusCode >= 400 || duration > 5000) {
+        log(logLine);
+      }
     }
   });
 

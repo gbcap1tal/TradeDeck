@@ -586,101 +586,112 @@ function initBackgroundTasks() {
   }, 1000);
 
   let lastScheduledWindow = '';
+  let isFullRefreshRunning = false;
 
   async function runFullDataRefresh(windowLabel: string) {
+    if (isFullRefreshRunning) {
+      console.log(`[scheduler] Skipping ${windowLabel} — refresh already in progress`);
+      return;
+    }
+    isFullRefreshRunning = true;
     const start = Date.now();
     console.log(`[scheduler] === Starting full data refresh: ${windowLabel} ===`);
 
     try {
-      console.log(`[scheduler] Force-refreshing Finviz data (fresh change% for all stocks)...`);
-      const finvizData = await getFinvizData(true);
-      if (finvizData) {
-        let totalStocks = 0;
-        for (const s of Object.values(finvizData)) {
-          for (const stocks of Object.values(s.stocks)) totalStocks += stocks.length;
+      try {
+        const finvizData = await getFinvizData(true);
+        if (finvizData) {
+          let totalStocks = 0;
+          for (const s of Object.values(finvizData)) {
+            for (const stocks of Object.values(s.stocks)) totalStocks += stocks.length;
+          }
+          console.log(`[scheduler] Finviz: ${Object.keys(finvizData).length} sectors, ${totalStocks} stocks`);
+          clearFailures('finviz_scrape');
+        } else {
+          sendAlert('Scheduled Finviz Refresh Returned No Data', `Finviz scrape during ${windowLabel} returned null (possible block, timeout, or too few stocks).`, 'finviz_scrape');
         }
-        console.log(`[scheduler] Finviz: ${Object.keys(finvizData).length} sectors, ${totalStocks} stocks`);
-        clearFailures('finviz_scrape');
-      } else {
-        sendAlert('Scheduled Finviz Refresh Returned No Data', `Finviz scrape during ${windowLabel} returned null (possible block, timeout, or too few stocks).`, 'finviz_scrape');
+      } catch (err: any) {
+        console.error(`[scheduler] Finviz refresh error: ${err.message}`);
+        sendAlert('Scheduled Finviz Refresh Failed', `Finviz scrape failed during ${windowLabel} refresh.\n\nError: ${err.message}`, 'finviz_scrape');
       }
-    } catch (err: any) {
-      console.error(`[scheduler] Finviz refresh error: ${err.message}`);
-      sendAlert('Scheduled Finviz Refresh Failed', `Finviz scrape failed during ${windowLabel} refresh.\n\nError: ${err.message}`, 'finviz_scrape');
-    }
 
-    try {
-      const rsData = await fetchIndustryRSFromFinviz(true);
-      console.log(`[scheduler] Industry RS refreshed: ${rsData.length} industries`);
-    } catch (e: any) {
-      console.log(`[scheduler] Industry RS refresh error: ${e.message}`);
-    }
-
-    let perfData = await computeIndustryPerformance();
-    if (!perfData.fullyEnriched) {
-      const persisted = loadPersistedIndustryPerf();
-      if (persisted) {
-        perfData = persisted;
-        console.log(`[scheduler] Falling back to persisted industry performance`);
+      try {
+        const rsData = await fetchIndustryRSFromFinviz(true);
+        console.log(`[scheduler] Industry RS refreshed: ${rsData.length} industries`);
+      } catch (e: any) {
+        console.log(`[scheduler] Industry RS refresh error: ${e.message}`);
       }
-      sendAlert('Industry Performance Incomplete', `Industry performance not fully enriched during ${windowLabel}. Using ${persisted ? 'persisted cache' : 'empty data'} as fallback.`, 'industry_perf');
-    }
-    setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
-    if (perfData.fullyEnriched) clearFailures('industry_perf');
-    console.log(`[scheduler] Industry performance refreshed: ${perfData.industries?.length} industries`);
 
-    const sectors = await computeSectorsData();
-    setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
-    console.log(`[scheduler] Sectors refreshed: ${sectors.length} sectors`);
-
-    await Promise.allSettled([
-      (async () => {
-        try {
-          const rotData = await computeRotationData();
-          setCache('rrg_rotation', rotData, CACHE_TTL.SECTORS);
-          console.log(`[scheduler] Rotation data refreshed`);
-          clearFailures('rotation');
-        } catch (err: any) {
-          console.error(`[scheduler] Rotation error: ${err.message}`);
-          sendAlert('Rotation Data Refresh Failed', `RRG rotation data failed during ${windowLabel}.\n\nError: ${err.message}`, 'rotation');
+      let perfData = await computeIndustryPerformance();
+      if (!perfData.fullyEnriched) {
+        const persisted = loadPersistedIndustryPerf();
+        if (persisted) {
+          perfData = persisted;
+          console.log(`[scheduler] Falling back to persisted industry performance`);
         }
-      })(),
-      (async () => {
-        try {
-          const breadth = await computeMarketBreadth(true);
-          setCache('market_breadth', breadth, CACHE_TTL.BREADTH);
-          console.log(`[scheduler] Market Quality refreshed: score=${breadth.overallScore}`);
-          clearFailures('breadth_scan');
-        } catch (err: any) {
-          console.error(`[scheduler] Breadth error: ${err.message}`);
-          sendAlert('Market Breadth Scan Failed', `Breadth scan failed during ${windowLabel} refresh.\n\nError: ${err.message}`, 'breadth_scan');
-        }
-      })(),
-    ]);
+        sendAlert('Industry Performance Incomplete', `Industry performance not fully enriched during ${windowLabel}. Using ${persisted ? 'persisted cache' : 'empty data'} as fallback.`, 'industry_perf');
+      }
+      setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
+      if (perfData.fullyEnriched) clearFailures('industry_perf');
+      console.log(`[scheduler] Industry performance refreshed: ${perfData.industries?.length} industries`);
 
-    try {
-      const mtPerf = await computeMegatrendPerformance();
-      console.log(`[scheduler] Megatrend performance refreshed: ${mtPerf.size} baskets`);
-    } catch (err: any) {
-      console.error(`[scheduler] Megatrend performance error: ${err.message}`);
+      const sectors = await computeSectorsData();
+      setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
+      console.log(`[scheduler] Sectors refreshed: ${sectors.length} sectors`);
+
+      await Promise.allSettled([
+        (async () => {
+          try {
+            const rotData = await computeRotationData();
+            setCache('rrg_rotation', rotData, CACHE_TTL.SECTORS);
+            console.log(`[scheduler] Rotation data refreshed`);
+            clearFailures('rotation');
+          } catch (err: any) {
+            console.error(`[scheduler] Rotation error: ${err.message}`);
+            sendAlert('Rotation Data Refresh Failed', `RRG rotation data failed during ${windowLabel}.\n\nError: ${err.message}`, 'rotation');
+          }
+        })(),
+        (async () => {
+          try {
+            const breadth = await computeMarketBreadth(true);
+            setCache('market_breadth', breadth, CACHE_TTL.BREADTH);
+            console.log(`[scheduler] Market Quality refreshed: score=${breadth.overallScore}`);
+            clearFailures('breadth_scan');
+          } catch (err: any) {
+            console.error(`[scheduler] Breadth error: ${err.message}`);
+            sendAlert('Market Breadth Scan Failed', `Breadth scan failed during ${windowLabel} refresh.\n\nError: ${err.message}`, 'breadth_scan');
+          }
+        })(),
+      ]);
+
+      try {
+        const mtPerf = await computeMegatrendPerformance();
+        console.log(`[scheduler] Megatrend performance refreshed: ${mtPerf.size} baskets`);
+      } catch (err: any) {
+        console.error(`[scheduler] Megatrend performance error: ${err.message}`);
         sendAlert('Megatrend Performance Refresh Failed', `Megatrend performance computation failed during ${windowLabel} refresh.\n\nError: ${(err as any).message}`, 'megatrend_perf');
-    }
+      }
 
-    try {
-      const digest = await scrapeFinvizDigest(true);
-      console.log(`[scheduler] News digest refreshed: ${digest ? 'ok' : 'empty'}`);
-    } catch (err: any) {
-      console.log(`[scheduler] News digest error: ${err.message}`);
-    }
+      try {
+        const digest = await scrapeFinvizDigest(true);
+        console.log(`[scheduler] News digest refreshed: ${digest ? 'ok' : 'empty'}`);
+      } catch (err: any) {
+        console.log(`[scheduler] News digest error: ${err.message}`);
+      }
 
-    try {
-      const premarket = await scrapeBriefingPreMarket(true);
-      console.log(`[scheduler] Pre-market briefing refreshed: ${premarket?.entries?.length ?? 0} entries`);
-    } catch (err: any) {
-      console.log(`[scheduler] Pre-market briefing error: ${err.message}`);
-    }
+      try {
+        const premarket = await scrapeBriefingPreMarket(true);
+        console.log(`[scheduler] Pre-market briefing refreshed: ${premarket?.entries?.length ?? 0} entries`);
+      } catch (err: any) {
+        console.log(`[scheduler] Pre-market briefing error: ${err.message}`);
+      }
 
-    console.log(`[scheduler] === Full data refresh complete: ${windowLabel} in ${((Date.now() - start) / 1000).toFixed(1)}s ===`);
+      console.log(`[scheduler] === Full data refresh complete: ${windowLabel} in ${((Date.now() - start) / 1000).toFixed(1)}s ===`);
+    } catch (outerErr: any) {
+      console.error(`[scheduler] Unhandled error in full refresh ${windowLabel}: ${outerErr.message}`);
+    } finally {
+      isFullRefreshRunning = false;
+    }
   }
 
   setInterval(() => {
@@ -1595,9 +1606,9 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  const ADMIN_USER_ID = '54198443';
   const isAdmin = (req: any): boolean => {
-    return req.user?.claims?.sub === ADMIN_USER_ID;
+    const adminId = process.env.ADMIN_USER_ID;
+    return adminId ? req.user?.claims?.sub === adminId : false;
   };
 
   app.get('/api/megatrends', async (req, res) => {

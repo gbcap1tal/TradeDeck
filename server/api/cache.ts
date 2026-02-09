@@ -2,9 +2,16 @@ import NodeCache from 'node-cache';
 
 const cache = new NodeCache({ checkperiod: 120 });
 
-const staleCache = new NodeCache({ checkperiod: 0, stdTTL: 0 });
+const staleCache = new NodeCache({
+  checkperiod: 600,
+  stdTTL: 86400 * 3,
+  maxKeys: 5000,
+});
 
 const refreshingKeys = new Set<string>();
+
+const REFRESH_TIMEOUT_MS = 120_000;
+const refreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 export const CACHE_TTL = {
   QUOTE: 60,
@@ -30,7 +37,7 @@ export function getStale<T>(key: string): T | undefined {
 
 export function setCache<T>(key: string, value: T, ttlSeconds: number): void {
   cache.set(key, value, ttlSeconds);
-  staleCache.set(key, value, 0);
+  staleCache.set(key, value, 86400 * 3);
 }
 
 export function isRefreshing(key: string): boolean {
@@ -39,10 +46,21 @@ export function isRefreshing(key: string): boolean {
 
 export function markRefreshing(key: string): void {
   refreshingKeys.add(key);
+  const existing = refreshTimers.get(key);
+  if (existing) clearTimeout(existing);
+  refreshTimers.set(key, setTimeout(() => {
+    refreshingKeys.delete(key);
+    refreshTimers.delete(key);
+  }, REFRESH_TIMEOUT_MS));
 }
 
 export function clearRefreshing(key: string): void {
   refreshingKeys.delete(key);
+  const timer = refreshTimers.get(key);
+  if (timer) {
+    clearTimeout(timer);
+    refreshTimers.delete(key);
+  }
 }
 
 export function clearCache(): void {
