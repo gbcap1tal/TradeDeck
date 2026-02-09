@@ -240,12 +240,12 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
   const formatRev = (v: number) => `${v.toFixed(1)}B`;
   const formatEps = (v: number) => `$${v.toFixed(2)}`;
 
-  const BAR_MAX_H = 60;
+  const BAR_MAX_H = 50;
 
   return (
-    <div className="glass-card rounded-xl px-4 py-3 h-full flex flex-col" data-testid="card-earnings-sales">
+    <div className="glass-card rounded-xl px-4 py-3 h-full flex flex-col overflow-hidden" data-testid="card-earnings-sales">
       <div className="flex items-center justify-between mb-2 flex-shrink-0 flex-wrap gap-1">
-        <h2 className="text-[13px] font-semibold text-white/90 tracking-wide">Earnings & Revenue</h2>
+        <h2 className="text-[13px] font-semibold text-white/90 tracking-wide">Sales & EPS</h2>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
@@ -282,10 +282,10 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col gap-2">
+      <div className="flex-1 min-h-0 flex flex-col gap-1 overflow-hidden">
         <div className="flex-1 min-h-0 flex flex-col">
           <div className="flex items-center gap-2 mb-1 flex-shrink-0">
-            <span className="text-[12px] text-white/40 uppercase tracking-widest font-semibold">Revenue</span>
+            <span className="text-[12px] text-white/40 uppercase tracking-widest font-semibold">Sales</span>
             {hoveredRevIdx !== null && (
               <span className="text-[12px] font-mono-nums text-white/50">
                 {data[hoveredRevIdx].quarter}: <span className="text-white/80">{formatRev(data[hoveredRevIdx].revenue)}</span>
@@ -499,17 +499,19 @@ export default function StockDetail() {
               </div>
 
               <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-2">
-                <div className="lg:col-span-7 flex flex-col gap-2 min-h-0">
-                  <div className="h-[260px] flex-shrink-0">
+                <div className="lg:col-span-7 flex flex-col gap-2 min-h-0" style={{ height: 'calc(100vh - 100px)' }}>
+                  <div className="flex-[3] min-h-0">
                     <StockChart symbol={symbol} currentPrice={quote.price} compact />
                   </div>
-                  <div className="h-[240px] flex-shrink-0">
+                  <div className="flex-[3] min-h-0">
                     <EarningsSalesChart symbol={symbol} />
                   </div>
-                  <NewsPanel symbol={symbol} />
+                  <div className="flex-[2] min-h-0">
+                    <NewsPanel symbol={symbol} />
+                  </div>
                 </div>
 
-                <div className="lg:col-span-5 min-h-0">
+                <div className="lg:col-span-5 min-h-0" style={{ height: 'calc(100vh - 100px)' }}>
                   <StockQualityPanel symbol={symbol} />
                 </div>
               </div>
