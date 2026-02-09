@@ -96,7 +96,7 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
             value={quality.details.rsVsSpy > 0 ? String(quality.details.rsVsSpy) : '—'}
             color={quality.details.rsVsSpy >= 80 ? "text-[#30d158]" : quality.details.rsVsSpy >= 50 ? "text-[#ffd60a]" : quality.details.rsVsSpy > 0 ? "text-[#ff453a]/80" : "text-white/30"}
           />
-          <QualityRow label="ADR %" value={`${quality.details.adr}%`} />
+
           <QualityRow label="Inst. Own" value={`${quality.details.instOwnership}%`} />
 
           <QualityRow label="Avg Vol 50D" value={formatVolume(quality.details.avgVolume50d)} />
