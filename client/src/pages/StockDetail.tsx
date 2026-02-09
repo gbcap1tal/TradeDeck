@@ -65,9 +65,9 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
   };
 
   const overextColors: Record<string, string> = {
-    '<4': 'text-[#30d158]',
+    '≤3': 'text-[#30d158]',
     '4-6': 'text-[#ffd60a]',
-    '>=7': 'text-[#ff453a]',
+    '7+': 'text-[#ff453a]',
   };
 
   const pctColor = (val: number): string => {
@@ -169,7 +169,7 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
               <span className={cn("text-[12px] font-mono-nums font-medium", overextColors[quality.trend.overextensionFlag])}>
                 {quality.trend.overextensionFlag} ATR
               </span>
-              {quality.trend.overextensionFlag === '>=7' && (
+              {quality.trend.overextensionFlag === '7+' && (
                 <AlertTriangle className="w-3 h-3 text-[#ff453a]/70" />
               )}
             </div>
