@@ -27,7 +27,7 @@ Preferred communication style: Simple, everyday language.
 - **API**: All routes prefixed with `/api/`.
 - **Data Sources**: Aggregates data from Yahoo Finance, Financial Modeling Prep, and Finviz (via scraping).
 - **Data Processing**:
-    - **Finviz Scraper**: Fetches all US stocks (~9,600), categorizes by Finviz's sector/industry classification, and caches data. Used for sector/industry mapping and stock search.
+    - **Finviz Scraper**: Fetches all US stocks (~9,600) with market cap data, categorizes by Finviz's sector/industry classification, and caches data. Used for sector/industry mapping, stock search, and cap-weighted performance calculations.
     - **Market Breadth**: Computes Market Quality Score and various breadth indicators (MA%, H/L, 4% movers) across ~3000 large-cap US stocks using Yahoo Finance screener API. Scheduled twice daily.
     - **Relative Strength (RS) Ratings**: A Python script computes true IBD-style RS ratings (1-99 percentile) for ~3,800+ stocks based on weighted momentum scores, saved to a file for server lookup.
     - **Hourly Scheduler**: Refreshes core data (Finviz, sectors, breadth, megatrend performance) hourly during market hours.
@@ -39,7 +39,7 @@ Preferred communication style: Simple, everyday language.
 - **ORM**: Drizzle ORM.
 - **Schema**: Defined in `shared/schema.ts` and `shared/models/auth.ts`.
 - **Tables**: `sessions`, `users`, `watchlists`, `watchlistItems`, `megatrends`.
-- **Megatrends**: Stores custom industry baskets; performance is dynamically computed based on constituent stocks.
+- **Megatrends**: Stores custom industry baskets; performance is dynamically computed using market-cap weighted averages of constituent stocks.
 
 ### Shared Code
 - Centralized Zod schemas for database and API validation, and API contract types.

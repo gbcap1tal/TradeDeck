@@ -18,12 +18,14 @@ export interface FinvizStock {
   sector: string;
   industry: string;
   changePercent?: number;
+  marketCap?: number;
 }
 
 export interface FinvizStockEntry {
   symbol: string;
   name: string;
   changePercent: number;
+  marketCap: number;
 }
 
 export interface FinvizIndustryData {
@@ -87,6 +89,20 @@ async function fetchPage(url: string): Promise<{ html: string | null; status: nu
   }
 }
 
+function parseMarketCap(mcStr: string): number {
+  if (!mcStr || mcStr === '-') return 0;
+  const cleaned = mcStr.trim();
+  const match = cleaned.match(/^([\d.]+)([BMKT]?)$/i);
+  if (!match) return 0;
+  const num = parseFloat(match[1]);
+  const suffix = (match[2] || '').toUpperCase();
+  if (suffix === 'T') return num * 1e12;
+  if (suffix === 'B') return num * 1e9;
+  if (suffix === 'M') return num * 1e6;
+  if (suffix === 'K') return num * 1e3;
+  return num;
+}
+
 function parseScreenerPage(html: string): { stocks: FinvizStock[]; totalRows: number } {
   const $ = cheerio.load(html);
   const stocks: FinvizStock[] = [];
@@ -106,11 +122,13 @@ function parseScreenerPage(html: string): { stocks: FinvizStock[]; totalRows: nu
     const company = cells.eq(2).text().trim();
     const sector = cells.eq(3).text().trim();
     const industry = cells.eq(4).text().trim();
+    const mcStr = cells.eq(6).text().trim();
+    const marketCap = parseMarketCap(mcStr);
     const changeStr = cells.eq(9).text().trim().replace('%', '');
     const changePercent = parseFloat(changeStr) || 0;
 
     if (ticker && sector && industry) {
-      stocks.push({ symbol: ticker, name: company, sector, industry, changePercent });
+      stocks.push({ symbol: ticker, name: company, sector, industry, changePercent, marketCap });
     }
   });
 
@@ -236,6 +254,7 @@ function organizeByIndustry(stocks: FinvizStock[]): FinvizSectorData {
       symbol: stock.symbol,
       name: stock.name,
       changePercent: stock.changePercent ?? 0,
+      marketCap: stock.marketCap ?? 0,
     });
   }
 
@@ -358,6 +377,23 @@ export function getStocksForIndustry(industryName: string): FinvizStockEntry[] {
 export function getIndustryAvgChange(industryName: string): number {
   const stocks = getStocksForIndustry(industryName);
   if (stocks.length === 0) return 0;
+  return capWeightedChange(stocks);
+}
+
+export function capWeightedChange(stocks: FinvizStockEntry[]): number {
+  if (stocks.length === 0) return 0;
+  let totalCap = 0;
+  let weightedSum = 0;
+  for (const s of stocks) {
+    const cap = s.marketCap || 0;
+    if (cap > 0) {
+      weightedSum += (s.changePercent || 0) * cap;
+      totalCap += cap;
+    }
+  }
+  if (totalCap > 0) {
+    return Math.round((weightedSum / totalCap) * 100) / 100;
+  }
   const sum = stocks.reduce((acc, s) => acc + (s.changePercent || 0), 0);
   return Math.round((sum / stocks.length) * 100) / 100;
 }

@@ -134,12 +134,19 @@ async function computeMegatrendPerformance(): Promise<Map<number, any>> {
   const finvizData = getFinvizDataSync();
 
   for (const mt of mts) {
-    let dailySum = 0, weekSum = 0, monthSum = 0, quarterSum = 0, halfSum = 0, yearSum = 0, ytdSum = 0;
+    let dailyWeightedSum = 0, dailyTotalCap = 0, dailyEqSum = 0, dailyEqCount = 0;
+    let weekWeightedSum = 0, weekTotalCap = 0;
+    let monthWeightedSum = 0, monthTotalCap = 0;
+    let quarterWeightedSum = 0, quarterTotalCap = 0;
+    let halfWeightedSum = 0, halfTotalCap = 0;
+    let yearWeightedSum = 0, yearTotalCap = 0;
+    let ytdWeightedSum = 0, ytdTotalCap = 0;
     let dailyCount = 0, multiCount = 0;
 
     const uniqueTickers = Array.from(new Set(mt.tickers.map(t => t.toUpperCase())));
     for (const upper of uniqueTickers) {
 
+      let stockCap = 0;
       if (finvizData) {
         let found = false;
         for (const sectorData of Object.values(finvizData)) {
@@ -147,7 +154,14 @@ async function computeMegatrendPerformance(): Promise<Map<number, any>> {
           for (const stockList of Object.values(sectorData.stocks)) {
             const stock = stockList.find(s => s.symbol?.toUpperCase() === upper);
             if (stock && stock.changePercent !== undefined) {
-              dailySum += stock.changePercent;
+              stockCap = stock.marketCap || 0;
+              if (stockCap > 0) {
+                dailyWeightedSum += stock.changePercent * stockCap;
+                dailyTotalCap += stockCap;
+              } else {
+                dailyEqSum += stock.changePercent;
+                dailyEqCount++;
+              }
               dailyCount++;
               found = true;
               break;
@@ -158,25 +172,29 @@ async function computeMegatrendPerformance(): Promise<Map<number, any>> {
 
       const prices = tickerPrices.get(upper);
       if (prices && prices.current > 0) {
-        if (prices.w > 0) weekSum += ((prices.current - prices.w) / prices.w) * 100;
-        if (prices.m > 0) monthSum += ((prices.current - prices.m) / prices.m) * 100;
-        if (prices.q > 0) quarterSum += ((prices.current - prices.q) / prices.q) * 100;
-        if (prices.h > 0) halfSum += ((prices.current - prices.h) / prices.h) * 100;
-        if (prices.y > 0) yearSum += ((prices.current - prices.y) / prices.y) * 100;
-        if (prices.ytd > 0) ytdSum += ((prices.current - prices.ytd) / prices.ytd) * 100;
+        const cap = stockCap || 1;
+        if (prices.w > 0) { weekWeightedSum += ((prices.current - prices.w) / prices.w) * 100 * cap; weekTotalCap += cap; }
+        if (prices.m > 0) { monthWeightedSum += ((prices.current - prices.m) / prices.m) * 100 * cap; monthTotalCap += cap; }
+        if (prices.q > 0) { quarterWeightedSum += ((prices.current - prices.q) / prices.q) * 100 * cap; quarterTotalCap += cap; }
+        if (prices.h > 0) { halfWeightedSum += ((prices.current - prices.h) / prices.h) * 100 * cap; halfTotalCap += cap; }
+        if (prices.y > 0) { yearWeightedSum += ((prices.current - prices.y) / prices.y) * 100 * cap; yearTotalCap += cap; }
+        if (prices.ytd > 0) { ytdWeightedSum += ((prices.current - prices.ytd) / prices.ytd) * 100 * cap; ytdTotalCap += cap; }
         multiCount++;
       }
     }
 
     const round2 = (v: number) => Math.round(v * 100) / 100;
+    const capWtAvg = (wSum: number, tCap: number) => tCap > 0 ? round2(wSum / tCap) : 0;
+    let dailyChange = capWtAvg(dailyWeightedSum, dailyTotalCap);
+    if (dailyChange === 0 && dailyEqCount > 0) dailyChange = round2(dailyEqSum / dailyEqCount);
     perfMap.set(mt.id, {
-      dailyChange: dailyCount > 0 ? round2(dailySum / dailyCount) : 0,
-      weeklyChange: multiCount > 0 ? round2(weekSum / multiCount) : 0,
-      monthlyChange: multiCount > 0 ? round2(monthSum / multiCount) : 0,
-      quarterChange: multiCount > 0 ? round2(quarterSum / multiCount) : 0,
-      halfChange: multiCount > 0 ? round2(halfSum / multiCount) : 0,
-      yearlyChange: multiCount > 0 ? round2(yearSum / multiCount) : 0,
-      ytdChange: multiCount > 0 ? round2(ytdSum / multiCount) : 0,
+      dailyChange,
+      weeklyChange: capWtAvg(weekWeightedSum, weekTotalCap),
+      monthlyChange: capWtAvg(monthWeightedSum, monthTotalCap),
+      quarterChange: capWtAvg(quarterWeightedSum, quarterTotalCap),
+      halfChange: capWtAvg(halfWeightedSum, halfTotalCap),
+      yearlyChange: capWtAvg(yearWeightedSum, yearTotalCap),
+      ytdChange: capWtAvg(ytdWeightedSum, ytdTotalCap),
     });
   }
 
@@ -256,10 +274,12 @@ async function computeIndustryPerformance(etfOnly: boolean = false): Promise<any
         return sectorIndustries.some(si => si.toLowerCase() === ind.name.toLowerCase());
       });
 
+      const capWeightedDaily = getIndustryAvgChange(ind.name);
+
       return {
         name: ind.name,
         sector: sectorMatch?.name || '',
-        dailyChange: ind.perfDay,
+        dailyChange: capWeightedDaily !== 0 ? capWeightedDaily : ind.perfDay,
         weeklyChange: ind.perfWeek,
         monthlyChange: ind.perfMonth,
         quarterChange: ind.perfQuarter,
@@ -1494,8 +1514,7 @@ export async function registerRoutes(
           return { ...mt, ...cached, tickerCount: mt.tickers.length };
         }
 
-        let dailyChange = 0;
-        let count = 0;
+        let weightedSum = 0, totalCap = 0, eqSum = 0, eqCount = 0;
         const uniqueFallbackTickers = Array.from(new Set(mt.tickers.map((t: string) => t.toUpperCase())));
         if (finvizData && uniqueFallbackTickers.length > 0) {
           for (const ticker of uniqueFallbackTickers) {
@@ -1505,8 +1524,14 @@ export async function registerRoutes(
               for (const stockList of Object.values(sectorData.stocks)) {
                 const stock = stockList.find(s => s.symbol?.toUpperCase() === ticker.toUpperCase());
                 if (stock) {
-                  dailyChange += stock.changePercent || 0;
-                  count++;
+                  const cap = stock.marketCap || 0;
+                  if (cap > 0) {
+                    weightedSum += (stock.changePercent || 0) * cap;
+                    totalCap += cap;
+                  } else {
+                    eqSum += stock.changePercent || 0;
+                    eqCount++;
+                  }
                   found = true;
                   break;
                 }
@@ -1514,9 +1539,11 @@ export async function registerRoutes(
             }
           }
         }
+        let dailyChange = totalCap > 0 ? Math.round((weightedSum / totalCap) * 100) / 100 : 0;
+        if (dailyChange === 0 && eqCount > 0) dailyChange = Math.round((eqSum / eqCount) * 100) / 100;
         return {
           ...mt,
-          dailyChange: count > 0 ? Math.round((dailyChange / count) * 100) / 100 : 0,
+          dailyChange,
           weeklyChange: 0, monthlyChange: 0, quarterChange: 0, halfChange: 0, yearlyChange: 0,
           tickerCount: mt.tickers.length,
         };
