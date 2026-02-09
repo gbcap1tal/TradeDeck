@@ -211,10 +211,10 @@ export function MarketBreadth() {
       </div>
 
       <div className="glass-card rounded-xl p-6">
-        <div className="flex items-center justify-center gap-10">
+        <div className="flex items-center gap-8">
           <ScoreRing score={overall} label={condition} />
 
-          <div className="flex-1 max-w-[320px] flex flex-col gap-3">
+          <div className="flex-1 flex flex-col gap-3">
             {tiers.map(tier => (
               <TierBar key={tier.name} {...tier} />
             ))}
