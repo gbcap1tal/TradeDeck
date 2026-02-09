@@ -3,7 +3,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { useStockQuote, useStockQuality, useStockEarnings, useStockNews } from "@/hooks/use-stocks";
 import { StockChart } from "@/components/stock/StockChart";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Plus, TrendingDown, TrendingUp, Check, X, AlertTriangle, Calendar, Newspaper } from "lucide-react";
+import { ChevronRight, Plus, TrendingDown, TrendingUp, Check, X, AlertTriangle, Calendar, Newspaper, Flame, Zap } from "lucide-react";
 import { useAddToWatchlist, useWatchlists } from "@/hooks/use-watchlists";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
@@ -124,19 +124,24 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
           <QualityRow label="Sales QoQ" value={`${quality.fundamentals.salesQoQ > 0 ? '+' : ''}${quality.fundamentals.salesQoQ}%`} color={pctColor(quality.fundamentals.salesQoQ)} />
           <QualityRow label="EPS YoY" value={`${quality.fundamentals.epsYoY > 0 ? '+' : ''}${quality.fundamentals.epsYoY}%`} color={pctColor(quality.fundamentals.epsYoY)} />
           <QualityRow label="Sales YoY" value={`${quality.fundamentals.salesYoY > 0 ? '+' : ''}${quality.fundamentals.salesYoY}%`} color={pctColor(quality.fundamentals.salesYoY)} />
-          <QualityRow
-            label="Earnings Accel."
-            value={
-              quality.fundamentals.earningsAcceleration >= 5 ? `${quality.fundamentals.earningsAcceleration}Q` :
-              quality.fundamentals.earningsAcceleration >= 3 ? `${quality.fundamentals.earningsAcceleration}Q` :
-              quality.fundamentals.earningsAcceleration > 0 ? `${quality.fundamentals.earningsAcceleration}Q` : '—'
-            }
-            color={
-              quality.fundamentals.earningsAcceleration >= 5 ? "text-[#30d158]" :
-              quality.fundamentals.earningsAcceleration >= 3 ? "text-[#ffd60a]" :
-              quality.fundamentals.earningsAcceleration > 0 ? "text-white/60" : "text-white/30"
-            }
-          />
+          <div className="flex items-center justify-between py-[3px]">
+            <span className="text-[11px] text-white/50">Earnings Accel.</span>
+            <span className="text-[11px] font-medium">
+              {quality.fundamentals.earningsAcceleration >= 5 ? (
+                <span className="flex items-center gap-1 text-[#ff9f0a]">
+                  <Flame className="w-3.5 h-3.5" />
+                  <span>{quality.fundamentals.earningsAcceleration}Q</span>
+                </span>
+              ) : quality.fundamentals.earningsAcceleration >= 3 ? (
+                <span className="flex items-center gap-1 text-[#30d158]">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>{quality.fundamentals.earningsAcceleration}Q</span>
+                </span>
+              ) : (
+                <span className="text-white/30">—</span>
+              )}
+            </span>
+          </div>
 
         </div>
 
