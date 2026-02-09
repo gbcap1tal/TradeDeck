@@ -1,0 +1,56 @@
+Agisci come un Senior Python Developer esperto in analisi tecnica quantitativa.
+Il mio obiettivo è creare una Web App su Replit utilizzando Streamlit e yfinance.
+
+L'app deve analizzare una lista di ticker azionari e restituire una tabella (DataFrame) con una colonna specifica chiamata "Weinstein Stage" che contenga SOLO il numero dello stage (1, 2, 3, o 4).
+
+Ecco le specifiche tecniche dettagliate che devi seguire rigorosamente:
+
+1. LIBRERIE:
+   - Usa `streamlit` per l'interfaccia utente.
+   - Usa `yfinance` per scaricare i dati.
+   - Usa `pandas` e `numpy` per i calcoli vettoriali.
+
+2. INPUT UTENTE:
+   - Una text area dove inserire i ticker separati da virgola (es: AAPL, NVDA, TSLA, MSFT).
+   - Un pulsante "Analizza".
+
+3. LOGICA DI CALCOLO (Cuore dell'algoritmo):
+   - Scarica dati storici di 2 anni con intervallo SETTIMANALE ('1wk'). La Stage Analysis si fa SOLO su grafici settimanali.
+   - Scarica anche l'indice S&P 500 (^GSPC) per il calcolo della forza relativa.
+   
+   Per ogni ticker, calcola:
+   A. SMA 30: La media mobile semplice a 30 settimane sui prezzi di chiusura.
+   B. Slope (Inclinazione): Calcola la differenza tra la SMA 30 attuale e la SMA 30 di 4 settimane fa.
+   C. Mansfield Relative Strength (RS):
+      - Formula: ((Close_Stock / Close_SP500) / Media_Mobile_52_Settimane(Close_Stock / Close_SP500)) - 1
+   
+4. LOGICA DI ASSEGNAZIONE STAGE (Output 1, 2, 3, 4):
+   Devi creare una funzione che restituisca un intero (1, 2, 3, 4) basandosi su queste regole condizionali precise:
+
+   - STAGE 2 (Avanzamento):
+     SE (Prezzo > SMA30) E (Slope > 0) E (Mansfield RS > 0 o in crescita).
+     OUTPUT: 2
+   
+   - STAGE 4 (Declino):
+     SE (Prezzo < SMA30) E (Slope < 0).
+     OUTPUT: 4
+   
+   - STAGE 1 (Base/Accumulazione):
+     SE (Prezzo oscilla vicino alla SMA30) E (Slope è "piatta", ovvero molto vicina a 0 in valore assoluto) E (Il prezzo viene da un trend ribassista o laterale).
+     OUTPUT: 1
+   
+   - STAGE 3 (Top/Distribuzione):
+     SE (Prezzo rompe sotto la SMA30 o oscilla) E (Slope inizia ad appiattirsi dopo essere stata positiva) E (Mansfield RS inizia a scendere).
+     OUTPUT: 3
+
+   *Nota: Se la condizione è ambigua, usa la logica della pendenza (Slope). Slope positivo = tendenza al 2, Slope negativo = tendenza al 4, Slope piatto = 1 o 3.*
+
+5. OUTPUT VISIVO:
+   - Mostra una tabella pulita con le colonne: "Ticker", "Prezzo", "SMA 30W", "Mansfield RS", "Weinstein Stage".
+   - Usa `st.dataframe` per mostrare i dati.
+   - Applica una formattazione condizionale (colore) alla colonna "Weinstein Stage": Verde per 2, Rosso per 4, Giallo per 1 e 3.
+
+6. GESTIONE ERRORI:
+   - Se un ticker non ha abbastanza dati (meno di 52 settimane), saltalo o scrivi "Dati Insufficienti" senza rompere l'app.
+
+Genera un unico file `main.py` completo e pronto all'uso.

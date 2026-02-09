@@ -158,7 +158,6 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
           <BoolIndicator label="Price > 20 EMA" value={quality.trend.aboveEma20} />
           <BoolIndicator label="Price > 50 SMA" value={quality.trend.aboveSma50} />
           <BoolIndicator label="Price > 200 SMA" value={quality.trend.aboveSma200} />
-          <BoolIndicator label="MA Aligned" value={quality.trend.maAlignment} />
           <QualityRow
             label="Dist 50 SMA"
             value={`${quality.trend.distFromSma50 > 0 ? '+' : ''}${quality.trend.distFromSma50}%`}

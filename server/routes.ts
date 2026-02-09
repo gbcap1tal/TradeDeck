@@ -1133,7 +1133,7 @@ export async function registerRoutes(
       details: { marketCap: 0, floatShares: 0, rsVsSpy: 0, rsTimeframe: 'current', adr: 0, instOwnership: 0, numInstitutions: 0, avgVolume50d: 0, shortInterest: 0, shortRatio: 0, shortPercentOfFloat: 0, nextEarningsDate: '', daysToEarnings: 0 },
       fundamentals: { epsQoQ: 0, salesQoQ: 0, epsYoY: 0, salesYoY: 0, earningsAcceleration: 0, salesGrowth1Y: 0 },
       profitability: { epsTTM: 0, fcfTTM: 0, operMarginPositive: false, fcfPositive: false },
-      trend: { weinsteinStage: 1, aboveEma10: false, aboveEma20: false, aboveSma50: false, aboveSma200: false, maAlignment: false, distFromSma50: 0, overextensionFlag: '<4', atrMultiple: 0 },
+      trend: { weinsteinStage: 1, aboveEma10: false, aboveEma20: false, aboveSma50: false, aboveSma200: false, distFromSma50: 0, overextensionFlag: '<4', atrMultiple: 0 },
     };
 
     try {
@@ -1180,12 +1180,8 @@ export async function registerRoutes(
       const emaIndicators = await yahoo.getEMAIndicators(sym);
       const aboveEma10 = emaIndicators.aboveEma10;
       const aboveEma20 = emaIndicators.aboveEma20;
-      const maAlignment = aboveEma10 && aboveEma20 && aboveSma50 && aboveSma200 && sma20Pct > sma50Pct;
 
-      let weinsteinStage = 1;
-      if (aboveSma200 && aboveSma50) weinsteinStage = 2;
-      else if (!aboveSma200 && !aboveSma50) weinsteinStage = 4;
-      else if (!aboveSma50) weinsteinStage = 3;
+      const weinsteinStage = await yahoo.getWeinsteinStage(sym);
 
       const distFromSma50 = Math.round(sma50Pct * 100) / 100;
 
@@ -1304,7 +1300,6 @@ export async function registerRoutes(
           aboveEma20,
           aboveSma50,
           aboveSma200,
-          maAlignment,
           distFromSma50,
           overextensionFlag,
           atrMultiple,

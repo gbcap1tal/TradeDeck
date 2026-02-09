@@ -742,6 +742,87 @@ export async function getBroadMarketData(): Promise<{
   }
 }
 
+export async function getWeinsteinStage(symbol: string): Promise<number> {
+  const cacheKey = `weinstein_${symbol}`;
+  const cached = getCached<number>(cacheKey);
+  if (cached != null) return cached;
+
+  try {
+    const period1 = new Date(Date.now() - 730 * 86400000);
+    const [stockResult, spxResult] = await Promise.all([
+      throttledYahooCall(() => yf.chart(symbol, { period1, interval: '1wk' as const })),
+      throttledYahooCall(() => yf.chart('^GSPC', { period1, interval: '1wk' as const })),
+    ]);
+
+    if (!stockResult?.quotes?.length || stockResult.quotes.length < 52) {
+      return 1;
+    }
+
+    const stockCloses = stockResult.quotes
+      .filter((q: any) => q.close != null)
+      .map((q: any) => q.close as number);
+
+    const spxCloses = spxResult?.quotes
+      ?.filter((q: any) => q.close != null)
+      ?.map((q: any) => q.close as number) || [];
+
+    if (stockCloses.length < 52) return 1;
+
+    const sma = (data: number[], period: number, offset = 0): number => {
+      const start = data.length - period - offset;
+      if (start < 0) return 0;
+      const slice = data.slice(start, start + period);
+      return slice.reduce((a, b) => a + b, 0) / period;
+    };
+
+    const price = stockCloses[stockCloses.length - 1];
+    const sma30 = sma(stockCloses, 30);
+    const sma30_4wAgo = sma(stockCloses, 30, 4);
+    const slope = sma30 - sma30_4wAgo;
+
+    let mansfieldRS = 0;
+    if (spxCloses.length >= 52) {
+      const ratios: number[] = [];
+      const minLen = Math.min(stockCloses.length, spxCloses.length);
+      const sCloses = stockCloses.slice(stockCloses.length - minLen);
+      const spCloses = spxCloses.slice(spxCloses.length - minLen);
+      for (let i = 0; i < minLen; i++) {
+        ratios.push(sCloses[i] / spCloses[i]);
+      }
+      const currentRatio = ratios[ratios.length - 1];
+      const ratioSma52 = ratios.length >= 52
+        ? ratios.slice(ratios.length - 52).reduce((a, b) => a + b, 0) / 52
+        : currentRatio;
+      mansfieldRS = (currentRatio / ratioSma52) - 1;
+    }
+
+    const slopeFlat = Math.abs(slope) < (sma30 * 0.005);
+
+    let stage: number;
+    if (price > sma30 && slope > 0) {
+      stage = 2;
+    } else if (price < sma30 && slope < 0) {
+      stage = 4;
+    } else if (slopeFlat || (price < sma30 && slope >= 0)) {
+      if (slope <= 0 || mansfieldRS < 0) {
+        stage = 3;
+      } else {
+        stage = 1;
+      }
+    } else if (price > sma30 && slope <= 0) {
+      stage = 3;
+    } else {
+      stage = 1;
+    }
+
+    setCache(cacheKey, stage, CACHE_TTL.HISTORY);
+    return stage;
+  } catch (e: any) {
+    console.error(`Weinstein stage error for ${symbol}:`, e.message);
+    return 1;
+  }
+}
+
 export async function getEMAIndicators(symbol: string): Promise<{ aboveEma10: boolean; aboveEma20: boolean }> {
   const cacheKey = `ema_ind_${symbol}`;
   const cached = getCached<{ aboveEma10: boolean; aboveEma20: boolean }>(cacheKey);
