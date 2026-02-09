@@ -1,0 +1,136 @@
+import React from 'react';
+import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
+
+// Mock data to simulate your props
+const salesData = [
+  { period: "Q4 '23", value: 137, growth: null },
+  { period: "Q1 '24", value: 106, growth: null },
+  { period: "Q2 '24", value: 98, growth: null },
+  { period: "Q3 '24", value: 146, growth: null },
+  { period: "Q4 '24", value: 172, growth: 26 },
+  { period: "Q1 '25", value: 244, growth: 130 },
+  { period: "Q2 '25", value: 264, growth: 169 },
+  { period: "Q3 '25", value: 285, growth: 95 },
+  { period: "Q4 '25", value: 404, growth: 135, isEst: true },
+  { period: "Q1 '26", value: 401, growth: 65, isEst: true },
+  { period: "Q2 '26", value: 396, growth: 50, isEst: true },
+  { period: "Q3 '26", value: 392, growth: 38, isEst: true },
+];
+
+const epsData = [
+  { period: "Q4 '23", value: -0.03, growth: null },
+  { period: "Q1 '24", value: -0.05, growth: null },
+  { period: "Q2 '24", value: -0.07, growth: null },
+  { period: "Q3 '24", value: -0.03, growth: null },
+  { period: "Q4 '24", value: 0.03, growth: 200 },
+  { period: "Q1 '25", value: 0.05, growth: 200 },
+  { period: "Q2 '25", value: 0.04, growth: 157 },
+  { period: "Q3 '25", value: 0.07, growth: 333 },
+  { period: "Q4 '25", value: 0.21, growth: 600, isEst: true },
+  { period: "Q1 '26", value: 0.19, growth: 280, isEst: true },
+  { period: "Q2 '26", value: 0.17, growth: 325, isEst: true },
+  { period: "Q3 '26", value: 0.15, growth: 114, isEst: true },
+];
+
+const FinancialPanel = () => {
+  // Helper to calculate bar height percentage relative to max value in dataset
+  const getBarHeight = (val, max) => {
+    const percentage = (Math.abs(val) / max) * 100;
+    return `${Math.max(percentage, 5)}%`; // Min 5% height so 0 isn't invisible
+  };
+
+  const maxSales = Math.max(...salesData.map(d => d.value));
+  const maxEps = Math.max(...epsData.map(d => Math.abs(d.value)));
+
+  return (
+    <div className="w-full h-full bg-[#111] text-gray-300 p-4 font-sans">
+      {/* MAIN CONTAINER: Grid ensures exactly equal height for both sections */}
+      <div className="grid grid-rows-2 gap-6 h-[600px]"> 
+        
+        {/* --- SALES SECTION --- */}
+        <ChartSection 
+          title="SALES" 
+          data={salesData} 
+          maxValue={maxSales} 
+          valuePrefix="" 
+          valueSuffix="M"
+          barColor="bg-gray-500"
+          estBarColor="bg-gray-600/50 border border-gray-500 border-dashed"
+        />
+
+        {/* --- EPS SECTION --- */}
+        <ChartSection 
+          title="EPS" 
+          data={epsData} 
+          maxValue={maxEps} 
+          valuePrefix="$" 
+          valueSuffix=""
+          barColor="bg-yellow-600"
+          estBarColor="bg-yellow-900/50 border border-yellow-600 border-dashed"
+          isEps={true}
+        />
+        
+      </div>
+    </div>
+  );
+};
+
+// Reusable Component to ensure identical layout
+const ChartSection = ({ title, data, maxValue, valuePrefix, valueSuffix, barColor, estBarColor, isEps = false }) => {
+  return (
+    <div className="flex flex-col w-full h-full bg-[#1a1a1a] rounded-xl p-5 border border-gray-800 shadow-lg">
+      
+      {/* HEADER: Fixed height at top. Contains Title and Legend */}
+      <div className="flex justify-between items-start mb-2 flex-none h-8">
+        <h3 className="text-xs font-bold tracking-widest text-gray-400 uppercase">{title}</h3>
+        <div className="flex gap-3 text-[10px] text-gray-500">
+          <div className="flex items-center gap-1"><div className={`w-2 h-2 rounded-full ${barColor}`}></div> Actual</div>
+          <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full border border-gray-500 border-dashed"></div> Est.</div>
+        </div>
+      </div>
+
+      {/* CHART AREA: Fills all remaining space. Aligns bars to bottom. */}
+      <div className="flex-1 flex items-end justify-between gap-2 w-full relative">
+        {/* Zero Line for EPS (optional visual guide) */}
+        {isEps && <div className="absolute w-full h-[1px] bg-gray-700 bottom-[30%] z-0 opacity-50"></div>}
+
+        {data.map((item, i) => (
+          <div key={i} className="flex flex-col items-center justify-end h-full flex-1 group relative z-10">
+            
+            {/* Hover Tooltip (UX Upgrade) */}
+            <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-black text-white text-[10px] p-1 rounded border border-gray-700 whitespace-nowrap z-20 pointer-events-none">
+              {item.period}: {valuePrefix}{item.value}{valueSuffix}
+            </div>
+
+            {/* The Bar */}
+            <div 
+              className={`w-full rounded-t-sm transition-all duration-300 hover:brightness-110 ${item.isEst ? estBarColor : (item.value < 0 ? 'bg-red-900/80' : barColor)}`}
+              style={{ height: getBarHeight(item.value, maxValue) }}
+            ></div>
+
+            {/* Labels below bar */}
+            <div className="mt-2 flex flex-col items-center gap-1 w-full">
+              {/* Period Label */}
+              <span className="text-[9px] text-gray-500 font-mono whitespace-nowrap">{item.period}</span>
+              
+              {/* Value Label */}
+              <span className={`text-[10px] font-medium ${item.value < 0 ? 'text-red-400' : 'text-gray-200'}`}>
+                {item.value}
+                <span className="text-[8px] text-gray-500 ml-[1px]">{valueSuffix}</span>
+              </span>
+
+              {/* Growth Badge */}
+              {item.growth && (
+                <span className="text-[9px] font-bold text-green-400 mt-0.5">
+                  +{item.growth}%
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default FinancialPanel;
