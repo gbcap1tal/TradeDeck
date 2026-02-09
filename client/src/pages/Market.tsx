@@ -8,10 +8,10 @@ import { Plus, X, Pencil, Trash2 } from "lucide-react";
 
 const ADMIN_ID = '54198443';
 
-type Timeframe = 'D' | 'W' | 'M' | '3M' | '6M' | 'Y';
+type Timeframe = 'D' | 'W' | 'M' | '3M' | '6M' | 'Y' | 'YTD';
 
 const TF_LABELS: Record<Timeframe, string> = {
-  'D': '1D', 'W': '1W', 'M': '1M', '3M': '3M', '6M': '6M', 'Y': '1Y'
+  'D': '1D', 'W': '1W', 'M': '1M', '3M': '3M', '6M': '6M', 'Y': '1Y', 'YTD': 'YTD'
 };
 
 function getChange(ind: any, tf: Timeframe): number {
@@ -21,6 +21,7 @@ function getChange(ind: any, tf: Timeframe): number {
     case '3M': return ind.quarterChange ?? 0;
     case '6M': return ind.halfChange ?? 0;
     case 'Y': return ind.yearlyChange ?? 0;
+    case 'YTD': return ind.ytdChange ?? 0;
     default: return ind.dailyChange ?? 0;
   }
 }
@@ -279,7 +280,7 @@ export default function Market() {
                 </button>
               )}
               <div className="flex items-center gap-0.5 rounded-md bg-white/[0.04] p-0.5" data-testid="switch-timeframe">
-                {(['D', 'W', 'M', '3M', '6M', 'Y'] as Timeframe[]).map(opt => (
+                {(['D', 'W', 'M', '3M', '6M', 'Y', 'YTD'] as Timeframe[]).map(opt => (
                   <button
                     key={opt}
                     onClick={() => setTf(opt)}
