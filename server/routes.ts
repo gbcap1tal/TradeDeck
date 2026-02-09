@@ -1225,8 +1225,21 @@ export async function registerRoutes(
           .filter(e => e.epsActual != null)
           .sort((a, b) => a.fiscalEndDate.localeCompare(b.fiscalEndDate));
 
-        for (let i = entries.length - 1; i >= 1; i--) {
-          if (entries[i].epsActual! > entries[i - 1].epsActual!) {
+        const qMap = new Map<string, number>();
+        for (const e of entries) {
+          const m = e.fiscalPeriod.match(/(\d{4})Q(\d)/);
+          if (m) qMap.set(`${m[1]}Q${m[2]}`, e.epsActual!);
+        }
+
+        for (let i = entries.length - 1; i >= 0; i--) {
+          const m = entries[i].fiscalPeriod.match(/(\d{4})Q(\d)/);
+          if (!m || entries[i].epsActual == null) break;
+          const yr = parseInt(m[1]);
+          const q = parseInt(m[2]);
+          const prevKey = `${yr - 1}Q${q}`;
+          const prevEps = qMap.get(prevKey);
+          if (prevEps == null) break;
+          if (entries[i].epsActual! > prevEps) {
             epsGrowthStreak++;
           } else {
             break;
