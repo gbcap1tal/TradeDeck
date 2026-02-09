@@ -11,7 +11,7 @@ import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForI
 import { computeMarketBreadth, loadPersistedBreadthData } from "./api/breadth";
 import { getRSScore, getCachedRS } from "./api/rs";
 import { sendAlert, clearFailures } from "./api/alerts";
-import { scrapeFinvizDigest, scrapeBriefingPreMarket } from "./api/news-scrapers";
+import { scrapeFinvizDigest, scrapeBriefingPreMarket, getPersistedDigest, scrapeDigestRaw, saveDigestFromRaw } from "./api/news-scrapers";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripe/stripeClient";
 import { db } from "./db";
 import { users } from "@shared/models/auth";
@@ -685,6 +685,54 @@ function initBackgroundTasks() {
       runFullDataRefresh(windowKey);
     }
   }, 60000);
+
+  let overnightDigestDate = '';
+  let overnightDigestDone = false;
+  let overnightBaselineSignature = '';
+
+  function digestSignature(d: { headline: string; bullets: string[] }): string {
+    return `${d.headline}||${d.bullets.slice(0, 3).join('||')}`;
+  }
+
+  setInterval(async () => {
+    try {
+      const now = new Date();
+      const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const todayStr = `${et.getFullYear()}-${String(et.getMonth() + 1).padStart(2, '0')}-${String(et.getDate()).padStart(2, '0')}`;
+
+      if (todayStr !== overnightDigestDate) {
+        const oldDigest = getPersistedDigest();
+        overnightBaselineSignature = oldDigest ? digestSignature(oldDigest) : '';
+        overnightDigestDone = false;
+        overnightDigestDate = todayStr;
+      }
+
+      if (overnightDigestDone) return;
+
+      const hours = et.getHours();
+      if (hours >= 10) return;
+
+      console.log(`[digest-refresh] Checking for new daily digest...`);
+
+      const result = await scrapeDigestRaw();
+
+      if (!result) {
+        console.log(`[digest-refresh] Scrape returned null, will retry in 15 min`);
+        return;
+      }
+
+      const newSig = digestSignature(result);
+      if (newSig !== overnightBaselineSignature) {
+        overnightDigestDone = true;
+        saveDigestFromRaw(result);
+        console.log(`[digest-refresh] New digest detected and saved! "${result.headline.substring(0, 60)}..." (${result.bullets.length} bullets)`);
+      } else {
+        console.log(`[digest-refresh] Same digest, will check again in 15 min`);
+      }
+    } catch (err: any) {
+      console.log(`[digest-refresh] Error: ${err.message}`);
+    }
+  }, 15 * 60 * 1000);
 
   let lastRSRunKey = '';
   let rsRunning = false;

@@ -79,6 +79,12 @@ function getChromiumPath(): string {
   }
 }
 
+export async function scrapeDigestRaw(): Promise<{ headline: string; bullets: string[] } | null> {
+  let result = await scrapeDigestWithPuppeteer();
+  if (!result) result = await scrapeDigestFallback();
+  return result;
+}
+
 async function scrapeDigestWithPuppeteer(): Promise<{ headline: string; bullets: string[] } | null> {
   let browser;
   try {
@@ -189,6 +195,22 @@ async function scrapeDigestFallback(): Promise<{ headline: string; bullets: stri
   } catch {
     return null;
   }
+}
+
+export function getPersistedDigest(): DailyDigest | null {
+  return loadPersisted<DailyDigest>(DIGEST_PERSIST_PATH, 48);
+}
+
+export function saveDigestFromRaw(result: { headline: string; bullets: string[] }): DailyDigest {
+  const digest: DailyDigest = {
+    headline: result.headline,
+    bullets: result.bullets,
+    timestamp: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }),
+    fetchedAt: Date.now(),
+  };
+  setCache(DIGEST_CACHE_KEY, digest, DIGEST_TTL);
+  persistToFile(DIGEST_PERSIST_PATH, digest);
+  return digest;
 }
 
 export async function scrapeFinvizDigest(forceRefresh = false): Promise<DailyDigest | null> {
