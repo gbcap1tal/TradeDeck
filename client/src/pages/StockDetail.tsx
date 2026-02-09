@@ -92,9 +92,9 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
           <QualityRow label="Market Cap" value={formatLargeNumber(quality.details.marketCap)} />
           <QualityRow label="Float" value={formatVolume(quality.details.floatShares)} />
           <QualityRow
-            label="RS"
-            value={`${quality.details.rsVsSpy >= 0 ? '+' : ''}${quality.details.rsVsSpy.toFixed(1)}%`}
-            color={quality.details.rsVsSpy > 0 ? "text-[#30d158]" : quality.details.rsVsSpy < 0 ? "text-[#ff453a]/80" : "text-white/50"}
+            label="RS Rating"
+            value={quality.details.rsVsSpy > 0 ? String(quality.details.rsVsSpy) : '—'}
+            color={quality.details.rsVsSpy >= 80 ? "text-[#30d158]" : quality.details.rsVsSpy >= 50 ? "text-[#ffd60a]" : quality.details.rsVsSpy > 0 ? "text-[#ff453a]/80" : "text-white/30"}
           />
           <QualityRow label="ADR %" value={`${quality.details.adr}%`} />
           <QualityRow label="Inst. Own" value={`${quality.details.instOwnership}%`} />
