@@ -283,17 +283,26 @@ export async function scrapeBriefingPreMarket(forceRefresh = false): Promise<Pre
       if (m) updated = m[1];
     }
 
+    const cleanText = (raw: string): string => {
+      return raw.replace(/\s*\n\s*/g, ' ').replace(/\s{2,}/g, ' ').trim();
+    };
+
     const extractBodyHtml = (el: ReturnType<typeof $>): string => {
       const lis = el.find('li');
       if (lis.length > 0) {
         const bullets: string[] = [];
         lis.each((_i: number, li: any) => {
-          const text = $(li).text().trim();
+          const text = cleanText($(li).text());
           if (text) bullets.push(text);
         });
         return bullets.map(b => `\u2022 ${b}`).join('\n');
       }
-      return el.text().trim();
+      let html = el.html() || '';
+      html = html.replace(/<br\s*\/?>/gi, '\n');
+      html = html.replace(/<\/p>\s*<p[^>]*>/gi, '\n\n');
+      const text = $('<div>').html(html).text().trim();
+      if (!text || text === '\u00a0' || text === '&nbsp;') return '';
+      return cleanText(text);
     };
 
     const allRows = $('table tr');
@@ -308,21 +317,19 @@ export async function scrapeBriefingPreMarket(forceRefresh = false): Promise<Pre
       if (!timeMatch) continue;
       const time = timeMatch[1];
 
-      const rawTitle = storyTd.text().trim();
-      let ticker = '';
-      let headlineText = '';
+      const boldEl = storyTd.find('b').first();
+      let headlineText = boldEl.length > 0 ? boldEl.text().trim() : '';
 
-      const tickerMatch = rawTitle.match(/^([A-Z]{1,6})\s/);
+      const cellText = storyTd.text().trim();
+      let ticker = '';
+      const tickerMatch = cellText.match(/^([A-Z]{1,6})\s/);
       if (tickerMatch) {
         ticker = tickerMatch[1];
-        headlineText = rawTitle.substring(ticker.length).trim();
-      } else {
-        headlineText = rawTitle;
       }
 
-      const priceTrail = headlineText.match(/\s*\([\d.]+\s*[+\-]?[\d.]*\)\s*$/);
-      if (priceTrail) {
-        headlineText = headlineText.substring(0, headlineText.length - priceTrail[0].length).trim();
+      if (!headlineText) {
+        headlineText = ticker ? cellText.substring(ticker.length).trim() : cellText;
+        headlineText = headlineText.replace(/\s*\([\d.]+[\s\u00a0]*[+\-]?[\d.]*\)\s*$/, '').trim();
       }
 
       let bodyContent = '';
