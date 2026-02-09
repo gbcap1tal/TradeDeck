@@ -250,159 +250,265 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
 
   const BAR_MAX_H = 50;
 
+  const formatRevShort = (v: number) => {
+    const abs = Math.abs(v);
+    if (abs >= 1000) return `${(v / 1000).toFixed(0)}B`;
+    if (abs >= 1) return `${v.toFixed(0)}M`;
+    return `${(v * 1000).toFixed(0)}K`;
+  };
+
+  const isQuarterly = view === 'quarterly';
+  const barCount = data.length;
+  const barGap = barCount > 6 ? 2 : 4;
+
+  const renderRevBar = (d: EarningsQuarterData, i: number) => {
+    const pct = maxRev > 0 ? Math.abs(d.revenue) / maxRev : 0;
+    const barH = Math.max(pct * BAR_MAX_H, 4);
+    const isHov = hoveredRevIdx === i;
+    const growth = d.revenueYoY;
+
+    return (
+      <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0"
+        onMouseEnter={() => setHoveredRevIdx(i)} onMouseLeave={() => setHoveredRevIdx(null)}
+        style={{ cursor: 'pointer' }} data-testid={`bar-revenue-${i}`}>
+        <div className="w-full rounded-t-[3px] transition-all duration-150" style={{
+          height: `${barH}px`,
+          backgroundColor: d.isEstimate
+            ? (isHov ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.15)')
+            : (isHov ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.35)'),
+          border: d.isEstimate ? '1px dashed rgba(255,255,255,0.25)' : 'none',
+        }} />
+        <div className="flex flex-col items-center mt-1.5 gap-[1px] min-w-0 w-full">
+          <span className={cn(
+            "font-mono-nums leading-none truncate w-full text-center",
+            isQuarterly ? "text-[9px]" : "text-[11px]",
+            d.isEstimate ? "text-white/25" : "text-white/55"
+          )}>
+            {d.quarter}
+          </span>
+          <span className={cn(
+            "font-mono-nums leading-none truncate w-full text-center",
+            isQuarterly ? "text-[8px]" : "text-[10px]",
+            "text-white/30"
+          )}>
+            {formatRevShort(d.revenue)}
+          </span>
+          {growth != null && (
+            <span className={cn(
+              "font-mono-nums font-semibold leading-none",
+              isQuarterly ? "text-[8px]" : "text-[10px]",
+              growth >= 0 ? "text-[#30d158]/70" : "text-[#ff453a]/70"
+            )}>
+              {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderEpsBarPositive = (d: EarningsQuarterData, i: number) => {
+    const pct = maxEpsAbs > 0 ? Math.abs(d.eps) / maxEpsAbs : 0;
+    const barH = Math.max(pct * BAR_MAX_H, d.eps > 0 ? 4 : 0);
+    const isHov = hoveredEpsIdx === i;
+    const growth = d.epsYoY;
+    const epsColor = d.eps >= 0
+      ? (d.isEstimate ? (isHov ? 'rgba(251,187,4,0.30)' : 'rgba(251,187,4,0.15)') : (isHov ? 'rgba(251,187,4,0.75)' : 'rgba(251,187,4,0.40)'))
+      : 'transparent';
+
+    return (
+      <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0"
+        onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
+        style={{ cursor: 'pointer' }} data-testid={`bar-eps-${i}`}>
+        <div className="w-full rounded-t-[3px] transition-all duration-150" style={{
+          height: d.eps >= 0 ? `${barH}px` : '0px',
+          backgroundColor: epsColor,
+          border: d.isEstimate && d.eps >= 0 ? '1px dashed rgba(251,187,4,0.3)' : 'none',
+        }} />
+      </div>
+    );
+  };
+
+  const renderEpsBarNegative = (d: EarningsQuarterData, i: number, scale = 1) => {
+    const pct = d.eps < 0 ? Math.abs(d.eps) / maxEpsAbs : 0;
+    const barH = d.eps < 0 ? Math.max(pct * BAR_MAX_H * scale, 4) : 0;
+    const isHov = hoveredEpsIdx === i;
+
+    return (
+      <div key={i} className="flex-1 flex flex-col items-center min-w-0"
+        onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
+        style={{ cursor: 'pointer' }}>
+        <div className="w-full rounded-b-[3px] transition-all duration-150" style={{
+          height: `${barH}px`,
+          backgroundColor: d.isEstimate
+            ? (isHov ? 'rgba(255,69,58,0.30)' : 'rgba(255,69,58,0.15)')
+            : (isHov ? 'rgba(255,69,58,0.75)' : 'rgba(255,69,58,0.40)'),
+          border: d.isEstimate ? '1px dashed rgba(255,69,58,0.3)' : 'none',
+        }} />
+      </div>
+    );
+  };
+
+  const renderEpsLabels = (d: EarningsQuarterData, i: number) => {
+    const growth = d.epsYoY;
+    return (
+      <div key={i} className="flex-1 flex flex-col items-center min-w-0"
+        onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
+        style={{ cursor: 'pointer' }}>
+        <div className="flex flex-col items-center mt-1.5 gap-[1px] min-w-0 w-full">
+          <span className={cn(
+            "font-mono-nums leading-none truncate w-full text-center",
+            isQuarterly ? "text-[9px]" : "text-[11px]",
+            d.isEstimate ? "text-white/25" : "text-white/55"
+          )}>
+            {d.quarter}
+          </span>
+          <span className={cn(
+            "font-mono-nums leading-none truncate w-full text-center",
+            isQuarterly ? "text-[8px]" : "text-[10px]",
+            d.eps >= 0 ? "text-[#FBBB04]/50" : "text-[#ff453a]/50"
+          )}>
+            {formatEps(d.eps)}
+          </span>
+          {growth != null && (
+            <span className={cn(
+              "font-mono-nums font-semibold leading-none",
+              isQuarterly ? "text-[8px]" : "text-[10px]",
+              growth >= 0 ? "text-[#30d158]/70" : "text-[#ff453a]/70"
+            )}>
+              {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderHoverTooltip = (type: 'sales' | 'eps') => {
+    const idx = type === 'sales' ? hoveredRevIdx : hoveredEpsIdx;
+    if (idx === null) return null;
+    const d = data[idx];
+
+    if (type === 'sales') {
+      return (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[12px] font-mono-nums text-white/80 font-medium">{formatRev(d.revenue)}</span>
+          {d.isEstimate && <span className="text-[10px] text-white/30 italic">est.</span>}
+          {d.revenueYoY != null && (
+            <span className={cn("text-[11px] font-mono-nums font-semibold",
+              d.revenueYoY >= 0 ? "text-[#30d158]" : "text-[#ff453a]")}>
+              {d.revenueYoY > 0 ? '+' : ''}{d.revenueYoY.toFixed(1)}% YoY
+            </span>
+          )}
+          <span className="text-[10px] text-white/25">{d.quarter}</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={cn("text-[12px] font-mono-nums font-medium",
+          d.eps >= 0 ? "text-[#FBBB04]" : "text-[#ff453a]")}>{formatEps(d.eps)}</span>
+        {d.isEstimate && <span className="text-[10px] text-white/30 italic">est.</span>}
+        {!d.isEstimate && d.epsEstimate != null && (
+          <span className="text-[10px] text-white/30">est. {formatEps(d.epsEstimate)}</span>
+        )}
+        {d.epsSurprise != null && !d.isEstimate && (
+          <span className={cn("text-[10px] font-mono-nums font-medium",
+            d.epsSurprise >= 0 ? "text-[#30d158]/80" : "text-[#ff453a]/80")}>
+            {d.epsSurprise > 0 ? '+' : ''}{d.epsSurprise.toFixed(1)}%
+          </span>
+        )}
+        {d.epsYoY != null && (
+          <span className={cn("text-[11px] font-mono-nums font-semibold",
+            d.epsYoY >= 0 ? "text-[#30d158]" : "text-[#ff453a]")}>
+            {d.epsYoY > 0 ? '+' : ''}{d.epsYoY.toFixed(1)}% YoY
+          </span>
+        )}
+        <span className="text-[10px] text-white/25">{d.quarter}</span>
+      </div>
+    );
+  };
+
   return (
     <div className="glass-card rounded-xl px-4 py-3 h-full flex flex-col overflow-hidden" data-testid="card-earnings-sales">
-      <div className="flex items-center justify-between mb-2 flex-shrink-0 flex-wrap gap-1">
-        <h2 className="text-[13px] font-semibold text-white/90 tracking-wide">Sales & EPS</h2>
+      <div className="flex items-center justify-end mb-1.5 flex-shrink-0 flex-wrap gap-2">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
-              <div className="w-2.5 h-2.5 rounded-sm bg-white/40" />
-              <span className="text-[10px] text-white/35">Actual</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2.5 h-2.5 rounded-sm border border-dashed border-white/30" />
-              <span className="text-[10px] text-white/35">Estimate</span>
-            </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-sm bg-white/40" />
+            <span className="text-[9px] text-white/30">Actual</span>
           </div>
-          <div className="flex bg-white/[0.06] rounded-md p-0.5">
-            <button
-              onClick={() => setView('quarterly')}
-              className={cn(
-                "text-[10px] px-2.5 py-0.5 rounded transition-colors font-medium",
-                view === 'quarterly' ? "bg-white/10 text-white/80" : "text-white/30 hover:text-white/50"
-              )}
-              data-testid="button-view-quarterly"
-            >
-              Quarterly
-            </button>
-            <button
-              onClick={() => setView('annual')}
-              className={cn(
-                "text-[10px] px-2.5 py-0.5 rounded transition-colors font-medium",
-                view === 'annual' ? "bg-white/10 text-white/80" : "text-white/30 hover:text-white/50"
-              )}
-              data-testid="button-view-annual"
-            >
-              Annual
-            </button>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-sm border border-dashed border-white/25" />
+            <span className="text-[9px] text-white/30">Est.</span>
           </div>
+        </div>
+        <div className="flex bg-white/[0.06] rounded-md p-0.5">
+          <button onClick={() => setView('quarterly')}
+            className={cn("text-[10px] px-2.5 py-0.5 rounded transition-colors font-medium",
+              view === 'quarterly' ? "bg-white/10 text-white/80" : "text-white/30 hover:text-white/50")}
+            data-testid="button-view-quarterly">Q</button>
+          <button onClick={() => setView('annual')}
+            className={cn("text-[10px] px-2.5 py-0.5 rounded transition-colors font-medium",
+              view === 'annual' ? "bg-white/10 text-white/80" : "text-white/30 hover:text-white/50")}
+            data-testid="button-view-annual">Y</button>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col gap-1 overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col gap-0.5 overflow-hidden">
         <div className="flex-1 min-h-0 flex flex-col">
-          <div className="flex items-center gap-2 mb-1 flex-shrink-0">
-            <span className="text-[12px] text-white/40 uppercase tracking-widest font-semibold">Sales</span>
-            {hoveredRevIdx !== null && (
-              <span className="text-[12px] font-mono-nums text-white/50">
-                {data[hoveredRevIdx].quarter}: <span className="text-white/80">{formatRev(data[hoveredRevIdx].revenue)}</span>
-                {data[hoveredRevIdx].isEstimate && data[hoveredRevIdx].salesEstimate != null && (
-                  <span className="text-white/30"> est.</span>
-                )}
-                {data[hoveredRevIdx].revenueYoY != null && (
-                  <span className={data[hoveredRevIdx].revenueYoY! >= 0 ? "text-[#30d158]" : "text-[#ff453a]"}>
-                    {' '}{data[hoveredRevIdx].revenueYoY! > 0 ? '+' : ''}{data[hoveredRevIdx].revenueYoY!.toFixed(1)}% YoY
-                  </span>
-                )}
-              </span>
-            )}
+          <div className="flex items-center gap-3 mb-1 flex-shrink-0 min-h-[18px]">
+            <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold">Sales</span>
+            {hoveredRevIdx !== null && renderHoverTooltip('sales')}
           </div>
-          <div className="flex-1 flex items-end gap-[3px]" data-testid="bars-revenue">
-            {data.map((d, i) => {
-              const pct = maxRev > 0 ? Math.abs(d.revenue) / maxRev : 0;
-              const barH = Math.max(pct * BAR_MAX_H, 4);
-              const isHov = hoveredRevIdx === i;
-              const growth = d.revenueYoY;
-
-              return (
-                <div
-                  key={i}
-                  className="flex-1 flex flex-col items-center justify-end min-w-0"
-                  onMouseEnter={() => setHoveredRevIdx(i)}
-                  onMouseLeave={() => setHoveredRevIdx(null)}
-                  style={{ cursor: 'pointer' }}
-                  data-testid={`bar-revenue-${i}`}
-                >
-                  {growth != null && (
-                    <span className={cn(
-                      "text-[10px] font-mono-nums font-semibold leading-none mb-0.5",
-                      growth >= 0 ? "text-[#30d158]/80" : "text-[#ff453a]/80"
-                    )}>
-                      {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
-                    </span>
-                  )}
-                  {growth == null && <span className="text-[10px] leading-none mb-0.5 invisible">0%</span>}
-                  <div
-                    className="w-full rounded-t-[2px] transition-all duration-150"
-                    style={{
-                      height: `${barH}px`,
-                      backgroundColor: d.isEstimate
-                        ? (isHov ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.15)')
-                        : (isHov ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.35)'),
-                      border: d.isEstimate ? '1px dashed rgba(255,255,255,0.25)' : 'none',
-                    }}
-                  />
-                  <span className={cn(
-                    "text-[10px] font-mono-nums leading-tight mt-1 truncate w-full text-center",
-                    d.isEstimate ? "text-white/25" : "text-white/45"
-                  )}>
-                    {d.quarter}
-                  </span>
-                </div>
-              );
-            })}
+          <div className="flex-1 flex items-end" style={{ gap: `${barGap}px` }} data-testid="bars-revenue">
+            {data.map((d, i) => renderRevBar(d, i))}
           </div>
         </div>
 
-        <div className="border-t border-white/[0.06]" />
+        <div className="border-t border-white/[0.06] my-0.5" />
 
         <div className="flex-1 min-h-0 flex flex-col">
-          <div className="flex items-center gap-2 mb-1 flex-shrink-0">
-            <span className="text-[12px] text-white/40 uppercase tracking-widest font-semibold">EPS</span>
-            {hoveredEpsIdx !== null && (
-              <span className="text-[12px] font-mono-nums text-white/50">
-                {data[hoveredEpsIdx].quarter}: <span className="text-[#FBBB04]">{formatEps(data[hoveredEpsIdx].eps)}</span>
-                {!data[hoveredEpsIdx].isEstimate && data[hoveredEpsIdx].epsEstimate != null && (
-                  <span className="text-white/30"> est. {formatEps(data[hoveredEpsIdx].epsEstimate!)}</span>
-                )}
-                {data[hoveredEpsIdx].isEstimate && (
-                  <span className="text-white/30"> est.</span>
-                )}
-                {data[hoveredEpsIdx].epsSurprise != null && !data[hoveredEpsIdx].isEstimate && (
-                  <span className={data[hoveredEpsIdx].epsSurprise! >= 0 ? "text-[#30d158]/70" : "text-[#ff453a]/70"}>
-                    {' '}{data[hoveredEpsIdx].epsSurprise! > 0 ? '+' : ''}{data[hoveredEpsIdx].epsSurprise!.toFixed(1)}% surp.
-                  </span>
-                )}
-                {data[hoveredEpsIdx].epsYoY != null && (
-                  <span className={data[hoveredEpsIdx].epsYoY! >= 0 ? "text-[#30d158]" : "text-[#ff453a]"}>
-                    {' '}{data[hoveredEpsIdx].epsYoY! > 0 ? '+' : ''}{data[hoveredEpsIdx].epsYoY!.toFixed(1)}% YoY
-                  </span>
-                )}
-              </span>
-            )}
+          <div className="flex items-center gap-3 mb-1 flex-shrink-0 min-h-[18px]">
+            <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold">EPS</span>
+            {hoveredEpsIdx !== null && renderHoverTooltip('eps')}
           </div>
           <div className="flex-1 flex flex-col" data-testid="bars-eps">
             {hasNegativeEps && hasPositiveEps ? (
-              <>
-                <div className="flex items-end gap-[3px]" style={{ height: `${BAR_MAX_H + 16}px` }}>
+              <div className="flex-1 flex flex-col">
+                <div className="flex-[3] flex items-end" style={{ gap: `${barGap}px` }}>
+                  {data.map((d, i) => renderEpsBarPositive(d, i))}
+                </div>
+                <div className="border-t border-white/15 mx-0" />
+                <div className="flex items-start" style={{ gap: `${barGap}px`, height: `${BAR_MAX_H * 0.35}px` }}>
+                  {data.map((d, i) => renderEpsBarNegative(d, i, 0.35))}
+                </div>
+                <div className="flex items-start" style={{ gap: `${barGap}px` }}>
+                  {data.map((d, i) => renderEpsLabels(d, i))}
+                </div>
+              </div>
+            ) : hasNegativeEps ? (
+              <div className="flex-1 flex flex-col">
+                <div className="border-t border-white/15 mx-0" />
+                <div className="flex-1 flex items-start" style={{ gap: `${barGap}px` }}>
+                  {data.map((d, i) => renderEpsBarNegative(d, i, 1))}
+                </div>
+                <div className="flex items-start" style={{ gap: `${barGap}px` }}>
+                  {data.map((d, i) => renderEpsLabels(d, i))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col">
+                <div className="flex-1 flex items-end" style={{ gap: `${barGap}px` }}>
                   {data.map((d, i) => {
-                    const pct = d.eps >= 0 ? d.eps / maxEpsAbs : 0;
-                    const barH = d.eps >= 0 ? Math.max(pct * BAR_MAX_H, d.eps > 0 ? 4 : 0) : 0;
+                    const pct = maxEpsAbs > 0 ? Math.abs(d.eps) / maxEpsAbs : 0;
+                    const barH = Math.max(pct * BAR_MAX_H, 4);
                     const isHov = hoveredEpsIdx === i;
-                    const growth = d.epsYoY;
                     return (
                       <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0"
                         onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
                         style={{ cursor: 'pointer' }} data-testid={`bar-eps-${i}`}>
-                        {growth != null && d.eps >= 0 && (
-                          <span className={cn("text-[10px] font-mono-nums font-semibold leading-none mb-0.5",
-                            growth >= 0 ? "text-[#30d158]/80" : "text-[#ff453a]/80")}>
-                            {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
-                          </span>
-                        )}
-                        {(growth == null || d.eps < 0) && <span className="text-[10px] leading-none mb-0.5 invisible">0%</span>}
-                        <div className="w-full rounded-t-[2px] transition-all duration-150" style={{
+                        <div className="w-full rounded-t-[3px] transition-all duration-150" style={{
                           height: `${barH}px`,
                           backgroundColor: d.isEstimate
                             ? (isHov ? 'rgba(251,187,4,0.30)' : 'rgba(251,187,4,0.15)')
@@ -413,93 +519,9 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                     );
                   })}
                 </div>
-                <div className="border-t border-white/20 mx-0" />
-                <div className="flex items-start gap-[3px]" style={{ height: `${BAR_MAX_H * 0.4 + 16}px` }}>
-                  {data.map((d, i) => {
-                    const pct = d.eps < 0 ? Math.abs(d.eps) / maxEpsAbs : 0;
-                    const barH = d.eps < 0 ? Math.max(pct * BAR_MAX_H * 0.4, 4) : 0;
-                    const isHov = hoveredEpsIdx === i;
-                    return (
-                      <div key={i} className="flex-1 flex flex-col items-center min-w-0"
-                        onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
-                        style={{ cursor: 'pointer' }}>
-                        <div className="w-full rounded-b-[2px] transition-all duration-150" style={{
-                          height: `${barH}px`,
-                          backgroundColor: d.isEstimate
-                            ? (isHov ? 'rgba(255,69,58,0.30)' : 'rgba(255,69,58,0.15)')
-                            : (isHov ? 'rgba(255,69,58,0.75)' : 'rgba(255,69,58,0.40)'),
-                          border: d.isEstimate ? '1px dashed rgba(255,69,58,0.3)' : 'none',
-                        }} />
-                        <span className={cn("text-[10px] font-mono-nums leading-tight mt-1 truncate w-full text-center",
-                          d.isEstimate ? "text-white/25" : "text-white/45")}>{d.quarter}</span>
-                      </div>
-                    );
-                  })}
+                <div className="flex items-start" style={{ gap: `${barGap}px` }}>
+                  {data.map((d, i) => renderEpsLabels(d, i))}
                 </div>
-              </>
-            ) : hasNegativeEps ? (
-              <div className="flex-1 flex flex-col">
-                <div className="border-t border-white/20 mx-0 mb-1" />
-                <div className="flex-1 flex items-start gap-[3px]">
-                  {data.map((d, i) => {
-                    const pct = maxEpsAbs > 0 ? Math.abs(d.eps) / maxEpsAbs : 0;
-                    const barH = Math.max(pct * BAR_MAX_H, 4);
-                    const isHov = hoveredEpsIdx === i;
-                    const growth = d.epsYoY;
-                    return (
-                      <div key={i} className="flex-1 flex flex-col items-center min-w-0"
-                        onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
-                        style={{ cursor: 'pointer' }} data-testid={`bar-eps-${i}`}>
-                        <div className="w-full rounded-b-[2px] transition-all duration-150" style={{
-                          height: `${barH}px`,
-                          backgroundColor: d.isEstimate
-                            ? (isHov ? 'rgba(255,69,58,0.30)' : 'rgba(255,69,58,0.15)')
-                            : (isHov ? 'rgba(255,69,58,0.75)' : 'rgba(255,69,58,0.40)'),
-                          border: d.isEstimate ? '1px dashed rgba(255,69,58,0.3)' : 'none',
-                        }} />
-                        <span className={cn("text-[10px] font-mono-nums leading-tight mt-1 truncate w-full text-center",
-                          d.isEstimate ? "text-white/25" : "text-white/45")}>{d.quarter}</span>
-                        {growth != null && (
-                          <span className={cn("text-[10px] font-mono-nums font-semibold leading-none mt-0.5",
-                            growth >= 0 ? "text-[#30d158]/80" : "text-[#ff453a]/80")}>
-                            {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="flex-1 flex items-end gap-[3px]">
-                {data.map((d, i) => {
-                  const pct = maxEpsAbs > 0 ? Math.abs(d.eps) / maxEpsAbs : 0;
-                  const barH = Math.max(pct * BAR_MAX_H, 4);
-                  const isHov = hoveredEpsIdx === i;
-                  const growth = d.epsYoY;
-                  return (
-                    <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0"
-                      onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
-                      style={{ cursor: 'pointer' }} data-testid={`bar-eps-${i}`}>
-                      {growth != null && (
-                        <span className={cn("text-[10px] font-mono-nums font-semibold leading-none mb-0.5",
-                          growth >= 0 ? "text-[#30d158]/80" : "text-[#ff453a]/80")}>
-                          {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
-                        </span>
-                      )}
-                      {growth == null && <span className="text-[10px] leading-none mb-0.5 invisible">0%</span>}
-                      <div className="w-full rounded-t-[2px] transition-all duration-150" style={{
-                        height: `${barH}px`,
-                        backgroundColor: d.isEstimate
-                          ? (isHov ? 'rgba(251,187,4,0.30)' : 'rgba(251,187,4,0.15)')
-                          : (isHov ? 'rgba(251,187,4,0.75)' : 'rgba(251,187,4,0.40)'),
-                        border: d.isEstimate ? '1px dashed rgba(251,187,4,0.3)' : 'none',
-                      }} />
-                      <span className={cn("text-[10px] font-mono-nums leading-tight mt-1 truncate w-full text-center",
-                        d.isEstimate ? "text-white/25" : "text-white/45")}>{d.quarter}</span>
-                    </div>
-                  );
-                })}
               </div>
             )}
           </div>
