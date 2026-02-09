@@ -354,17 +354,17 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
 
   const labelRow = (quarter: string, value: string, growth: number | null, isEst: boolean, colorClass?: string) => {
     return (
-      <div className="flex flex-col items-center gap-[4px] w-full py-[3px]">
+      <div className="flex flex-col items-center gap-[5px] w-full py-[4px]">
         <span className={cn(
           "font-mono-nums leading-none truncate w-full text-center font-semibold",
-          isQuarterly ? "text-[11px]" : "text-[12px]",
+          isQuarterly ? "text-[13px]" : "text-[14px]",
           isEst ? "text-white/30" : "text-white/70"
         )}>
           {quarter}
         </span>
         <span className={cn(
           "font-mono-nums leading-none truncate w-full text-center font-medium",
-          isQuarterly ? "text-[10px]" : "text-[11px]",
+          isQuarterly ? "text-[12px]" : "text-[13px]",
           colorClass || "text-white/45"
         )}>
           {value}
@@ -372,13 +372,13 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
         {growth != null ? (
           <span className={cn(
             "font-mono-nums font-bold leading-none",
-            isQuarterly ? "text-[10px]" : "text-[11px]",
+            isQuarterly ? "text-[12px]" : "text-[13px]",
             growth >= 0 ? "text-[#30d158]" : "text-[#ff453a]"
           )}>
             {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
           </span>
         ) : (
-          <span className={cn("leading-none invisible", isQuarterly ? "text-[10px]" : "text-[11px]")}>0%</span>
+          <span className={cn("leading-none invisible", isQuarterly ? "text-[12px]" : "text-[13px]")}>0%</span>
         )}
       </div>
     );
@@ -410,12 +410,12 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
       </div>
 
       <div className="flex-1 min-h-0 flex flex-col gap-0 overflow-hidden">
-        <div className="flex-1 min-h-0 flex flex-col">
-          <div className="flex items-center flex-shrink-0 h-[20px] mb-0.5">
+        <div className="flex-1 min-h-0 flex flex-col justify-end">
+          <div className="flex items-end flex-shrink-0 mb-1.5">
             <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold leading-none">Sales</span>
             {hoveredRevIdx !== null && renderHoverTooltip('sales')}
           </div>
-          <div className="flex-1 min-h-0 flex flex-col justify-end">
+          <div className="flex flex-col justify-end">
             <div className="flex items-end" style={{ gap: `${barGap}px` }} data-testid="bars-revenue">
               {data.map((d, i) => {
                 const pct = maxRev > 0 ? Math.abs(d.revenue) / maxRev : 0;
@@ -451,7 +451,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
         <div className="border-t border-white/[0.06] my-0.5" />
 
         <div className="flex-1 min-h-0 flex flex-col">
-          <div className="flex items-center flex-shrink-0 h-[20px] mb-0.5">
+          <div className="flex items-end flex-shrink-0 mb-1.5">
             <span className="text-[11px] text-white/40 uppercase tracking-widest font-semibold leading-none">EPS</span>
             {hoveredEpsIdx !== null && renderHoverTooltip('eps')}
           </div>
