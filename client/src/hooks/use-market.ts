@@ -52,10 +52,11 @@ export function useSectorRotation() {
   });
 }
 
-export function useMarketBreadth() {
+export function useMarketBreadth(timeframe: 'daily' | 'weekly' | 'monthly' = 'daily') {
+  const url = timeframe === 'daily' ? '/api/market/breadth' : `/api/market/breadth/${timeframe}`;
   return useQuery({
-    queryKey: ['/api/market/breadth'],
-    queryFn: () => fetchWithWarmingRetry('/api/market/breadth'),
+    queryKey: ['/api/market/breadth', timeframe],
+    queryFn: () => fetchWithWarmingRetry(url),
     refetchInterval: (query) => {
       const data = query.state.data as any;
       if (data && !data.fullyEnriched) return 10000;

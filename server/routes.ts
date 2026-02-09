@@ -8,7 +8,7 @@ import * as fmp from "./api/fmp";
 import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
 import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, scrapeIndustryRS, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote } from "./api/finviz";
-import { computeMarketBreadth, loadPersistedBreadthData } from "./api/breadth";
+import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe } from "./api/breadth";
 import { getRSScore, getCachedRS } from "./api/rs";
 import { sendAlert, clearFailures } from "./api/alerts";
 import { scrapeFinvizDigest, scrapeBriefingPreMarket, getPersistedDigest, scrapeDigestRaw, saveDigestFromRaw } from "./api/news-scrapers";
@@ -917,6 +917,16 @@ export async function registerRoutes(
 
     backgroundRefresh(cacheKey, () => computeMarketBreadth(true), CACHE_TTL.BREADTH);
     res.status(202).json({ _warming: true });
+  });
+
+  app.get('/api/market/breadth/:timeframe', (req, res) => {
+    const tf = req.params.timeframe as 'daily' | 'weekly' | 'monthly';
+    if (!['daily', 'weekly', 'monthly'].includes(tf)) {
+      return res.status(400).json({ error: 'Invalid timeframe' });
+    }
+    const data = getBreadthWithTimeframe(tf);
+    if (!data) return res.status(202).json({ _warming: true });
+    res.json(data);
   });
 
   app.get('/api/market/status', (req, res) => {

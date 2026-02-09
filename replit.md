@@ -28,7 +28,7 @@ Preferred communication style: Simple, everyday language.
 - **Data Sources**: Aggregates data from Yahoo Finance, Financial Modeling Prep, and Finviz (via scraping).
 - **Data Processing**:
     - **Finviz Scraper**: Fetches all US stocks (~9,600) with market cap data, categorizes by Finviz's sector/industry classification, and caches data. Used for sector/industry mapping, stock search, and cap-weighted performance calculations.
-    - **Market Breadth**: Computes Market Quality Score and various breadth indicators (MA%, H/L, 4% movers) across ~3000 large-cap US stocks using Yahoo Finance screener API. Scheduled twice daily.
+    - **Market Breadth**: Computes Market Quality Score and various breadth indicators (MA%, H/L, 4% movers) across ~7000 US stocks ($100M+ market cap) using Yahoo Finance screener API. Supports daily/weekly/monthly timeframes via history snapshots. Scheduled twice daily.
     - **Relative Strength (RS) Ratings**: A Python script computes true IBD-style RS ratings (1-99 percentile) for ~3,800+ stocks based on weighted momentum scores, saved to a file for server lookup.
     - **Hourly Scheduler**: Refreshes core data (Finviz, sectors, breadth, megatrend performance) hourly during market hours.
     - **Overnight Digest Refresh**: Polls Finviz every 15 min from 4:00 AM to 10:00 AM ET for new daily digest. Stops once new content detected.

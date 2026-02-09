@@ -215,8 +215,8 @@ export interface BreadthData {
       max: number;
       percentage: number;
       components: {
-        above50ma: { value: number; score: number; max: number };
-        above200ma: { value: number; score: number; max: number };
+        above50ma: { value: number; above: number; below: number; total: number; score: number; max: number };
+        above200ma: { value: number; above: number; below: number; total: number; score: number; max: number };
       };
     };
     strength: {
@@ -266,8 +266,8 @@ export async function computeTrendTier(): Promise<BreadthData['tiers']['trend']>
 }
 
 export async function computeQuoteBreadth(): Promise<{
-  above50ma: { value: number; score: number; max: number };
-  above200ma: { value: number; score: number; max: number };
+  above50ma: { value: number; above: number; below: number; total: number; score: number; max: number };
+  above200ma: { value: number; above: number; below: number; total: number; score: number; max: number };
   netHighs52w: { value: number; highs: number; lows: number; score: number; max: number };
   fourPercent: { value: number; bulls: number; bears: number; score: number; max: number };
   vixLevel: { value: number; score: number; max: number };
@@ -313,8 +313,8 @@ export async function computeQuoteBreadth(): Promise<{
   console.log(`[breadth] Universe: ${universe.length} stocks, >50MA: ${above50}/${total50}, >200MA: ${above200}/${total200}, H/L: ${newHighs}/${newLows}, 4%: ${bulls4}/${bears4}`);
 
   return {
-    above50ma: { value: pctAbove50, score: scoreAbove50MA(pctAbove50), max: 11 },
-    above200ma: { value: pctAbove200, score: scoreAbove200MA(pctAbove200), max: 11 },
+    above50ma: { value: pctAbove50, above: above50, below: total50 - above50, total: total50, score: scoreAbove50MA(pctAbove50), max: 11 },
+    above200ma: { value: pctAbove200, above: above200, below: total200 - above200, total: total200, score: scoreAbove200MA(pctAbove200), max: 11 },
     netHighs52w: { value: netHighs, highs: newHighs, lows: newLows, score: scoreNetHighs(netHighs), max: 9 },
     fourPercent: { value: ratio4, bulls: bulls4, bears: bears4, score: score4PercentRatio(ratio4), max: 16 },
     vixLevel: { value: vixLevel, score: scoreVIX(vixLevel), max: 7 },
@@ -408,8 +408,8 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
 
   let fourPercentData = { value: 1, bulls: 0, bears: 0, score: 7, max: 16 };
   let twentyFivePercentData = { value: 1, bulls: 0, bears: 0, score: 4, max: 11 };
-  let above50maData = { value: 50, score: 5, max: 11 };
-  let above200maData = { value: 50, score: 4, max: 11 };
+  let above50maData = { value: 50, above: 0, below: 0, total: 0, score: 5, max: 11 };
+  let above200maData = { value: 50, above: 0, below: 0, total: 0, score: 4, max: 11 };
   let netHighsData = { value: 0, highs: 0, lows: 0, score: 2, max: 9 };
   let vixData = { value: 20, score: 5, max: 7 };
 
@@ -496,7 +496,166 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
   if (fullScan) {
     setCache('breadth_full_result', result, 1800);
     persistBreadthToFile(result);
+    saveDailySnapshot(result);
   }
 
   return result;
+}
+
+const BREADTH_HISTORY_PATH = path.join(process.cwd(), '.breadth-history.json');
+
+interface DailySnapshot {
+  date: string;
+  overallScore: number;
+  above50: number;
+  below50: number;
+  total50: number;
+  above200: number;
+  below200: number;
+  total200: number;
+  bulls4: number;
+  bears4: number;
+  highs: number;
+  lows: number;
+  universeSize: number;
+  trendScore: number;
+  momentumScore: number;
+  breadthScore: number;
+  strengthScore: number;
+}
+
+function getTodayET(): string {
+  const now = new Date();
+  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  return `${et.getFullYear()}-${String(et.getMonth() + 1).padStart(2, '0')}-${String(et.getDate()).padStart(2, '0')}`;
+}
+
+function saveDailySnapshot(data: BreadthData): void {
+  try {
+    const history: DailySnapshot[] = loadBreadthHistory();
+    const today = getTodayET();
+
+    const snapshot: DailySnapshot = {
+      date: today,
+      overallScore: data.overallScore,
+      above50: data.tiers.breadth.components.above50ma.above,
+      below50: data.tiers.breadth.components.above50ma.below,
+      total50: data.tiers.breadth.components.above50ma.total,
+      above200: data.tiers.breadth.components.above200ma.above,
+      below200: data.tiers.breadth.components.above200ma.below,
+      total200: data.tiers.breadth.components.above200ma.total,
+      bulls4: data.tiers.momentum.components.fourPercentRatio.bulls,
+      bears4: data.tiers.momentum.components.fourPercentRatio.bears,
+      highs: data.tiers.strength.components.netHighs52w.highs,
+      lows: data.tiers.strength.components.netHighs52w.lows,
+      universeSize: data.universeSize,
+      trendScore: data.tiers.trend.score,
+      momentumScore: data.tiers.momentum.score,
+      breadthScore: data.tiers.breadth.score,
+      strengthScore: data.tiers.strength.score,
+    };
+
+    const existingIdx = history.findIndex(s => s.date === today);
+    if (existingIdx >= 0) {
+      history[existingIdx] = snapshot;
+    } else {
+      history.push(snapshot);
+    }
+
+    const trimmed = history.slice(-60);
+    fs.writeFileSync(BREADTH_HISTORY_PATH, JSON.stringify(trimmed), 'utf-8');
+  } catch {}
+}
+
+function loadBreadthHistory(): DailySnapshot[] {
+  try {
+    if (!fs.existsSync(BREADTH_HISTORY_PATH)) return [];
+    return JSON.parse(fs.readFileSync(BREADTH_HISTORY_PATH, 'utf-8'));
+  } catch { return []; }
+}
+
+export function getBreadthWithTimeframe(timeframe: 'daily' | 'weekly' | 'monthly'): any {
+  const cached = getCached<BreadthData>('breadth_full_result');
+  const data = cached || loadPersistedBreadth();
+
+  if (!data) return null;
+
+  if (timeframe === 'daily') return data;
+
+  const history = loadBreadthHistory();
+  const days = timeframe === 'weekly' ? 5 : 22;
+  const recentDays = history.slice(-days);
+
+  if (recentDays.length === 0) return data;
+
+  const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
+
+  const avgScore = Math.round(avg(recentDays.map(d => d.overallScore)));
+  const avgAbove50Pct = recentDays.length > 0
+    ? Math.round(avg(recentDays.map(d => d.total50 > 0 ? (d.above50 / d.total50) * 100 : 50)) * 10) / 10
+    : 50;
+  const avgAbove200Pct = recentDays.length > 0
+    ? Math.round(avg(recentDays.map(d => d.total200 > 0 ? (d.above200 / d.total200) * 100 : 50)) * 10) / 10
+    : 50;
+
+  const totalBulls4 = recentDays.reduce((s, d) => s + d.bulls4, 0);
+  const totalBears4 = recentDays.reduce((s, d) => s + d.bears4, 0);
+  const totalHighs = recentDays.reduce((s, d) => s + d.highs, 0);
+  const totalLows = recentDays.reduce((s, d) => s + d.lows, 0);
+
+  const lastDay = recentDays[recentDays.length - 1];
+
+  return {
+    ...data,
+    overallScore: avgScore,
+    status: getScoreStatus(avgScore),
+    statusColor: getScoreColor(avgScore),
+    timeframe,
+    daysIncluded: recentDays.length,
+    tiers: {
+      ...data.tiers,
+      momentum: {
+        ...data.tiers.momentum,
+        components: {
+          ...data.tiers.momentum.components,
+          fourPercentRatio: {
+            ...data.tiers.momentum.components.fourPercentRatio,
+            bulls: totalBulls4,
+            bears: totalBears4,
+          },
+        },
+      },
+      breadth: {
+        ...data.tiers.breadth,
+        components: {
+          above50ma: {
+            ...data.tiers.breadth.components.above50ma,
+            value: avgAbove50Pct,
+            above: Math.round(avg(recentDays.map(d => d.above50))),
+            below: Math.round(avg(recentDays.map(d => d.below50))),
+            total: Math.round(avg(recentDays.map(d => d.total50))),
+          },
+          above200ma: {
+            ...data.tiers.breadth.components.above200ma,
+            value: avgAbove200Pct,
+            above: Math.round(avg(recentDays.map(d => d.above200))),
+            below: Math.round(avg(recentDays.map(d => d.below200))),
+            total: Math.round(avg(recentDays.map(d => d.total200))),
+          },
+        },
+      },
+      strength: {
+        ...data.tiers.strength,
+        components: {
+          ...data.tiers.strength.components,
+          netHighs52w: {
+            ...data.tiers.strength.components.netHighs52w,
+            value: totalHighs - totalLows,
+            highs: totalHighs,
+            lows: totalLows,
+          },
+        },
+      },
+    },
+  };
 }
