@@ -1,7 +1,9 @@
 import * as cheerio from 'cheerio';
+import puppeteer from 'puppeteer-core';
 import { getCached, setCache } from './cache';
 import * as fs from 'fs';
 import * as path from 'path';
+import { execSync } from 'child_process';
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
@@ -69,6 +71,126 @@ async function fetchHTML(url: string): Promise<string | null> {
   }
 }
 
+function getChromiumPath(): string {
+  try {
+    return execSync('which chromium', { encoding: 'utf-8' }).trim();
+  } catch {
+    return '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
+  }
+}
+
+async function scrapeDigestWithPuppeteer(): Promise<{ headline: string; bullets: string[] } | null> {
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      executablePath: getChromiumPath(),
+      headless: true,
+      args: [
+        '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
+        '--disable-gpu', '--disable-extensions', '--disable-background-networking',
+        '--disable-default-apps', '--disable-sync', '--disable-translate',
+        '--no-first-run', '--disable-background-timer-throttling',
+      ],
+      timeout: 30000,
+    });
+
+    const page = await browser.newPage();
+    await page.setUserAgent(USER_AGENT);
+    await page.setViewport({ width: 1280, height: 800 });
+
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      const type = request.resourceType();
+      if (['image', 'media', 'font', 'stylesheet'].includes(type)) {
+        request.abort();
+      } else {
+        request.continue();
+      }
+    });
+
+    await page.goto('https://finviz.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await new Promise(r => setTimeout(r, 3000));
+
+    await page.evaluate(() => {
+      const buttons = Array.from(document.querySelectorAll('button'));
+      const moreBtn = buttons.find(b => (b.textContent || '').trim() === 'More');
+      if (moreBtn) moreBtn.click();
+    });
+
+    await new Promise(r => setTimeout(r, 3000));
+
+    const digest = await page.evaluate(() => {
+      const allDivs = Array.from(document.querySelectorAll('div, section'));
+      for (let i = 0; i < allDivs.length; i++) {
+        const div = allDivs[i];
+        const text = (div.textContent || '').trim();
+        if (text.startsWith('Daily Digest') && text.length > 100 && text.length < 5000) {
+          const children = Array.from(div.querySelectorAll('p, li, div, span'));
+          const items: string[] = [];
+          children.forEach(child => {
+            const ct = (child.textContent || '').trim();
+            if (ct.length > 20 && ct.length < 500 && !items.includes(ct)) {
+              const isFiltered = ct.includes('AI-generated content') || ct === 'Daily Digest' || ct.startsWith('×');
+              if (!isFiltered) {
+                items.push(ct);
+              }
+            }
+          });
+          return items;
+        }
+      }
+      return null;
+    });
+
+    await browser.close();
+
+    if (digest && digest.length > 0) {
+      const headline = digest[0];
+      const bullets = digest.slice(1);
+      return { headline, bullets };
+    }
+    return null;
+  } catch (err: any) {
+    console.error(`[news] Puppeteer digest error: ${err.message}`);
+    if (browser) {
+      try { await browser.close(); } catch {}
+    }
+    return null;
+  }
+}
+
+async function scrapeDigestFallback(): Promise<{ headline: string; bullets: string[] } | null> {
+  try {
+    const html = await fetchHTML('https://finviz.com/');
+    if (!html) return null;
+
+    const $ = cheerio.load(html);
+    let headline = '';
+    const bullets: string[] = [];
+
+    const bar = $('td.is-digest, td.is-news, [class*="news-bar"]');
+    if (bar.length > 0) {
+      const rawText = bar.text().trim();
+      const cleanText = rawText.replace(/Today,.*?(AM|PM)/i, '').replace('More +', '').replace('More', '').trim();
+      if (cleanText.length > 20) headline = cleanText;
+    }
+
+    $('a.nn-tab-link').each((_, el) => {
+      const text = $(el).text().trim();
+      if (text.length > 20 && text.length < 250 && bullets.length < 12) {
+        if (!bullets.includes(text)) bullets.push(text);
+      }
+    });
+
+    if (!headline && bullets.length > 0) headline = bullets.shift()!;
+    if (!headline) return null;
+
+    return { headline, bullets };
+  } catch {
+    return null;
+  }
+}
+
 export async function scrapeFinvizDigest(forceRefresh = false): Promise<DailyDigest | null> {
   if (!forceRefresh) {
     const cached = getCached<DailyDigest>(DIGEST_CACHE_KEY);
@@ -81,73 +203,31 @@ export async function scrapeFinvizDigest(forceRefresh = false): Promise<DailyDig
     }
   }
 
-  console.log('[news] Scraping Finviz daily digest...');
+  console.log('[news] Scraping Finviz daily digest with Puppeteer...');
 
-  try {
-    const html = await fetchHTML('https://finviz.com/');
-    if (!html) {
-      console.log('[news] Failed to fetch Finviz homepage');
-      return null;
-    }
+  let result = await scrapeDigestWithPuppeteer();
 
-    const $ = cheerio.load(html);
+  if (!result) {
+    console.log('[news] Puppeteer failed, falling back to HTTP scraper...');
+    result = await scrapeDigestFallback();
+  }
 
-    let headline = '';
-    let bullets: string[] = [];
-    let timestamp = '';
-
-    const digestBar = $('td.is-digest');
-    if (digestBar.length > 0) {
-      const digestText = digestBar.text().trim();
-      const timeMatch = digestText.match(/Today,\s*([\d:]+\s*[AP]M)/i);
-      if (timeMatch) timestamp = timeMatch[1];
-
-      const allText = digestBar.text().replace(/Today,.*?(AM|PM)/i, '').replace('More +', '').replace('More', '').trim();
-      if (allText && allText.length > 20) headline = allText;
-    }
-
-    if (!headline) {
-      const bar = $('td.is-news, .is-digest, [class*="news-bar"]');
-      if (bar.length > 0) {
-        const rawText = bar.text().trim();
-        const cleanText = rawText.replace(/Today,.*?(AM|PM)/i, '').replace('More +', '').replace('More', '').trim();
-        if (cleanText.length > 20) headline = cleanText;
-      }
-    }
-
-    $('a.nn-tab-link').each((_, el) => {
-      const text = $(el).text().trim();
-      if (text.length > 20 && text.length < 250 && bullets.length < 12) {
-        if (!bullets.includes(text)) {
-          bullets.push(text);
-        }
-      }
-    });
-
-    if (!headline && bullets.length > 0) {
-      headline = bullets.shift()!;
-    }
-
-    if (!headline) {
-      console.log('[news] Could not find Finviz digest headline');
-      return null;
-    }
-
-    const digest: DailyDigest = {
-      headline,
-      bullets,
-      timestamp: timestamp || new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }),
-      fetchedAt: Date.now(),
-    };
-
-    setCache(DIGEST_CACHE_KEY, digest, DIGEST_TTL);
-    persistToFile(DIGEST_PERSIST_PATH, digest);
-    console.log(`[news] Finviz digest scraped: "${headline.substring(0, 60)}..." with ${bullets.length} bullets`);
-    return digest;
-  } catch (err: any) {
-    console.error(`[news] Finviz digest scrape error: ${err.message}`);
+  if (!result) {
+    console.log('[news] Could not scrape Finviz digest');
     return null;
   }
+
+  const digest: DailyDigest = {
+    headline: result.headline,
+    bullets: result.bullets,
+    timestamp: new Date().toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' }),
+    fetchedAt: Date.now(),
+  };
+
+  setCache(DIGEST_CACHE_KEY, digest, DIGEST_TTL);
+  persistToFile(DIGEST_PERSIST_PATH, digest);
+  console.log(`[news] Finviz digest scraped: "${result.headline.substring(0, 60)}..." with ${result.bullets.length} bullets`);
+  return digest;
 }
 
 export async function scrapeBriefingPreMarket(forceRefresh = false): Promise<PreMarketData | null> {

@@ -1,0 +1,112 @@
+Per risolvere questo problema di scraping su Finviz, hai bisogno di gestire due aspetti:
+
+Leggere la headline - relativamente semplice
+Cliccare su "More +" e recuperare il digest completo - richiede gestione JavaScript
+Soluzione Furba con Selenium
+python
+Copy
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
+import time
+
+# Setup per Replit
+chrome_options = Options()
+chrome_options.add_argument('--headless')
+chrome_options.add_argument('--no-sandbox')
+chrome_options.add_argument('--disable-dev-shm-usage')
+
+driver = webdriver.Chrome(options=chrome_options)
+
+try:
+    driver.get('https://finviz.com/')
+    
+    # Aspetta che la headline sia visibile
+    wait = WebDriverWait(driver, 10)
+    headline_element = wait.until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, '.news-link-container'))
+    )
+    
+    # Leggi la headline
+    headline_text = headline_element.text
+    print(f"Headline: {headline_text}")
+    
+    # Trova e clicca sul bottone "More +"
+    more_button = driver.find_element(By.LINK_TEXT, 'More')
+    more_button.click()
+    
+    # Aspetta che il digest si apra
+    time.sleep(2)
+    digest_content = wait.until(
+        EC.presence_of_element_located((By.CLASS_NAME, 'modal-content'))
+    )
+    
+    # Recupera tutto il contenuto del digest
+    digest_text = digest_content.text
+    print(f"\nDigest completo:\n{digest_text}")
+    
+    # Oppure recupera i singoli bullet points
+    bullets = digest_content.find_elements(By.TAG_NAME, 'li')
+    for i, bullet in enumerate(bullets, 1):
+        print(f"{i}. {bullet.text}")
+        
+finally:
+    driver.quit()
+Alternativa con Playwright (più moderna)
+python
+Copy
+from playwright.sync_api import sync_playwright
+
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True)
+    page = browser.new_page()
+    
+    page.goto('https://finviz.com/')
+    
+    # Leggi headline
+    headline = page.locator('.news-link-container').first.text_content()
+    print(f"Headline: {headline}")
+    
+    # Clicca su More
+    page.click('text=More')
+    
+    # Aspetta che il modal si apra
+    page.wait_for_selector('.modal-content')
+    
+    # Recupera il digest
+    digest = page.locator('.modal-content').text_content()
+    print(f"\nDigest:\n{digest}")
+    
+    browser.close()
+Setup su Replit
+Nel tuo replit.nix o .replit:
+
+nix
+Copy
+{ pkgs }: {
+  deps = [
+    pkgs.python3
+    pkgs.chromium
+    pkgs.chromedriver
+  ];
+}
+E installa i pacchetti Python:
+
+bash
+Copy
+pip install selenium playwright
+playwright install chromium
+Soluzione ancora più furba: API non ufficiale
+Se Finviz ha pattern prevedibili, potresti intercettare le richieste XHR che caricano il digest invece di simulare il click:
+
+python
+Copy
+import requests
+from bs4 import BeautifulSoup
+
+# Analizza la richiesta che viene fatta quando clicchi More
+# Usa DevTools del browser per vedere l'endpoint esatto
+# Poi fai una richiesta diretta
+Quale approccio preferisci? Posso aiutarti a implementarlo meglio per il tuo caso specifico su Replit.
