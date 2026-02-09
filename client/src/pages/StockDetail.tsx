@@ -402,6 +402,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
   const BAR_MAX_H = 70;
 
   const formatRevShort = (v: number) => {
+    if (v === 0) return '-';
     const abs = Math.abs(v);
     if (abs >= 10000) return `${(v / 1000).toFixed(0)}B`;
     if (abs >= 1000) return `${(v / 1000).toFixed(1)}B`;
