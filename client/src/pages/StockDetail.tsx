@@ -233,11 +233,19 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
 
   const data = rawData as EarningsQuarterData[];
   const revValues = data.map(d => Math.abs(d.revenue));
-  const epsValues = data.map(d => Math.abs(d.eps));
+  const epsValues = data.map(d => d.eps);
   const maxRev = Math.max(...revValues, 0.01);
-  const maxEps = Math.max(...epsValues, 0.01);
+  const maxEpsAbs = Math.max(...epsValues.map(v => Math.abs(v)), 0.01);
+  const hasNegativeEps = epsValues.some(v => v < 0);
+  const hasPositiveEps = epsValues.some(v => v > 0);
 
-  const formatRev = (v: number) => `${v.toFixed(1)}B`;
+  const formatRev = (v: number) => {
+    const abs = Math.abs(v);
+    if (abs >= 1000) return `$${(v / 1000).toFixed(1)}B`;
+    if (abs >= 1) return `$${v.toFixed(1)}M`;
+    if (abs >= 0.01) return `$${(v * 1000).toFixed(0)}K`;
+    return `$${v.toFixed(2)}M`;
+  };
   const formatEps = (v: number) => `$${v.toFixed(2)}`;
 
   const BAR_MAX_H = 50;
@@ -374,50 +382,126 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
               </span>
             )}
           </div>
-          <div className="flex-1 flex items-end gap-[3px]" data-testid="bars-eps">
-            {data.map((d, i) => {
-              const pct = maxEps > 0 ? Math.abs(d.eps) / maxEps : 0;
-              const barH = Math.max(pct * BAR_MAX_H, 4);
-              const isHov = hoveredEpsIdx === i;
-              const growth = d.epsYoY;
-
-              return (
-                <div
-                  key={i}
-                  className="flex-1 flex flex-col items-center justify-end min-w-0"
-                  onMouseEnter={() => setHoveredEpsIdx(i)}
-                  onMouseLeave={() => setHoveredEpsIdx(null)}
-                  style={{ cursor: 'pointer' }}
-                  data-testid={`bar-eps-${i}`}
-                >
-                  {growth != null && (
-                    <span className={cn(
-                      "text-[10px] font-mono-nums font-semibold leading-none mb-0.5",
-                      growth >= 0 ? "text-[#30d158]/80" : "text-[#ff453a]/80"
-                    )}>
-                      {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
-                    </span>
-                  )}
-                  {growth == null && <span className="text-[10px] leading-none mb-0.5 invisible">0%</span>}
-                  <div
-                    className="w-full rounded-t-[2px] transition-all duration-150"
-                    style={{
-                      height: `${barH}px`,
-                      backgroundColor: d.isEstimate
-                        ? (isHov ? 'rgba(251,187,4,0.30)' : 'rgba(251,187,4,0.15)')
-                        : (isHov ? 'rgba(251,187,4,0.75)' : 'rgba(251,187,4,0.40)'),
-                      border: d.isEstimate ? '1px dashed rgba(251,187,4,0.3)' : 'none',
-                    }}
-                  />
-                  <span className={cn(
-                    "text-[10px] font-mono-nums leading-tight mt-1 truncate w-full text-center",
-                    d.isEstimate ? "text-white/25" : "text-white/45"
-                  )}>
-                    {d.quarter}
-                  </span>
+          <div className="flex-1 flex flex-col" data-testid="bars-eps">
+            {hasNegativeEps && hasPositiveEps ? (
+              <>
+                <div className="flex items-end gap-[3px]" style={{ height: `${BAR_MAX_H + 16}px` }}>
+                  {data.map((d, i) => {
+                    const pct = d.eps >= 0 ? d.eps / maxEpsAbs : 0;
+                    const barH = d.eps >= 0 ? Math.max(pct * BAR_MAX_H, d.eps > 0 ? 4 : 0) : 0;
+                    const isHov = hoveredEpsIdx === i;
+                    const growth = d.epsYoY;
+                    return (
+                      <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0"
+                        onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
+                        style={{ cursor: 'pointer' }} data-testid={`bar-eps-${i}`}>
+                        {growth != null && d.eps >= 0 && (
+                          <span className={cn("text-[10px] font-mono-nums font-semibold leading-none mb-0.5",
+                            growth >= 0 ? "text-[#30d158]/80" : "text-[#ff453a]/80")}>
+                            {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
+                          </span>
+                        )}
+                        {(growth == null || d.eps < 0) && <span className="text-[10px] leading-none mb-0.5 invisible">0%</span>}
+                        <div className="w-full rounded-t-[2px] transition-all duration-150" style={{
+                          height: `${barH}px`,
+                          backgroundColor: d.isEstimate
+                            ? (isHov ? 'rgba(251,187,4,0.30)' : 'rgba(251,187,4,0.15)')
+                            : (isHov ? 'rgba(251,187,4,0.75)' : 'rgba(251,187,4,0.40)'),
+                          border: d.isEstimate ? '1px dashed rgba(251,187,4,0.3)' : 'none',
+                        }} />
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+                <div className="border-t border-white/20 mx-0" />
+                <div className="flex items-start gap-[3px]" style={{ height: `${BAR_MAX_H * 0.4 + 16}px` }}>
+                  {data.map((d, i) => {
+                    const pct = d.eps < 0 ? Math.abs(d.eps) / maxEpsAbs : 0;
+                    const barH = d.eps < 0 ? Math.max(pct * BAR_MAX_H * 0.4, 4) : 0;
+                    const isHov = hoveredEpsIdx === i;
+                    return (
+                      <div key={i} className="flex-1 flex flex-col items-center min-w-0"
+                        onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
+                        style={{ cursor: 'pointer' }}>
+                        <div className="w-full rounded-b-[2px] transition-all duration-150" style={{
+                          height: `${barH}px`,
+                          backgroundColor: d.isEstimate
+                            ? (isHov ? 'rgba(255,69,58,0.30)' : 'rgba(255,69,58,0.15)')
+                            : (isHov ? 'rgba(255,69,58,0.75)' : 'rgba(255,69,58,0.40)'),
+                          border: d.isEstimate ? '1px dashed rgba(255,69,58,0.3)' : 'none',
+                        }} />
+                        <span className={cn("text-[10px] font-mono-nums leading-tight mt-1 truncate w-full text-center",
+                          d.isEstimate ? "text-white/25" : "text-white/45")}>{d.quarter}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            ) : hasNegativeEps ? (
+              <div className="flex-1 flex flex-col">
+                <div className="border-t border-white/20 mx-0 mb-1" />
+                <div className="flex-1 flex items-start gap-[3px]">
+                  {data.map((d, i) => {
+                    const pct = maxEpsAbs > 0 ? Math.abs(d.eps) / maxEpsAbs : 0;
+                    const barH = Math.max(pct * BAR_MAX_H, 4);
+                    const isHov = hoveredEpsIdx === i;
+                    const growth = d.epsYoY;
+                    return (
+                      <div key={i} className="flex-1 flex flex-col items-center min-w-0"
+                        onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
+                        style={{ cursor: 'pointer' }} data-testid={`bar-eps-${i}`}>
+                        <div className="w-full rounded-b-[2px] transition-all duration-150" style={{
+                          height: `${barH}px`,
+                          backgroundColor: d.isEstimate
+                            ? (isHov ? 'rgba(255,69,58,0.30)' : 'rgba(255,69,58,0.15)')
+                            : (isHov ? 'rgba(255,69,58,0.75)' : 'rgba(255,69,58,0.40)'),
+                          border: d.isEstimate ? '1px dashed rgba(255,69,58,0.3)' : 'none',
+                        }} />
+                        <span className={cn("text-[10px] font-mono-nums leading-tight mt-1 truncate w-full text-center",
+                          d.isEstimate ? "text-white/25" : "text-white/45")}>{d.quarter}</span>
+                        {growth != null && (
+                          <span className={cn("text-[10px] font-mono-nums font-semibold leading-none mt-0.5",
+                            growth >= 0 ? "text-[#30d158]/80" : "text-[#ff453a]/80")}>
+                            {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex items-end gap-[3px]">
+                {data.map((d, i) => {
+                  const pct = maxEpsAbs > 0 ? Math.abs(d.eps) / maxEpsAbs : 0;
+                  const barH = Math.max(pct * BAR_MAX_H, 4);
+                  const isHov = hoveredEpsIdx === i;
+                  const growth = d.epsYoY;
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0"
+                      onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
+                      style={{ cursor: 'pointer' }} data-testid={`bar-eps-${i}`}>
+                      {growth != null && (
+                        <span className={cn("text-[10px] font-mono-nums font-semibold leading-none mb-0.5",
+                          growth >= 0 ? "text-[#30d158]/80" : "text-[#ff453a]/80")}>
+                          {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
+                        </span>
+                      )}
+                      {growth == null && <span className="text-[10px] leading-none mb-0.5 invisible">0%</span>}
+                      <div className="w-full rounded-t-[2px] transition-all duration-150" style={{
+                        height: `${barH}px`,
+                        backgroundColor: d.isEstimate
+                          ? (isHov ? 'rgba(251,187,4,0.30)' : 'rgba(251,187,4,0.15)')
+                          : (isHov ? 'rgba(251,187,4,0.75)' : 'rgba(251,187,4,0.40)'),
+                        border: d.isEstimate ? '1px dashed rgba(251,187,4,0.3)' : 'none',
+                      }} />
+                      <span className={cn("text-[10px] font-mono-nums leading-tight mt-1 truncate w-full text-center",
+                        d.isEstimate ? "text-white/25" : "text-white/45")}>{d.quarter}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>

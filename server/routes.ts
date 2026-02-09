@@ -1119,8 +1119,8 @@ export async function registerRoutes(
             if (!m) continue;
             const yr = parseInt(m[1]);
             const existing = yearMap.get(yr) || { revenue: 0, eps: 0, revenueEst: 0, epsEst: 0, hasActual: false, count: 0 };
-            if (e.salesActual != null) { existing.revenue += e.salesActual / 1000; existing.hasActual = true; }
-            else if (e.salesEstimate != null) existing.revenueEst += e.salesEstimate / 1000;
+            if (e.salesActual != null) { existing.revenue += e.salesActual; existing.hasActual = true; }
+            else if (e.salesEstimate != null) existing.revenueEst += e.salesEstimate;
             if (e.epsActual != null) { existing.eps += e.epsActual; existing.hasActual = true; }
             else if (e.epsEstimate != null) existing.epsEst += e.epsEstimate;
             existing.count++;
@@ -1136,7 +1136,7 @@ export async function registerRoutes(
             const eps = d.hasActual ? d.eps + d.epsEst : d.epsEst;
             return {
               quarter: `FY '${String(yr).slice(-2)}`,
-              revenue: Math.round(rev * 10) / 10,
+              revenue: Math.round(rev * 100) / 100,
               eps: Math.round(eps * 100) / 100,
               revenueYoY: null as number | null,
               epsYoY: null as number | null,
@@ -1166,8 +1166,8 @@ export async function registerRoutes(
           const label = m ? `Q${m[2]} '${m[1].slice(-2)}` : e.fiscalPeriod;
           const isEst = e.epsActual == null && e.salesActual == null;
           const rev = isEst
-            ? Math.round((e.salesEstimate || 0) / 1000 * 10) / 10
-            : Math.round((e.salesActual || 0) / 1000 * 10) / 10;
+            ? Math.round((e.salesEstimate || 0) * 100) / 100
+            : Math.round((e.salesActual || 0) * 100) / 100;
           const eps = isEst ? (e.epsEstimate || 0) : (e.epsActual || 0);
 
           const surprise = (!isEst && e.epsEstimate != null && e.epsActual != null && e.epsEstimate !== 0)
@@ -1183,7 +1183,7 @@ export async function registerRoutes(
             isEstimate: isEst,
             epsEstimate: e.epsEstimate != null ? Math.round(e.epsEstimate * 100) / 100 : undefined,
             epsSurprise: surprise,
-            salesEstimate: e.salesEstimate != null ? Math.round(e.salesEstimate / 1000 * 10) / 10 : undefined,
+            salesEstimate: e.salesEstimate != null ? Math.round(e.salesEstimate * 100) / 100 : undefined,
             numAnalysts: e.epsAnalysts ?? undefined,
           };
         });
