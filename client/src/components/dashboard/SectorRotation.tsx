@@ -185,6 +185,12 @@ export function SectorRotation() {
         </div>
 
         <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="block flex-1" data-testid="rrg-chart">
+          <defs>
+            <clipPath id="rrg-plot-clip">
+              <rect x={PAD.left} y={PAD.top} width={plotW} height={plotH} />
+            </clipPath>
+          </defs>
+
           <rect x={centerX} y={PAD.top} width={PAD.left + plotW - centerX} height={centerY - PAD.top} fill={QUADRANT_BG.leading} />
           <rect x={PAD.left} y={PAD.top} width={centerX - PAD.left} height={centerY - PAD.top} fill={QUADRANT_BG.improving} />
           <rect x={PAD.left} y={centerY} width={centerX - PAD.left} height={PAD.top + plotH - centerY} fill={QUADRANT_BG.lagging} />
@@ -223,6 +229,7 @@ export function SectorRotation() {
             RS-Momentum
           </text>
 
+          <g clipPath="url(#rrg-plot-clip)">
           {typedSectors.map((sector) => {
             const isHovered = hoveredSector === sector.ticker;
             if (!isHovered) return null;
@@ -266,6 +273,7 @@ export function SectorRotation() {
               </g>
             );
           })}
+          </g>
 
           {typedSectors.map((sector) => {
             const isHovered = hoveredSector === sector.ticker;
