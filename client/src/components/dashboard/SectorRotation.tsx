@@ -51,19 +51,16 @@ export function SectorRotation() {
 
     const typedSectors = sectors as RRGSector[];
 
-    const allRS = typedSectors.flatMap(s => [s.rsRatio, ...s.tail.map(t => t.rsRatio)]);
-    const allMom = typedSectors.flatMap(s => [s.rsMomentum, ...s.tail.map(t => t.rsMomentum)]);
+    const currentRS = typedSectors.map(s => s.rsRatio);
+    const currentMom = typedSectors.map(s => s.rsMomentum);
 
-    const rsSpread = Math.max(Math.max(...allRS) - 100, 100 - Math.min(...allRS), 1.5);
-    const momAbsMax = Math.max(Math.abs(Math.max(...allMom)), Math.abs(Math.min(...allMom)), 1);
+    const rsSpread = Math.max(Math.max(...currentRS) - 100, 100 - Math.min(...currentRS), 2);
+    const momAbsMax = Math.max(Math.abs(Math.max(...currentMom)), Math.abs(Math.min(...currentMom)), 2);
 
-    const rsPad = rsSpread * 0.4;
-    const momPad = momAbsMax * 0.4;
-
-    const rsMin = 100 - rsSpread - rsPad;
-    const rsMax = 100 + rsSpread + rsPad;
-    const momMin = -momAbsMax - momPad;
-    const momMax = momAbsMax + momPad;
+    const rsMin = 100 - rsSpread * 1.35;
+    const rsMax = 100 + rsSpread * 1.35;
+    const momMin = -momAbsMax * 1.35;
+    const momMax = momAbsMax * 1.35;
 
     return { typedSectors, rsMin, rsMax, momMin, momMax };
   }, [sectors]);
