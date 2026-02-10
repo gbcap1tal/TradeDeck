@@ -20,8 +20,14 @@ interface Leader {
   qualityScore?: number;
 }
 
-type SortField = 'rsRating' | 'changePercent' | 'marketCap' | 'symbol' | 'sector' | 'industry' | 'qualityScore';
+type SortField = 'composite' | 'rsRating' | 'changePercent' | 'marketCap' | 'symbol' | 'sector' | 'industry' | 'qualityScore';
 type SortDir = 'asc' | 'desc';
+
+function compositeScore(rs: number, quality?: number): number {
+  const rsNorm = (rs / 99) * 10;
+  const q = quality ?? 0;
+  return rsNorm + q;
+}
 
 const RS_OPTIONS = [
   { label: '99', value: '99' },
@@ -69,7 +75,7 @@ export default function Leaders() {
       prev.includes(sector) ? prev.filter(s => s !== sector) : [...prev, sector]
     );
   };
-  const [sortField, setSortField] = useState<SortField>('rsRating');
+  const [sortField, setSortField] = useState<SortField>('composite');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   const { data, isLoading } = useQuery<{ leaders: Leader[]; total: number }>({
@@ -151,6 +157,7 @@ export default function Leaders() {
     list = [...list].sort((a, b) => {
       let cmp = 0;
       switch (sortField) {
+        case 'composite': cmp = compositeScore(a.rsRating, a.qualityScore) - compositeScore(b.rsRating, b.qualityScore); break;
         case 'symbol': cmp = a.symbol.localeCompare(b.symbol); break;
         case 'sector': cmp = a.sector.localeCompare(b.sector); break;
         case 'industry': cmp = a.industry.localeCompare(b.industry); break;
@@ -341,7 +348,14 @@ export default function Leaders() {
               <table className="w-full" data-testid="table-leaders">
                 <thead>
                   <tr className="border-b border-white/[0.06]">
-                    <th className="text-left px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold w-8" data-testid="th-rank">#</th>
+                    <th
+                      className="text-left px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold w-8 cursor-pointer select-none"
+                      onClick={() => handleSort('composite')}
+                      title="Sort by RS + Quality combined"
+                      data-testid="th-rank"
+                    >
+                      #<SortIcon field="composite" />
+                    </th>
                     <th
                       className="text-left px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold cursor-pointer select-none"
                       onClick={() => handleSort('symbol')}
