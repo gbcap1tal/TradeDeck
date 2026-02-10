@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Search, X, ChevronUp, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Leader {
   symbol: string;
@@ -21,12 +22,20 @@ interface Leader {
 type SortField = 'rsRating' | 'changePercent' | 'marketCap' | 'symbol' | 'sector' | 'industry' | 'qualityScore';
 type SortDir = 'asc' | 'desc';
 
-const RS_FILTERS = [
-  { label: 'RS 99', value: 99 },
-  { label: 'RS 95+', value: 95 },
-  { label: 'RS 90+', value: 90 },
-  { label: 'RS 85+', value: 85 },
-  { label: 'RS 80+', value: 80 },
+const RS_OPTIONS = [
+  { label: '99', value: '99' },
+  { label: '95+', value: '95' },
+  { label: '90+', value: '90' },
+  { label: '85+', value: '85' },
+  { label: '80+', value: '80' },
+];
+
+const QUALITY_OPTIONS = [
+  { label: 'Any', value: '0' },
+  { label: '5+', value: '5' },
+  { label: '6+', value: '6' },
+  { label: '7+', value: '7' },
+  { label: '8+', value: '8' },
 ];
 
 const SECTORS = [
@@ -51,6 +60,7 @@ export default function Leaders() {
   const [minRS, setMinRS] = useState(90);
   const [search, setSearch] = useState('');
   const [sectorFilter, setSectorFilter] = useState('All Sectors');
+  const [minQuality, setMinQuality] = useState(0);
   const [sortField, setSortField] = useState<SortField>('rsRating');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
@@ -117,6 +127,10 @@ export default function Leaders() {
       list = list.filter(l => l.sector === sectorFilter);
     }
 
+    if (minQuality > 0) {
+      list = list.filter(l => l.qualityScore != null && l.qualityScore >= minQuality);
+    }
+
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter(l =>
@@ -139,7 +153,7 @@ export default function Leaders() {
     });
 
     return list;
-  }, [leadersWithQuality, sectorFilter, search, sortField, sortDir]);
+  }, [leadersWithQuality, sectorFilter, minQuality, search, sortField, sortDir]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -170,7 +184,7 @@ export default function Leaders() {
     <div className="min-h-screen bg-[#0a0a0a]">
       <Navbar />
       <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
             <h1 className="text-[18px] sm:text-[22px] font-semibold text-white tracking-tight" data-testid="text-leaders-title">
               Leaders
@@ -178,34 +192,17 @@ export default function Leaders() {
             <p className="text-[12px] text-white/40 mt-0.5" data-testid="text-leaders-subtitle">
               {isLoading ? 'Loading...' : `${filtered.length} stocks with RS ${minRS}+`}
               {sectorFilter !== 'All Sectors' ? ` in ${sectorFilter}` : ''}
+              {minQuality > 0 ? ` · Quality ${minQuality}+` : ''}
             </p>
-          </div>
-
-          <div className="flex items-center gap-1 flex-wrap">
-            {RS_FILTERS.map(f => (
-              <Button
-                key={f.value}
-                variant="ghost"
-                size="sm"
-                onClick={() => setMinRS(f.value)}
-                className={cn(
-                  "text-[11px] font-medium toggle-elevate",
-                  minRS === f.value ? "bg-white/15 text-white toggle-elevated" : "text-white/40"
-                )}
-                data-testid={`button-rs-filter-${f.value}`}
-              >
-                {f.label}
-              </Button>
-            ))}
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 mb-4">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <div className="relative flex-1 min-w-[180px] max-w-xs">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 z-10" />
             <Input
-              placeholder="Search ticker, name, or industry..."
-              className="pl-8 pr-8 h-8 text-[13px] bg-white/5 border-white/10 text-white placeholder:text-white/30 focus-visible:ring-white/20"
+              placeholder="Search ticker, name, industry..."
+              className="pl-8 pr-8 h-8 text-[12px] bg-white/5 border-white/10 text-white placeholder:text-white/30 focus-visible:ring-white/20"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               data-testid="input-leaders-search"
@@ -223,24 +220,74 @@ export default function Leaders() {
             )}
           </div>
 
-          <div className="flex items-center gap-1 flex-wrap">
-            {SECTORS.filter(s => s === 'All Sectors' || (sectorCounts[s] || 0) > 0).map(s => (
-              <Button
-                key={s}
-                variant="ghost"
-                size="sm"
-                onClick={() => setSectorFilter(s)}
-                className={cn(
-                  "text-[10px] font-medium whitespace-nowrap toggle-elevate",
-                  sectorFilter === s ? "bg-white/15 text-white toggle-elevated" : "text-white/35"
-                )}
-                data-testid={`button-sector-filter-${s.replace(/\s+/g, '-')}`}
-              >
-                {s === 'All Sectors' ? 'All' : s}
-                {s !== 'All Sectors' && sectorCounts[s] ? ` (${sectorCounts[s]})` : ''}
-              </Button>
-            ))}
-          </div>
+          <Select value={String(minRS)} onValueChange={(v) => setMinRS(Number(v))}>
+            <SelectTrigger
+              className="w-auto min-w-[90px] h-8 text-[12px] bg-white/5 border-white/10 text-white gap-1"
+              data-testid="select-rs-filter"
+            >
+              <span className="text-white/40 mr-0.5">RS</span>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {RS_OPTIONS.map(o => (
+                <SelectItem key={o.value} value={o.value} data-testid={`option-rs-${o.value}`}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={sectorFilter} onValueChange={setSectorFilter}>
+            <SelectTrigger
+              className="w-auto min-w-[120px] max-w-[200px] h-8 text-[12px] bg-white/5 border-white/10 text-white gap-1"
+              data-testid="select-sector-filter"
+            >
+              <span className="text-white/40 mr-0.5">Sector</span>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SECTORS.filter(s => s === 'All Sectors' || (sectorCounts[s] || 0) > 0).map(s => (
+                <SelectItem key={s} value={s} data-testid={`option-sector-${s.replace(/\s+/g, '-')}`}>
+                  {s === 'All Sectors' ? 'All' : s}
+                  {s !== 'All Sectors' && sectorCounts[s] ? ` (${sectorCounts[s]})` : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={String(minQuality)} onValueChange={(v) => setMinQuality(Number(v))}>
+            <SelectTrigger
+              className="w-auto min-w-[100px] h-8 text-[12px] bg-white/5 border-white/10 text-white gap-1"
+              data-testid="select-quality-filter"
+            >
+              <span className="text-white/40 mr-0.5">Quality</span>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {QUALITY_OPTIONS.map(o => (
+                <SelectItem key={o.value} value={o.value} data-testid={`option-quality-${o.value}`}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {(sectorFilter !== 'All Sectors' || minQuality > 0 || search) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-[11px] text-white/40"
+              onClick={() => {
+                setSectorFilter('All Sectors');
+                setMinQuality(0);
+                setSearch('');
+              }}
+              data-testid="button-clear-all-filters"
+            >
+              <X className="w-3 h-3 mr-1" />
+              Clear
+            </Button>
+          )}
         </div>
 
         {isLoading ? (
