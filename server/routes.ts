@@ -597,7 +597,30 @@ function initBackgroundTasks() {
     const etMinutes = etNow.getHours() * 60 + etNow.getMinutes();
     const isDuringMarket = etDay >= 1 && etDay <= 5 && etMinutes >= 540 && etMinutes <= 965;
 
-    console.log(`[bg] Loading Finviz data (needed for sectors/industries/performance)... ${isDuringMarket ? '(market hours — force refresh)' : '(off hours — using cache)'}`);
+    // Phase 1: Fast Yahoo-only data (sectors, rotation, breadth) — no Finviz needed
+    console.log('[bg] Phase 1: Computing fast Yahoo data (sectors, rotation, breadth)...');
+    await Promise.allSettled([
+      (async () => {
+        const sectors = await computeSectorsData();
+        setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
+        console.log(`[bg] Sectors computed: ${sectors.length} sectors in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+      })(),
+      (async () => {
+        const rotData = await computeRotationData();
+        setCache('rrg_rotation', rotData, CACHE_TTL.SECTORS);
+        console.log(`[bg] Rotation pre-computed: ${rotData.sectors?.length} sectors in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+      })(),
+      (async () => {
+        const breadthFast = await computeMarketBreadth(false);
+        setCache('market_breadth', breadthFast, CACHE_TTL.BREADTH);
+        console.log(`[bg] Breadth trend-only pre-computed: score=${breadthFast.overallScore} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+      })(),
+    ]);
+
+    console.log(`[bg] Phase 1 complete in ${((Date.now() - bgStart) / 1000).toFixed(1)}s — dashboard data ready`);
+
+    // Phase 2: Slow Finviz scrape + industry enrichment (runs in background)
+    console.log(`[bg] Phase 2: Loading Finviz data... ${isDuringMarket ? '(market hours — force refresh)' : '(off hours — using cache)'}`);
     const finvizData = await getFinvizData(isDuringMarket);
     if (finvizData) {
       let totalStocks = 0;
@@ -634,26 +657,10 @@ function initBackgroundTasks() {
     setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
     console.log(`[bg] Industry performance computed: ${perfData.industries?.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
 
+    // Re-compute sectors with industry enrichment now that Finviz is ready
     const sectors = await computeSectorsData();
     setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
-    console.log(`[bg] Sectors computed: ${sectors.length} sectors in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
-
-    await Promise.allSettled([
-      (async () => {
-        console.log('[bg] Pre-computing rotation data...');
-        const rotData = await computeRotationData();
-        setCache('rrg_rotation', rotData, CACHE_TTL.SECTORS);
-        console.log(`[bg] Rotation pre-computed: ${rotData.sectors?.length} sectors in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
-      })(),
-      (async () => {
-        console.log('[bg] Pre-computing breadth (trend-only fast mode)...');
-        const breadthFast = await computeMarketBreadth(false);
-        setCache('market_breadth', breadthFast, CACHE_TTL.BREADTH);
-        console.log(`[bg] Breadth trend-only pre-computed: score=${breadthFast.overallScore} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
-      })(),
-    ]);
-
-    console.log(`[bg] Fast data ready in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+    console.log(`[bg] Sectors re-enriched with industry data: ${sectors.length} sectors in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
 
     try {
       console.log('[bg] Computing full market breadth...');

@@ -316,8 +316,7 @@ export async function getSectorETFs() {
 
   try {
     const tickers = SECTOR_ETFS.map(s => s.ticker);
-    const [quotesResult, ytdPrices, histResults] = await Promise.all([
-      Promise.allSettled(SECTOR_ETFS.map(s => throttledYahooCall(() => yf.quote(s.ticker)))),
+    const [ytdPrices, histResults] = await Promise.all([
       getYearStartPrices(tickers),
       Promise.allSettled(tickers.map(t => throttledYahooCall(() => yf.chart(t, {
         period1: new Date(Date.now() - 35 * 86400000),
@@ -325,57 +324,54 @@ export async function getSectorETFs() {
       })))),
     ]);
 
-    const histMap = new Map<string, number[]>();
-    tickers.forEach((t, i) => {
-      const r = histResults[i];
-      if (r.status === 'fulfilled' && r.value?.quotes) {
-        const closes = r.value.quotes
-          .filter((q: any) => q.close != null)
-          .map((q: any) => q.close as number);
-        histMap.set(t, closes);
-      }
-    });
-
     const results = SECTOR_ETFS.map((sector, i) => {
-      const r = quotesResult[i];
-      if (r.status === 'fulfilled' && r.value) {
-        const q = r.value;
-        const currentPrice = q.regularMarketPrice ?? 0;
-        const closes = histMap.get(sector.ticker) || [];
+      const r = histResults[i];
+      if (r.status !== 'fulfilled' || !r.value?.quotes?.length) return null;
 
-        let weeklyChange = 0;
-        let monthlyChange = 0;
-        if (closes.length >= 5) {
-          const weekAgoPrice = closes[closes.length - 5] || closes[0];
-          weeklyChange = Math.round(((currentPrice - weekAgoPrice) / weekAgoPrice) * 10000) / 100;
-        }
-        if (closes.length >= 1) {
-          const monthAgoPrice = closes[0];
-          monthlyChange = Math.round(((currentPrice - monthAgoPrice) / monthAgoPrice) * 10000) / 100;
-        }
+      const chartData = r.value;
+      const meta = chartData.meta || {};
+      const quotes = chartData.quotes.filter((q: any) => q.close != null);
+      if (quotes.length < 2) return null;
 
-        const ytdStartPrice = ytdPrices.get(sector.ticker);
-        const ytdChange = ytdStartPrice
-          ? Math.round(((currentPrice - ytdStartPrice) / ytdStartPrice) * 10000) / 100
-          : 0;
+      const currentPrice = meta.regularMarketPrice ?? (quotes[quotes.length - 1].close as number);
+      const prevDayClose = quotes[quotes.length - 2].close as number;
+      const change = Math.round((currentPrice - prevDayClose) * 100) / 100;
+      const changePercent = prevDayClose > 0
+        ? Math.round(((currentPrice - prevDayClose) / prevDayClose) * 10000) / 100
+        : 0;
 
-        return {
-          name: sector.name,
-          ticker: sector.ticker,
-          price: Math.round(currentPrice * 100) / 100,
-          change: Math.round((q.regularMarketChange ?? 0) * 100) / 100,
-          changePercent: Math.round((q.regularMarketChangePercent ?? 0) * 100) / 100,
-          weeklyChange,
-          monthlyChange,
-          ytdChange,
-          marketCap: Math.round((q.marketCap ?? 0) / 1e9 * 10) / 10,
-          rs: 0,
-          rsMomentum: 0,
-          color: sector.color,
-          industries: [],
-        };
+      const closes = quotes.map((q: any) => q.close as number);
+      let weeklyChange = 0;
+      let monthlyChange = 0;
+      if (closes.length >= 5) {
+        const weekAgoPrice = closes[closes.length - 5] || closes[0];
+        weeklyChange = Math.round(((currentPrice - weekAgoPrice) / weekAgoPrice) * 10000) / 100;
       }
-      return null;
+      if (closes.length >= 1) {
+        const monthAgoPrice = closes[0];
+        monthlyChange = Math.round(((currentPrice - monthAgoPrice) / monthAgoPrice) * 10000) / 100;
+      }
+
+      const ytdStartPrice = ytdPrices.get(sector.ticker);
+      const ytdChange = ytdStartPrice
+        ? Math.round(((currentPrice - ytdStartPrice) / ytdStartPrice) * 10000) / 100
+        : 0;
+
+      return {
+        name: sector.name,
+        ticker: sector.ticker,
+        price: Math.round(currentPrice * 100) / 100,
+        change,
+        changePercent,
+        weeklyChange,
+        monthlyChange,
+        ytdChange,
+        marketCap: 0,
+        rs: 0,
+        rsMomentum: 0,
+        color: sector.color,
+        industries: [],
+      };
     }).filter(Boolean);
 
     setCache(key, results, CACHE_TTL.SECTORS);

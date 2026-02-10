@@ -27,12 +27,12 @@ export function useSectorPerformance() {
   return useQuery({
     queryKey: ['/api/market/sectors'],
     queryFn: () => fetchWithWarmingRetry('/api/market/sectors'),
-    refetchInterval: 30000,
+    refetchInterval: 120000,
     retry: (failureCount, error) => {
       if (error?.message === "Data warming up") return failureCount < 60;
       return false;
     },
-    retryDelay: 5000,
+    retryDelay: 3000,
   });
 }
 
