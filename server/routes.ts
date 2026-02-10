@@ -8,6 +8,7 @@ import * as fmp from "./api/fmp";
 import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
 import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, scrapeIndustryRS, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying } from "./api/finviz";
+import { getSectorPerformanceFromPolygon } from "./api/polygon";
 import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe } from "./api/breadth";
 import { getRSScore, getCachedRS, getAllRSRatings } from "./api/rs";
 import { sendAlert, clearFailures } from "./api/alerts";
@@ -234,6 +235,18 @@ function computeMegatrendRS(cached: any | null): number {
 }
 
 async function computeSectorsData(): Promise<any[]> {
+  let polygonData: any[] = [];
+  try {
+    polygonData = await getSectorPerformanceFromPolygon();
+  } catch (e: any) {
+    console.warn('[sectors] Polygon fetch failed, falling back to Yahoo:', e.message);
+  }
+
+  const polygonMap = new Map<string, any>();
+  for (const s of polygonData) {
+    polygonMap.set(s.ticker, s);
+  }
+
   const data = await yahoo.getSectorETFs();
   if (!data || data.length === 0) return [];
 
@@ -258,7 +271,16 @@ async function computeSectorsData(): Promise<any[]> {
         rs: 0,
       };
     });
-    return { ...sector, industries: industryData, color: config?.color };
+
+    const poly = polygonMap.get(sector.ticker);
+    return {
+      ...sector,
+      weeklyChange: poly?.weeklyChange ?? sector.weeklyChange ?? 0,
+      monthlyChange: poly?.monthlyChange ?? sector.monthlyChange ?? 0,
+      ytdChange: poly?.ytdChange ?? sector.ytdChange ?? 0,
+      industries: industryData,
+      color: config?.color,
+    };
   });
   withIndustries.sort((a: any, b: any) => (b.changePercent ?? 0) - (a.changePercent ?? 0));
   return withIndustries;
