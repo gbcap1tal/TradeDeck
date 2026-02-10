@@ -1199,6 +1199,7 @@ export async function registerRoutes(
     const sym = symbol.toUpperCase();
 
     const defaultResponse = {
+      qualityScore: { total: 0, pillars: { trend: 0, demand: 0, growth: 0, estimates: 0, structure: 0 }, interpretation: '' },
       details: { marketCap: 0, floatShares: 0, rsVsSpy: 0, rsTimeframe: 'current', adr: 0, instOwnership: 0, numInstitutions: 0, avgVolume50d: 0, shortInterest: 0, shortRatio: 0, shortPercentOfFloat: 0, nextEarningsDate: '', daysToEarnings: 0 },
       fundamentals: { epsQoQ: 0, salesQoQ: 0, epsYoY: 0, salesYoY: 0, earningsAcceleration: 0, salesGrowth1Y: 0 },
       profitability: { epsTTM: 0, fcfTTM: 0, operMarginPositive: false, fcfPositive: false },
@@ -1372,11 +1373,164 @@ export async function registerRoutes(
       const pFcf = parseNumVal(s['P/FCF']);
       const fcfPositive = pFcf > 0;
 
+      const rsRating = await getRSScore(sym);
+
+      let smartMoney = false;
+      try {
+        const insiderTx = await scrapeFinvizInsiderBuying(sym);
+        smartMoney = insiderTx.length > 0;
+      } catch {}
+
+      let salesAccelQuarters = 0;
+      let latestQEpsYoY = epsYoY;
+      let latestQSalesYoY = salesYoY;
+      let epsEstQAbove15 = 0;
+      let salesEstQAbove10 = 0;
+      let estimatesAccelerating: 'yes' | 'no' | 'mixed' = 'no';
+
+      if (snap && snap.earnings && snap.earnings.length > 0) {
+        const allEntries = [...snap.earnings].sort((a, b) => a.fiscalEndDate.localeCompare(b.fiscalEndDate));
+        const actuals = allEntries.filter(e => e.salesActual != null);
+
+        const salesQMap = new Map<string, number>();
+        for (const e of actuals) {
+          const m = e.fiscalPeriod.match(/(\d{4})Q(\d)/);
+          if (m && e.salesActual != null) salesQMap.set(`${m[1]}Q${m[2]}`, e.salesActual);
+        }
+
+        const salesYoYGrowths: number[] = [];
+        for (const e of actuals) {
+          const m = e.fiscalPeriod.match(/(\d{4})Q(\d)/);
+          if (!m || e.salesActual == null) continue;
+          const prevSales = salesQMap.get(`${parseInt(m[1]) - 1}Q${m[2]}`);
+          if (prevSales != null && prevSales !== 0) {
+            salesYoYGrowths.push(((e.salesActual - prevSales) / Math.abs(prevSales)) * 100);
+          }
+        }
+
+        for (let i = salesYoYGrowths.length - 1; i >= 1; i--) {
+          if (salesYoYGrowths[i] > salesYoYGrowths[i - 1]) {
+            salesAccelQuarters++;
+          } else {
+            break;
+          }
+        }
+
+        const estimates = allEntries.filter(e => e.epsActual == null && e.salesActual == null);
+        const lastActual = actuals.length > 0 ? actuals[actuals.length - 1] : null;
+        const futureEstimates = lastActual
+          ? estimates.filter(e => e.fiscalEndDate > lastActual.fiscalEndDate).slice(0, 4)
+          : estimates.slice(0, 4);
+
+        const estYoYGrowths: number[] = [];
+        for (const est of futureEstimates) {
+          const m = est.fiscalPeriod.match(/(\d{4})Q(\d)/);
+          if (!m) continue;
+          const yr = parseInt(m[1]);
+          const q = parseInt(m[2]);
+
+          const prevEps = allEntries.find(e => {
+            const em = e.fiscalPeriod.match(/(\d{4})Q(\d)/);
+            return em && parseInt(em[1]) === yr - 1 && parseInt(em[2]) === q;
+          });
+          if (prevEps) {
+            const baseEps = prevEps.epsActual ?? prevEps.epsEstimate;
+            if (baseEps != null && baseEps !== 0 && est.epsEstimate != null) {
+              const g = ((est.epsEstimate - baseEps) / Math.abs(baseEps)) * 100;
+              if (g >= 15) epsEstQAbove15++;
+              estYoYGrowths.push(g);
+            }
+          }
+
+          const prevSales = allEntries.find(e => {
+            const em = e.fiscalPeriod.match(/(\d{4})Q(\d)/);
+            return em && parseInt(em[1]) === yr - 1 && parseInt(em[2]) === q;
+          });
+          if (prevSales) {
+            const baseSales = prevSales.salesActual ?? prevSales.salesEstimate;
+            if (baseSales != null && baseSales !== 0 && est.salesEstimate != null) {
+              const g = ((est.salesEstimate - baseSales) / Math.abs(baseSales)) * 100;
+              if (g >= 10) salesEstQAbove10++;
+            }
+          }
+        }
+
+        if (estYoYGrowths.length >= 2) {
+          let increasing = 0;
+          let decreasing = 0;
+          for (let i = 1; i < estYoYGrowths.length; i++) {
+            if (estYoYGrowths[i] > estYoYGrowths[i - 1]) increasing++;
+            else decreasing++;
+          }
+          if (increasing > decreasing) estimatesAccelerating = 'yes';
+          else if (increasing > 0 && decreasing > 0) estimatesAccelerating = 'mixed';
+          else estimatesAccelerating = 'no';
+        }
+      }
+
+      // ---- STOCK QUALITY SCORE ENGINE v2.0 ----
+      // Pillar 1: Trend & Technical Structure (max 3.0)
+      const p1Stage = weinsteinStage === 2 ? 1.0 : weinsteinStage === 1 ? 0.25 : 0.0;
+      const emaCount = (aboveEma10 ? 1 : 0) + (aboveEma20 ? 1 : 0);
+      const p1Ema = emaCount === 2 ? 0.5 : emaCount === 1 ? 0.25 : 0.0;
+      const smaCount = (aboveSma50 ? 1 : 0) + (aboveSma200 ? 1 : 0);
+      const p1Sma = smaCount === 2 ? 0.5 : smaCount === 1 ? 0.25 : 0.0;
+      const p1Dist = distFromSma50 >= 0 && distFromSma50 <= 10 ? 0.5 : distFromSma50 >= 0 && distFromSma50 <= 20 ? 0.25 : 0.0;
+      const p1Atr = atrMultiple <= 2 ? 0.5 : atrMultiple <= 4 ? 0.25 : 0.0;
+      const pillar1 = p1Stage + p1Ema + p1Sma + p1Dist + p1Atr;
+
+      // Pillar 2: Demand & Institutional Footprint (max 2.5)
+      const p2Rs = rsRating >= 90 ? 1.0 : rsRating >= 80 ? 0.5 : 0.0;
+      const p2Inst = (instOwnership >= 20 && instOwnership <= 60) ? 0.5 : 0.25;
+      const p2Vol = avgVolume50d >= 1_000_000 ? 0.5 : avgVolume50d >= 500_000 ? 0.25 : 0.0;
+      const p2Smart = smartMoney ? 0.5 : 0.0;
+      const pillar2 = p2Rs + p2Inst + p2Vol + p2Smart;
+
+      // Pillar 3: Growth — Quarterly Momentum (max 2.0)
+      const p3Eps = latestQEpsYoY > 25 ? 0.5 : latestQEpsYoY >= 10 ? 0.25 : 0.0;
+      const p3Sales = latestQSalesYoY > 15 ? 0.5 : latestQSalesYoY >= 5 ? 0.25 : 0.0;
+      const p3EpsAcc = earningsAcceleration >= 2 ? 0.5 : earningsAcceleration === 1 ? 0.25 : 0.0;
+      const p3SalesAcc = salesAccelQuarters >= 2 ? 0.5 : salesAccelQuarters === 1 ? 0.25 : 0.0;
+      const pillar3 = p3Eps + p3Sales + p3EpsAcc + p3SalesAcc;
+
+      // Pillar 4: Forward Estimates (max 1.5)
+      const p4Eps = epsEstQAbove15 >= 2 ? 0.5 : epsEstQAbove15 === 1 ? 0.25 : 0.0;
+      const p4Sales = salesEstQAbove10 >= 2 ? 0.5 : salesEstQAbove10 === 1 ? 0.25 : 0.0;
+      const p4Acc = estimatesAccelerating === 'yes' ? 0.5 : estimatesAccelerating === 'mixed' ? 0.25 : 0.0;
+      const pillar4 = p4Eps + p4Sales + p4Acc;
+
+      // Pillar 5: Structure & Risk (max 1.0)
+      const floatMillions = floatShares / 1e6;
+      const mcapMillions = marketCap / 1e6;
+      const p5Margin = operMarginPositive ? 0.25 : 0.0;
+      const p5Fcf = fcfPositive ? 0.25 : 0.0;
+      const p5Float = floatMillions < 100 ? 0.25 : 0.0;
+      const p5Cap = mcapMillions > 300 ? 0.25 : 0.0;
+      const pillar5 = p5Margin + p5Fcf + p5Float + p5Cap;
+
+      const totalScore = Math.round((pillar1 + pillar2 + pillar3 + pillar4 + pillar5) * 100) / 100;
+      let interpretation = '';
+      if (totalScore >= 8.0) interpretation = 'A+ Setup';
+      else if (totalScore >= 6.5) interpretation = 'Strong Setup';
+      else if (totalScore >= 5.0) interpretation = 'Watchlist';
+      else interpretation = 'Pass';
+
       return res.json({
+        qualityScore: {
+          total: totalScore,
+          pillars: {
+            trend: Math.round(pillar1 * 100) / 100,
+            demand: Math.round(pillar2 * 100) / 100,
+            growth: Math.round(pillar3 * 100) / 100,
+            estimates: Math.round(pillar4 * 100) / 100,
+            structure: Math.round(pillar5 * 100) / 100,
+          },
+          interpretation,
+        },
         details: {
           marketCap,
           floatShares,
-          rsVsSpy: await getRSScore(sym),
+          rsVsSpy: rsRating,
           rsTimeframe: req.query.rsTimeframe || 'current',
           adr,
           instOwnership,

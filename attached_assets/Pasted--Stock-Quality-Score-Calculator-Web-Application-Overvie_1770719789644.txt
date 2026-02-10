@@ -1,0 +1,244 @@
+# Stock Quality Score Calculator — Web Application
+
+## Overview
+Build a single-page web application that calculates a Stock Quality Score (1-10) for swing trading and investing. The user inputs stock data manually into a form, and the app calculates and displays a weighted score across 5 pillars.
+
+## Tech Stack
+- Frontend: HTML, CSS, JavaScript (vanilla or React — your choice)
+- No backend needed — all calculations happen client-side
+- Clean, dark-themed UI (similar to a trading terminal aesthetic — dark background, green/red accents for positive/negative values)
+- Mobile responsive
+
+## UI Layout
+
+### Input Form
+Create a form with 5 collapsible sections matching the 5 pillars below. Each field should have a label, an input, and a small helper text explaining what to enter.
+
+### Results Panel
+- Large circular or semi-circular gauge showing the total score (1-10) with color coding:
+  - 8-10: Green — "A+ Setup"
+  - 6.5-7.9: Yellow/Gold — "Strong — Wait for Entry"
+  - 5-6.4: Orange — "Watchlist"
+  - Below 5: Red — "Pass"
+- Below the gauge, show a breakdown table with each pillar's score and a horizontal bar showing how much of the max was achieved
+- At the bottom, show a text interpretation/recommendation based on the score and specific weaknesses detected
+
+---
+
+## SCORING ENGINE — EXACT LOGIC
+
+### PILLAR 1: TREND & TECHNICAL STRUCTURE
+**Weight: 30% | Max: 3.0 points**
+
+**Inputs needed:**
+- Weinstein Stage (dropdown: Stage 1, Stage 2, Stage 3, Stage 4)
+- Price > 10 EMA (checkbox yes/no)
+- Price > 20 EMA (checkbox yes/no)
+- Price > 50 SMA (checkbox yes/no)
+- Price > 200 SMA (checkbox yes/no)
+- Distance from 50 SMA in % (number input)
+- Overextension in ATR (number input)
+
+**Scoring logic:**
+1. Weinstein Stage:
+   - Stage 2 = 1.0 pt
+   - Stage 1 = 0.25 pt
+   - Stage 3 or Stage 4 = 0 pt
+
+2. Price > 10 EMA AND Price > 20 EMA:
+   - Both true = 0.5 pt
+   - Only one true = 0.25 pt
+   - Neither = 0 pt
+
+3. Price > 50 SMA AND Price > 200 SMA:
+   - Both true = 0.5 pt
+   - Only one true = 0.25 pt
+   - Neither = 0 pt
+
+4. Distance from 50 SMA:
+   - ≤ 10% = 0.5 pt
+   - 10.01% to 20% = 0.25 pt
+   - > 20% = 0 pt
+
+5. Overextension (ATR):
+   - ≤ 2 ATR = 0.5 pt
+   - 2.01 to 4 ATR = 0.25 pt
+   - > 4 ATR = 0 pt
+
+**Pillar 1 Total = sum of above (max 3.0)**
+
+---
+
+### PILLAR 2: DEMAND & INSTITUTIONAL FOOTPRINT
+**Weight: 25% | Max: 2.5 points**
+
+**Inputs needed:**
+- RS Rating (number input, 0-99)
+- Institutional Ownership % (number input)
+- Average Volume 50D (number input — in shares, e.g. 1900000 for 1.9M)
+- Smart Money (toggle: Yes / No — Yes means funds or insiders are buying in last 12 months)
+
+**Scoring logic:**
+1. RS Rating:
+   - ≥ 90 = 1.0 pt
+   - 80 to 89 = 0.5 pt
+   - < 80 = 0 pt
+
+2. Institutional Ownership:
+   - 20% to 60% (inclusive) = 0.5 pt
+   - < 20% OR > 60% = 0.25 pt
+
+3. Average Volume 50D:
+   - ≥ 1,000,000 = 0.5 pt
+   - 500,000 to 999,999 = 0.25 pt
+   - < 500,000 = 0 pt
+
+4. Smart Money:
+   - Yes = 0.5 pt
+   - No = 0 pt
+
+**Pillar 2 Total = sum of above (max 2.5)**
+
+---
+
+### PILLAR 3: GROWTH — QUARTERLY MOMENTUM
+**Weight: 20% | Max: 2.0 points**
+
+**Important context:** All "QoQ" values are actually Year-over-Year comparisons (same quarter vs same quarter prior year). The labels say QoQ but the data is YoY. TTM figures are NOT used in scoring — only quarterly data matters.
+
+**Inputs needed:**
+- Latest Quarter EPS YoY Growth % (number input — this is the "EPS QoQ" field from the data source)
+- Latest Quarter Sales YoY Growth % (number input — this is the "Sales QoQ" field from the data source)
+- Number of consecutive quarters where EPS YoY growth rate is INCREASING (number input, 0-8). Example: if EPS YoY went +12% → +26% → +30% across 3 quarters, that's 2 consecutive quarters of acceleration.
+- Number of consecutive quarters where Sales YoY growth rate is INCREASING (number input, 0-8). Same logic as above.
+
+**Scoring logic:**
+1. Latest Quarter EPS YoY:
+   - > 25% = 0.5 pt
+   - 10% to 25% = 0.25 pt
+   - < 10% = 0 pt
+
+2. Latest Quarter Sales YoY:
+   - > 15% = 0.5 pt
+   - 5% to 15% = 0.25 pt
+   - < 5% = 0 pt
+
+3. EPS Acceleration:
+   - ≥ 2 consecutive quarters of increasing YoY EPS growth = 0.5 pt
+   - 1 quarter = 0.25 pt
+   - 0 = 0 pt
+
+4. Sales Acceleration:
+   - ≥ 2 consecutive quarters of increasing YoY Sales growth = 0.5 pt
+   - 1 quarter = 0.25 pt
+   - 0 = 0 pt
+
+**Pillar 3 Total = sum of above (max 2.0)**
+
+---
+
+### PILLAR 4: FORWARD ESTIMATES
+**Weight: 15% | Max: 1.5 points**
+
+**Inputs needed:**
+- Number of upcoming estimated quarters showing EPS YoY growth ≥ 15% (number input, 0-4)
+- Number of upcoming estimated quarters showing Sales YoY growth ≥ 10% (number input, 0-4)
+- Are the estimated growth rates accelerating across future quarters? (dropdown: Yes / No / Mixed)
+
+**Scoring logic:**
+1. EPS Estimates:
+   - ≥ 2 quarters with ≥ 15% YoY EPS growth = 0.5 pt
+   - 1 quarter = 0.25 pt
+   - 0 = 0 pt
+
+2. Sales Estimates:
+   - ≥ 2 quarters with ≥ 10% YoY Sales growth = 0.5 pt
+   - 1 quarter = 0.25 pt
+   - 0 = 0 pt
+
+3. Estimate Acceleration:
+   - Yes (growth rates increasing across future quarters) = 0.5 pt
+   - Mixed = 0.25 pt
+   - No (decelerating) = 0 pt
+
+**Pillar 4 Total = sum of above (max 1.5)**
+
+---
+
+### PILLAR 5: STRUCTURE & RISK
+**Weight: 10% | Max: 1.0 point**
+
+**Inputs needed:**
+- Operating Margin > 0 (checkbox yes/no)
+- Free Cash Flow > 0 (checkbox yes/no)
+- Float in millions (number input)
+- Market Cap in millions (number input)
+
+**Scoring logic:**
+1. Operating Margin > 0:
+   - Yes = 0.25 pt
+   - No = 0 pt
+
+2. FCF > 0:
+   - Yes = 0.25 pt
+   - No = 0 pt
+
+3. Float:
+   - < 100M = 0.25 pt
+   - ≥ 100M = 0 pt
+
+4. Market Cap:
+   - > $300M = 0.25 pt
+   - ≤ $300M = 0 pt
+
+**Pillar 5 Total = sum of above (max 1.0)**
+
+---
+
+## TOTAL SCORE CALCULATION
+
+**Total Score = Pillar 1 + Pillar 2 + Pillar 3 + Pillar 4 + Pillar 5**
+
+Maximum possible = 3.0 + 2.5 + 2.0 + 1.5 + 1.0 = 10.0
+
+---
+
+## INTERPRETATION TEXT (display below the score)
+
+Based on the total score, display:
+
+- **8.0 - 10.0**: "A+ Setup — High conviction. Full size position warranted on proper entry."
+- **6.5 - 7.9**: "Strong Setup — Standard position size. Wait for a clean technical entry (pullback to 10/20 EMA)."
+- **5.0 - 6.4**: "Watchlist — Needs improvement in key areas. Monitor for catalyst or technical setup improvement."
+- **Below 5.0**: "Pass — Too many weaknesses. Look elsewhere."
+
+Additionally, generate specific warnings:
+- If Overextension > 4 ATR: "⚠️ Overextended — do NOT chase. Wait for pullback."
+- If Dist from 50 SMA > 20%: "⚠️ Far from 50 SMA — elevated risk of mean reversion."
+- If Pillar 3 (Growth) < 0.5: "ℹ️ Weak fundamentals — this is a momentum/story stock. Manage risk accordingly."
+- If Pillar 5 (Structure) < 0.5: "ℹ️ Not yet profitable — position size conservatively."
+- If Smart Money = No AND RS < 80: "⚠️ No institutional support detected."
+
+---
+
+## ADDITIONAL FEATURES
+
+1. **Save/Load**: Allow saving the current stock analysis to localStorage with a ticker name, and loading previous analyses. Show a list of saved analyses with ticker, date, and score.
+
+2. **Reset Button**: Clear all form fields.
+
+3. **Print/Export**: Button to export the score breakdown as a clean summary (could be a printable view or copy-to-clipboard as formatted text).
+
+4. **Score History Chart**: Small chart showing scores of saved stocks for quick comparison.
+
+---
+
+## DESIGN NOTES
+- Dark theme (background #1a1a2e or similar dark navy/charcoal)
+- Green (#00c853) for positive values and good scores
+- Red (#ff1744) for negative values and warnings
+- Gold/Yellow (#ffd600) for medium scores
+- Use a monospace or clean sans-serif font
+- Cards/panels for each pillar with subtle borders
+- Smooth animations when calculating/displaying the score
+- The gauge/score display should be the visual centerpiece

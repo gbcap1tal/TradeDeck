@@ -1,0 +1,399 @@
+# ============================================================
+# STOCK QUALITY SCORE ENGINE v2.0
+# Pure scoring logic — no UI, no charts
+# ============================================================
+
+def calculate_stock_quality(data: dict) -> dict:
+    """
+    Calculates the Stock Quality Score (1-10) from input data.
+    
+    Parameters:
+    -----------
+    data : dict with the following keys:
+    
+    # TREND
+    weinstein_stage: int (1, 2, 3, or 4)
+    price_above_10ema: bool
+    price_above_20ema: bool
+    price_above_50sma: bool
+    price_above_200sma: bool
+    dist_from_50sma_pct: float (e.g. 26.0 for +26%)
+    overextension_atr: float (e.g. 4.5)
+    
+    # DEMAND
+    rs_rating: int (0-99)
+    inst_own_pct: float (e.g. 20.49)
+    avg_vol_50d: int (e.g. 1900000)
+    smart_money: bool
+    
+    # GROWTH — from bar charts (each Q vs same Q one year ago)
+    latest_q_eps_yoy_pct: float (e.g. 59.0)
+    latest_q_sales_yoy_pct: float (e.g. -30.0)
+    eps_accel_quarters: int (consecutive Q's of increasing YoY EPS growth)
+    sales_accel_quarters: int (consecutive Q's of increasing YoY Sales growth)
+    
+    # FUNDAMENTALS PANEL (QoQ sequential & YoY TTM) — used for warnings only
+    eps_qoq_pct: float (e.g. 19.66) — sequential quarter vs prior quarter
+    sales_qoq_pct: float (e.g. 7.06)
+    eps_yoy_ttm_pct: float (e.g. 59.25) — trailing 12m vs prior 12m
+    sales_yoy_ttm_pct: float (e.g. -29.59)
+    
+    # FORWARD ESTIMATES (from bar chart estimates)
+    eps_est_quarters_above_15: int (0-4, how many future Q's show ≥15% YoY EPS growth)
+    sales_est_quarters_above_10: int (0-4, how many future Q's show ≥10% YoY Sales growth)
+    estimates_accelerating: str ("yes", "no", "mixed")
+    
+    # STRUCTURE
+    oper_margin_positive: bool
+    fcf_positive: bool
+    float_millions: float (e.g. 122.7)
+    market_cap_millions: float (e.g. 343.0)
+    
+    Returns:
+    --------
+    dict with total_score, pillar scores, breakdown, warnings, interpretation
+    """
+
+    results = {}
+    warnings = []
+
+    # --------------------------------------------------------
+    # PILLAR 1: TREND & TECHNICAL STRUCTURE (max 3.0)
+    # --------------------------------------------------------
+    
+    # Weinstein Stage
+    stage = data["weinstein_stage"]
+    if stage == 2:
+        p1_stage = 1.0
+    elif stage == 1:
+        p1_stage = 0.25
+    else:
+        p1_stage = 0.0
+
+    # Price > 10 EMA + 20 EMA
+    ema_count = sum([data["price_above_10ema"], data["price_above_20ema"]])
+    if ema_count == 2:
+        p1_ema = 0.5
+    elif ema_count == 1:
+        p1_ema = 0.25
+    else:
+        p1_ema = 0.0
+
+    # Price > 50 SMA + 200 SMA
+    sma_count = sum([data["price_above_50sma"], data["price_above_200sma"]])
+    if sma_count == 2:
+        p1_sma = 0.5
+    elif sma_count == 1:
+        p1_sma = 0.25
+    else:
+        p1_sma = 0.0
+
+    # Distance from 50 SMA
+    dist = data["dist_from_50sma_pct"]
+    if dist <= 10:
+        p1_dist = 0.5
+    elif dist <= 20:
+        p1_dist = 0.25
+    else:
+        p1_dist = 0.0
+
+    # Overextension ATR
+    atr = data["overextension_atr"]
+    if atr <= 2:
+        p1_atr = 0.5
+    elif atr <= 4:
+        p1_atr = 0.25
+    else:
+        p1_atr = 0.0
+
+    pillar1 = p1_stage + p1_ema + p1_sma + p1_dist + p1_atr
+    results["pillar1"] = {
+        "name": "Trend & Technical Structure",
+        "max": 3.0,
+        "score": pillar1,
+        "breakdown": {
+            "weinstein_stage": p1_stage,
+            "ema_10_20": p1_ema,
+            "sma_50_200": p1_sma,
+            "dist_50sma": p1_dist,
+            "overextension_atr": p1_atr,
+        }
+    }
+
+    if atr > 4:
+        warnings.append("⚠️ Overextended (>4 ATR) — do NOT chase. Wait for pullback.")
+    if dist > 20:
+        warnings.append("⚠️ Far from 50 SMA (>20%) — elevated mean reversion risk.")
+
+    # --------------------------------------------------------
+    # PILLAR 2: DEMAND & INSTITUTIONAL FOOTPRINT (max 2.5)
+    # --------------------------------------------------------
+    
+    # RS Rating
+    rs = data["rs_rating"]
+    if rs >= 90:
+        p2_rs = 1.0
+    elif rs >= 80:
+        p2_rs = 0.5
+    else:
+        p2_rs = 0.0
+
+    # Institutional Ownership
+    inst = data["inst_own_pct"]
+    if 20 <= inst <= 60:
+        p2_inst = 0.5
+    else:
+        p2_inst = 0.25
+
+    # Average Volume 50D
+    vol = data["avg_vol_50d"]
+    if vol >= 1_000_000:
+        p2_vol = 0.5
+    elif vol >= 500_000:
+        p2_vol = 0.25
+    else:
+        p2_vol = 0.0
+
+    # Smart Money
+    p2_smart = 0.5 if data["smart_money"] else 0.0
+
+    pillar2 = p2_rs + p2_inst + p2_vol + p2_smart
+    results["pillar2"] = {
+        "name": "Demand & Institutional Footprint",
+        "max": 2.5,
+        "score": pillar2,
+        "breakdown": {
+            "rs_rating": p2_rs,
+            "inst_ownership": p2_inst,
+            "avg_vol_50d": p2_vol,
+            "smart_money": p2_smart,
+        }
+    }
+
+    if not data["smart_money"] and rs < 80:
+        warnings.append("⚠️ No institutional support detected (no smart money + RS < 80).")
+
+    # --------------------------------------------------------
+    # PILLAR 3: GROWTH — QUARTERLY MOMENTUM (max 2.0)
+    # Bar chart data: each Q vs same Q one year ago (YoY)
+    # --------------------------------------------------------
+    
+    # Latest Q EPS YoY
+    eps_yoy = data["latest_q_eps_yoy_pct"]
+    if eps_yoy > 25:
+        p3_eps = 0.5
+    elif eps_yoy >= 10:
+        p3_eps = 0.25
+    else:
+        p3_eps = 0.0
+
+    # Latest Q Sales YoY
+    sales_yoy = data["latest_q_sales_yoy_pct"]
+    if sales_yoy > 15:
+        p3_sales = 0.5
+    elif sales_yoy >= 5:
+        p3_sales = 0.25
+    else:
+        p3_sales = 0.0
+
+    # EPS Acceleration
+    eps_acc = data["eps_accel_quarters"]
+    if eps_acc >= 2:
+        p3_eps_acc = 0.5
+    elif eps_acc == 1:
+        p3_eps_acc = 0.25
+    else:
+        p3_eps_acc = 0.0
+
+    # Sales Acceleration
+    sales_acc = data["sales_accel_quarters"]
+    if sales_acc >= 2:
+        p3_sales_acc = 0.5
+    elif sales_acc == 1:
+        p3_sales_acc = 0.25
+    else:
+        p3_sales_acc = 0.0
+
+    pillar3 = p3_eps + p3_sales + p3_eps_acc + p3_sales_acc
+    results["pillar3"] = {
+        "name": "Growth — Quarterly Momentum",
+        "max": 2.0,
+        "score": pillar3,
+        "breakdown": {
+            "latest_q_eps_yoy": p3_eps,
+            "latest_q_sales_yoy": p3_sales,
+            "eps_acceleration": p3_eps_acc,
+            "sales_acceleration": p3_sales_acc,
+        }
+    }
+
+    if pillar3 < 0.5:
+        warnings.append("ℹ️ Weak fundamentals — momentum/story stock. Manage risk accordingly.")
+
+    # TTM-based warnings (not scored, context only)
+    if data.get("eps_yoy_ttm_pct", 0) < 0 and eps_yoy > 0:
+        warnings.append("ℹ️ TTM EPS still negative but latest quarter positive — potential turnaround.")
+    if data.get("sales_yoy_ttm_pct", 0) < 0:
+        warnings.append("ℹ️ TTM Sales negative — verify if quarterly trend is reversing.")
+
+    # --------------------------------------------------------
+    # PILLAR 4: FORWARD ESTIMATES (max 1.5)
+    # --------------------------------------------------------
+    
+    # EPS Estimates
+    eps_est = data["eps_est_quarters_above_15"]
+    if eps_est >= 2:
+        p4_eps = 0.5
+    elif eps_est == 1:
+        p4_eps = 0.25
+    else:
+        p4_eps = 0.0
+
+    # Sales Estimates
+    sales_est = data["sales_est_quarters_above_10"]
+    if sales_est >= 2:
+        p4_sales = 0.5
+    elif sales_est == 1:
+        p4_sales = 0.25
+    else:
+        p4_sales = 0.0
+
+    # Estimate Acceleration
+    est_acc = data["estimates_accelerating"].lower()
+    if est_acc == "yes":
+        p4_acc = 0.5
+    elif est_acc == "mixed":
+        p4_acc = 0.25
+    else:
+        p4_acc = 0.0
+
+    pillar4 = p4_eps + p4_sales + p4_acc
+    results["pillar4"] = {
+        "name": "Forward Estimates",
+        "max": 1.5,
+        "score": pillar4,
+        "breakdown": {
+            "eps_estimates": p4_eps,
+            "sales_estimates": p4_sales,
+            "estimates_accelerating": p4_acc,
+        }
+    }
+
+    # --------------------------------------------------------
+    # PILLAR 5: STRUCTURE & RISK (max 1.0)
+    # --------------------------------------------------------
+    
+    p5_margin = 0.25 if data["oper_margin_positive"] else 0.0
+    p5_fcf = 0.25 if data["fcf_positive"] else 0.0
+    p5_float = 0.25 if data["float_millions"] < 100 else 0.0
+    p5_cap = 0.25 if data["market_cap_millions"] > 300 else 0.0
+
+    pillar5 = p5_margin + p5_fcf + p5_float + p5_cap
+    results["pillar5"] = {
+        "name": "Structure & Risk",
+        "max": 1.0,
+        "score": pillar5,
+        "breakdown": {
+            "oper_margin": p5_margin,
+            "fcf": p5_fcf,
+            "float": p5_float,
+            "market_cap": p5_cap,
+        }
+    }
+
+    if pillar5 < 0.5:
+        warnings.append("ℹ️ Not yet profitable or structural weaknesses — size conservatively.")
+
+    # --------------------------------------------------------
+    # TOTAL SCORE & INTERPRETATION
+    # --------------------------------------------------------
+    
+    total = pillar1 + pillar2 + pillar3 + pillar4 + pillar5
+    total = round(total, 2)
+
+    if total >= 8.0:
+        interpretation = "A+ Setup — High conviction. Full size position on proper entry."
+    elif total >= 6.5:
+        interpretation = "Strong Setup — Standard size. Wait for clean technical entry (pullback to 10/20 EMA)."
+    elif total >= 5.0:
+        interpretation = "Watchlist — Needs improvement. Monitor for catalyst or setup improvement."
+    else:
+        interpretation = "Pass — Too many weaknesses."
+
+    return {
+        "total_score": total,
+        "interpretation": interpretation,
+        "pillars": results,
+        "warnings": warnings,
+    }
+
+
+def print_score(result: dict):
+    """Pretty-print the score result."""
+    print(f"\n{'='*50}")
+    print(f"  STOCK QUALITY SCORE: {result['total_score']} / 10")
+    print(f"  {result['interpretation']}")
+    print(f"{'='*50}\n")
+
+    for key in ["pillar1", "pillar2", "pillar3", "pillar4", "pillar5"]:
+        p = result["pillars"][key]
+        print(f"  {p['name']}: {p['score']} / {p['max']}")
+        for metric, val in p["breakdown"].items():
+            print(f"    - {metric}: {val}")
+        print()
+
+    if result["warnings"]:
+        print("  WARNINGS:")
+        for w in result["warnings"]:
+            print(f"    {w}")
+        print()
+
+
+# ============================================================
+# EXAMPLE: WDC (Western Digital)
+# ============================================================
+
+if __name__ == "__main__":
+
+    wdc = {
+        # TREND
+        "weinstein_stage": 2,
+        "price_above_10ema": True,
+        "price_above_20ema": True,
+        "price_above_50sma": True,
+        "price_above_200sma": True,  # not visible in screenshot, assuming yes given Stage 2
+        "dist_from_50sma_pct": 15.0,  # estimate from chart
+        "overextension_atr": 3.0,     # estimate
+
+        # DEMAND
+        "rs_rating": 99,
+        "inst_own_pct": 103.51,  # >60%, gets 0.25
+        "avg_vol_50d": 9_100_000,
+        "smart_money": False,
+
+        # GROWTH — bar chart (each Q vs same Q one year ago)
+        "latest_q_eps_yoy_pct": 59.0,   # Q2'26: $2.13 vs Q2'25: $1.34 — but bar shows 0%? Using +59% from panel
+        "latest_q_sales_yoy_pct": -30.0, # Q4'25: 2.6B vs Q4'24: not shown, bar shows -30%
+        "eps_accel_quarters": 1,          # 0% → +59% = 1 quarter of acceleration
+        "sales_accel_quarters": 0,        # still negative YoY
+
+        # FUNDAMENTALS PANEL (context only, not scored)
+        "eps_qoq_pct": 19.66,
+        "sales_qoq_pct": 7.06,
+        "eps_yoy_ttm_pct": 59.25,
+        "sales_yoy_ttm_pct": -29.59,
+
+        # FORWARD ESTIMATES
+        "eps_est_quarters_above_15": 4,   # +72%, +58%, +65%, +54% — all above 15%
+        "sales_est_quarters_above_10": 3, # +41%, +32%, +30%, +29% — all above 10%
+        "estimates_accelerating": "no",   # 72→58→65→54 — not consistently accelerating
+
+        # STRUCTURE
+        "oper_margin_positive": True,
+        "fcf_positive": True,
+        "float_millions": 336.0,
+        "market_cap_millions": 97_080.0,  # $97.08B
+    }
+
+    result = calculate_stock_quality(wdc)
+    print_score(result)
