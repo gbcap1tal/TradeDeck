@@ -1199,9 +1199,9 @@ export async function registerRoutes(
     const sym = symbol.toUpperCase();
 
     const defaultResponse = {
-      qualityScore: { total: 0, pillars: { trend: 0, demand: 0, growth: 0, estimates: 0, structure: 0 }, interpretation: '' },
-      details: { marketCap: 0, floatShares: 0, rsVsSpy: 0, rsTimeframe: 'current', adr: 0, instOwnership: 0, numInstitutions: 0, avgVolume50d: 0, shortInterest: 0, shortRatio: 0, shortPercentOfFloat: 0, nextEarningsDate: '', daysToEarnings: 0 },
-      fundamentals: { epsQoQ: 0, salesQoQ: 0, epsYoY: 0, salesYoY: 0, earningsAcceleration: 0, salesGrowth1Y: 0 },
+      qualityScore: { total: 0, pillars: { trend: 0, demand: 0, earnings: 0, profitability: 0, volume: 0 }, interpretation: '' },
+      details: { marketCap: 0, floatShares: 0, rsVsSpy: 0, rsTimeframe: 'current', adr: 0, instOwnership: 0, numInstitutions: 0, avgVolume50d: 0, avgVolume10d: 0, shortInterest: 0, shortRatio: 0, shortPercentOfFloat: 0, nextEarningsDate: '', daysToEarnings: 0 },
+      fundamentals: { epsQoQ: 0, salesQoQ: 0, epsYoY: 0, salesYoY: 0, earningsAcceleration: 0, salesAccelQuarters: 0 },
       profitability: { epsTTM: 0, fcfTTM: 0, operMarginPositive: false, fcfPositive: false },
       trend: { weinsteinStage: 1, aboveEma10: false, aboveEma20: false, aboveSma50: false, aboveSma200: false, distFromSma50: 0, overextensionFlag: '<4', atrMultiple: 0 },
     };
@@ -1381,12 +1381,18 @@ export async function registerRoutes(
         smartMoney = insiderTx.length > 0;
       } catch {}
 
+      let avgVolume10d = 0;
+      try {
+        const yahooQuote = await yahoo.getQuote(sym);
+        avgVolume10d = yahooQuote.avgVolume10Day || 0;
+      } catch {}
+
       let salesAccelQuarters = 0;
       let latestQEpsYoY = epsYoY;
       let latestQSalesYoY = salesYoY;
-      let epsEstQAbove15 = 0;
-      let salesEstQAbove10 = 0;
-      let estimatesAccelerating: 'yes' | 'no' | 'mixed' = 'no';
+
+      let epsQoQValues: number[] = [];
+      let salesQoQValues: number[] = [];
 
       if (snap && snap.earnings && snap.earnings.length > 0) {
         const allEntries = [...snap.earnings].sort((a, b) => a.fiscalEndDate.localeCompare(b.fiscalEndDate));
@@ -1416,98 +1422,94 @@ export async function registerRoutes(
           }
         }
 
-        const estimates = allEntries.filter(e => e.epsActual == null && e.salesActual == null);
-        const lastActual = actuals.length > 0 ? actuals[actuals.length - 1] : null;
-        const futureEstimates = lastActual
-          ? estimates.filter(e => e.fiscalEndDate > lastActual.fiscalEndDate).slice(0, 4)
-          : estimates.slice(0, 4);
-
-        const estYoYGrowths: number[] = [];
-        for (const est of futureEstimates) {
-          const m = est.fiscalPeriod.match(/(\d{4})Q(\d)/);
-          if (!m) continue;
-          const yr = parseInt(m[1]);
-          const q = parseInt(m[2]);
-
-          const prevEps = allEntries.find(e => {
-            const em = e.fiscalPeriod.match(/(\d{4})Q(\d)/);
-            return em && parseInt(em[1]) === yr - 1 && parseInt(em[2]) === q;
-          });
-          if (prevEps) {
-            const baseEps = prevEps.epsActual ?? prevEps.epsEstimate;
-            if (baseEps != null && baseEps !== 0 && est.epsEstimate != null) {
-              const g = ((est.epsEstimate - baseEps) / Math.abs(baseEps)) * 100;
-              if (g >= 15) epsEstQAbove15++;
-              estYoYGrowths.push(g);
+        if (actuals.length >= 2) {
+          const recentActuals = actuals.slice(-4);
+          for (let i = 1; i < recentActuals.length; i++) {
+            const curr = recentActuals[i];
+            const prev = recentActuals[i - 1];
+            if (prev.epsActual != null && prev.epsActual !== 0 && curr.epsActual != null) {
+              epsQoQValues.push(((curr.epsActual - prev.epsActual) / Math.abs(prev.epsActual)) * 100);
+            }
+            if (prev.salesActual != null && prev.salesActual !== 0 && curr.salesActual != null) {
+              salesQoQValues.push(((curr.salesActual - prev.salesActual) / Math.abs(prev.salesActual)) * 100);
             }
           }
-
-          const prevSales = allEntries.find(e => {
-            const em = e.fiscalPeriod.match(/(\d{4})Q(\d)/);
-            return em && parseInt(em[1]) === yr - 1 && parseInt(em[2]) === q;
-          });
-          if (prevSales) {
-            const baseSales = prevSales.salesActual ?? prevSales.salesEstimate;
-            if (baseSales != null && baseSales !== 0 && est.salesEstimate != null) {
-              const g = ((est.salesEstimate - baseSales) / Math.abs(baseSales)) * 100;
-              if (g >= 10) salesEstQAbove10++;
-            }
-          }
-        }
-
-        if (estYoYGrowths.length >= 2) {
-          let increasing = 0;
-          let decreasing = 0;
-          for (let i = 1; i < estYoYGrowths.length; i++) {
-            if (estYoYGrowths[i] > estYoYGrowths[i - 1]) increasing++;
-            else decreasing++;
-          }
-          if (increasing > decreasing) estimatesAccelerating = 'yes';
-          else if (increasing > 0 && decreasing > 0) estimatesAccelerating = 'mixed';
-          else estimatesAccelerating = 'no';
         }
       }
 
-      // ---- STOCK QUALITY SCORE ENGINE v2.1 (no quarter points) ----
-      // Pillar 1: Trend & Technical Structure (max 3.0)
-      const p1Stage = weinsteinStage === 2 ? 1.0 : weinsteinStage === 1 ? 0.5 : 0.0;
+      // ---- STOCK QUALITY SCORE ENGINE v3.0 ----
+      // Pillar 1: Trend & Technical Structure (max 2.5)
+      const p1Stage = weinsteinStage === 2 ? 0.75 : weinsteinStage === 1 ? 0.25 : 0.0;
       const emaCount = (aboveEma10 ? 1 : 0) + (aboveEma20 ? 1 : 0);
-      const p1Ema = emaCount === 2 ? 0.5 : 0.0;
+      const p1Ema = emaCount === 2 ? 0.5 : emaCount === 1 ? 0.25 : 0.0;
       const smaCount = (aboveSma50 ? 1 : 0) + (aboveSma200 ? 1 : 0);
-      const p1Sma = smaCount === 2 ? 0.5 : 0.0;
-      const p1Dist = distFromSma50 >= 0 && distFromSma50 <= 10 ? 0.5 : 0.0;
-      const p1Atr = atrMultiple <= 2 ? 0.5 : 0.0;
+      const p1Sma = smaCount === 2 ? 0.5 : smaCount === 1 ? 0.25 : 0.0;
+      const p1Dist = distFromSma50 >= 0 && distFromSma50 <= 10 ? 0.375 : distFromSma50 >= 0 && distFromSma50 <= 20 ? 0.25 : distFromSma50 >= 0 && distFromSma50 <= 30 ? 0.125 : 0.0;
+      const p1Atr = atrMultiple <= 2 ? 0.375 : atrMultiple <= 3 ? 0.25 : atrMultiple <= 4 ? 0.125 : 0.0;
       const pillar1 = p1Stage + p1Ema + p1Sma + p1Dist + p1Atr;
 
-      // Pillar 2: Demand & Institutional Footprint (max 2.5)
+      // Pillar 2: Demand & Institutional Footprint (max 2.0)
       const p2Rs = rsRating >= 90 ? 1.0 : rsRating >= 80 ? 0.5 : 0.0;
-      const p2Inst = (instOwnership >= 20 && instOwnership <= 60) ? 0.5 : 0.0;
-      const p2Vol = avgVolume50d >= 1_000_000 ? 0.5 : 0.0;
+      const mcapB = marketCap / 1e9;
+      let p2Inst = 0;
+      if (mcapB >= 10) {
+        p2Inst = (instOwnership >= 50 && instOwnership <= 95) ? 0.5 : (instOwnership >= 30 && instOwnership <= 50) || instOwnership > 95 ? 0.25 : 0.0;
+      } else if (mcapB >= 2) {
+        p2Inst = (instOwnership >= 30 && instOwnership <= 80) ? 0.5 : (instOwnership >= 15 && instOwnership <= 30) || instOwnership > 80 ? 0.25 : 0.0;
+      } else {
+        p2Inst = (instOwnership >= 20 && instOwnership <= 60) ? 0.5 : (instOwnership >= 10 && instOwnership <= 20) || instOwnership > 60 ? 0.25 : 0.0;
+      }
       const p2Smart = smartMoney ? 0.5 : 0.0;
-      const pillar2 = p2Rs + p2Inst + p2Vol + p2Smart;
+      const pillar2 = p2Rs + p2Inst + p2Smart;
 
-      // Pillar 3: Growth — Quarterly Momentum (max 2.0)
-      const p3Eps = latestQEpsYoY > 25 ? 0.5 : 0.0;
-      const p3Sales = latestQSalesYoY > 15 ? 0.5 : 0.0;
-      const p3EpsAcc = earningsAcceleration >= 2 ? 0.5 : 0.0;
-      const p3SalesAcc = salesAccelQuarters >= 2 ? 0.5 : 0.0;
-      const pillar3 = p3Eps + p3Sales + p3EpsAcc + p3SalesAcc;
+      // Pillar 3: Earnings & Revenue Momentum (max 3.0)
+      const p3EpsYoY = latestQEpsYoY > 25 ? 0.5 : latestQEpsYoY >= 10 ? 0.25 : 0.0;
+      const p3SalesYoY = latestQSalesYoY > 15 ? 0.5 : latestQSalesYoY >= 5 ? 0.25 : 0.0;
 
-      // Pillar 4: Forward Estimates (max 1.5)
-      const p4Eps = epsEstQAbove15 >= 2 ? 0.5 : 0.0;
-      const p4Sales = salesEstQAbove10 >= 2 ? 0.5 : 0.0;
-      const p4Acc = estimatesAccelerating === 'yes' ? 0.5 : 0.0;
-      const pillar4 = p4Eps + p4Sales + p4Acc;
+      const recentEpsQoQ = epsQoQValues.slice(-3);
+      let p3EpsQoQ = 0;
+      if (recentEpsQoQ.length >= 2) {
+        const last2 = recentEpsQoQ.slice(-2);
+        if (last2.every(v => v > 0) && last2[1] > last2[0]) p3EpsQoQ = 0.5;
+        else if (last2.some(v => v > 0)) p3EpsQoQ = 0.25;
+      } else if (recentEpsQoQ.length === 1 && recentEpsQoQ[0] > 0) {
+        p3EpsQoQ = 0.25;
+      }
 
-      // Pillar 5: Structure & Risk (max 1.0)
-      const floatMillions = floatShares / 1e6;
+      const recentSalesQoQ = salesQoQValues.slice(-3);
+      let p3SalesQoQ = 0;
+      if (recentSalesQoQ.length >= 2) {
+        const last2 = recentSalesQoQ.slice(-2);
+        if (last2.every(v => v > 0) && last2[1] > last2[0]) p3SalesQoQ = 0.5;
+        else if (last2.some(v => v > 0)) p3SalesQoQ = 0.25;
+      } else if (recentSalesQoQ.length === 1 && recentSalesQoQ[0] > 0) {
+        p3SalesQoQ = 0.25;
+      }
+
+      const p3EpsAcc = earningsAcceleration >= 2 ? 0.5 : earningsAcceleration === 1 ? 0.25 : 0.0;
+      const p3SalesAcc = salesAccelQuarters >= 2 ? 0.5 : salesAccelQuarters === 1 ? 0.25 : 0.0;
+      const pillar3 = p3EpsYoY + p3SalesYoY + p3EpsQoQ + p3SalesQoQ + p3EpsAcc + p3SalesAcc;
+
+      // Pillar 4: Profitability & Business Quality (max 1.5)
+      const p4Margin = operMarginPositive ? 0.5 : 0.0;
+      const p4Fcf = fcfPositive ? 0.5 : 0.0;
       const mcapMillions = marketCap / 1e6;
-      const p5Profitability = (operMarginPositive || fcfPositive) ? 0.5 : 0.0;
-      const p5Structure = mcapMillions > 300 ? 0.5 : 0.0;
-      const pillar5 = p5Profitability + p5Structure;
+      const p4Cap = mcapMillions >= 10000 ? 0.5 : mcapMillions >= 2000 ? 0.375 : mcapMillions >= 300 ? 0.25 : 0.0;
+      const pillar4 = p4Margin + p4Fcf + p4Cap;
+
+      // Pillar 5: Volume & Liquidity (max 1.0)
+      const p5Vol = avgVolume50d >= 2_000_000 ? 0.5 : avgVolume50d >= 1_000_000 ? 0.375 : avgVolume50d >= 500_000 ? 0.25 : 0.0;
+      let p5VolTrend = 0.25;
+      if (avgVolume50d > 0 && avgVolume10d > 0) {
+        const volRatio = ((avgVolume10d - avgVolume50d) / avgVolume50d) * 100;
+        if (volRatio >= 20) p5VolTrend = 0.5;
+        else if (volRatio <= -20) p5VolTrend = 0.0;
+        else p5VolTrend = 0.25;
+      }
+      const pillar5 = p5Vol + p5VolTrend;
 
       const rawTotal = pillar1 + pillar2 + pillar3 + pillar4 + pillar5;
-      const totalScore = Math.round(rawTotal * 2) / 2;
+      const totalScore = Math.round(rawTotal * 8) / 8;
       let interpretation = '';
       if (totalScore >= 8.0) interpretation = 'A+ Setup';
       else if (totalScore >= 6.5) interpretation = 'Strong Setup';
@@ -1518,11 +1520,11 @@ export async function registerRoutes(
         qualityScore: {
           total: totalScore,
           pillars: {
-            trend: Math.round(pillar1 * 100) / 100,
-            demand: Math.round(pillar2 * 100) / 100,
-            growth: Math.round(pillar3 * 100) / 100,
-            estimates: Math.round(pillar4 * 100) / 100,
-            structure: Math.round(pillar5 * 100) / 100,
+            trend: Math.round(pillar1 * 1000) / 1000,
+            demand: Math.round(pillar2 * 1000) / 1000,
+            earnings: Math.round(pillar3 * 1000) / 1000,
+            profitability: Math.round(pillar4 * 1000) / 1000,
+            volume: Math.round(pillar5 * 1000) / 1000,
           },
           interpretation,
         },
@@ -1535,6 +1537,7 @@ export async function registerRoutes(
           instOwnership,
           numInstitutions: 0,
           avgVolume50d,
+          avgVolume10d,
           shortInterest,
           shortRatio,
           shortPercentOfFloat,
@@ -1547,7 +1550,7 @@ export async function registerRoutes(
           epsYoY,
           salesYoY,
           earningsAcceleration,
-          salesGrowth1Y: salesYoY,
+          salesAccelQuarters,
         },
         profitability: {
           epsTTM,

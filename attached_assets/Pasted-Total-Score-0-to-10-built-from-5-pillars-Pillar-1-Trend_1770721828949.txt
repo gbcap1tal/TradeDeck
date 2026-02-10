@@ -1,0 +1,38 @@
+Total Score: 0 to 10, built from 5 pillars.
+Pillar 1 — Trend & Technical Structure (max 2.5 points)
+Measures whether the stock is in a healthy uptrend and not overextended.
+
+Weinstein Stage (0 to 0.75): Stage 2 = 0.75. Stage 1 = 0.25. Stage 3 or 4 = 0.
+Price vs 10 EMA + 20 EMA (0 to 0.5): Above both = 0.5. Above one = 0.25. Below both = 0.
+Price vs 50 SMA + 200 SMA (0 to 0.5): Above both = 0.5. Above one = 0.25. Below both = 0.
+Distance from 50 SMA (0 to 0.375): Only scores if the stock is ABOVE the 50 SMA. Within 10% = 0.375. Within 20% = 0.25. Within 30% = 0.125. More than 30% above or below = 0.
+Overextension / ATR multiple (0 to 0.375): ATR multiple ≤ 2 = 0.375. ≤ 3 = 0.25. ≤ 4 = 0.125. Above 4 = 0.
+Pillar 2 — Demand & Institutional Footprint (max 2.0 points)
+Measures whether big money is behind the stock.
+
+RS Rating (0 to 1.0): RS ≥ 90 = 1.0. RS ≥ 80 = 0.5. Below 80 = 0.
+Institutional Ownership (0 to 0.5): Scaled by market cap:
+Large cap (≥ $10B): 50–95% = 0.5. 30–50% or >95% = 0.25. Below 30% = 0.
+Mid cap ($2B–$10B): 30–80% = 0.5. 15–30% or >80% = 0.25. Below 15% = 0.
+Small cap (<$2B): 20–60% = 0.5. 10–20% or >60% = 0.25. Below 10% = 0.
+Smart Money (0 or 0.5): Insider buying in the last 12 months = 0.5. No insider buying = 0.
+Pillar 3 — Earnings & Revenue Momentum (max 3.0 points)
+Measures actual reported growth. Uses the data from the EPS and Sales tables (QoQ, YoY values). No forward estimates.
+
+Latest Quarter EPS YoY (0 to 0.5): > 25% = 0.5. ≥ 10% = 0.25. Below 10% = 0.
+Latest Quarter Sales YoY (0 to 0.5): > 15% = 0.5. ≥ 5% = 0.25. Below 5% = 0.
+EPS QoQ trend (0 to 0.5): Looks at the last 3 reported quarters' QoQ EPS values. If the most recent 2 are both positive and increasing = 0.5. If at least 1 is positive = 0.25. All declining = 0.
+Sales QoQ trend (0 to 0.5): Same logic as EPS QoQ but for revenue.
+EPS Acceleration (0 to 0.5): Counts consecutive quarters where YoY EPS growth rate is increasing (each quarter's YoY growth is higher than the previous quarter's YoY growth). ≥ 2 quarters accelerating = 0.5. 1 quarter = 0.25. None = 0.
+Sales Acceleration (0 to 0.5): Same logic as EPS acceleration but for revenue. ≥ 2 quarters = 0.5. 1 = 0.25. None = 0.
+Pillar 4 — Profitability & Business Quality (max 1.5 points)
+Checks structural health of the business.
+
+Operating Margin Positive (0 or 0.5): Positive = 0.5. Negative = 0.
+Free Cash Flow Positive (0 or 0.5): Positive FCF = 0.5. Negative = 0.
+Market Cap (0 to 0.5): Above $10B = 0.5. Above $2B = 0.375. Above $300M = 0.25. Below $300M = 0.
+Pillar 5 — Volume & Liquidity (max 1.0 points)
+Ensures the stock is tradeable and has active participation.
+
+Average Daily Volume 50D (0 to 0.5): ≥ 2M shares/day = 0.5. ≥ 1M = 0.375. ≥ 500K = 0.25. Below 500K = 0.
+Volume Trend (0 to 0.5): Recent average volume (10-day) vs 50-day average. If 10D avg > 50D avg by ≥ 20% = 0.5 (rising demand). Within ±20% = 0.25 (neutral). 10D avg < 50D avg by > 20% = 0 (fading interest).
