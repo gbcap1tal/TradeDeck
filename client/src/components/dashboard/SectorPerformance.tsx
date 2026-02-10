@@ -14,7 +14,7 @@ function TimeframeSwitch({ value, onChange, testId }: { value: Timeframe; onChan
         <button
           key={opt}
           onClick={() => onChange(opt)}
-          className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-colors ${
+          className={`px-2.5 py-0.5 text-[10px] font-semibold rounded transition-colors ${
             value === opt
               ? 'bg-white/10 text-white/80'
               : 'text-white/25 hover:text-white/40'
@@ -29,13 +29,13 @@ function TimeframeSwitch({ value, onChange, testId }: { value: Timeframe; onChan
 }
 
 function MAArrow({ above }: { above: boolean | undefined }) {
-  if (above === undefined) return <span className="w-3 h-3 inline-block" />;
+  if (above === undefined) return <span className="w-3 h-3 inline-block opacity-20">-</span>;
   return (
-    <svg width="12" height="12" viewBox="0 0 12 12" className="inline-block">
+    <svg width="10" height="10" viewBox="0 0 10 10" className="inline-block">
       {above ? (
-        <path d="M6 2 L10 8 L2 8 Z" fill="#30d158" />
+        <path d="M5 1.5 L8.5 7 L1.5 7 Z" fill="#30d158" />
       ) : (
-        <path d="M6 10 L10 4 L2 4 Z" fill="#ff453a" />
+        <path d="M5 8.5 L8.5 3 L1.5 3 Z" fill="#ff453a" />
       )}
     </svg>
   );
@@ -86,28 +86,35 @@ export function SectorPerformance() {
     );
   }
 
+  const maHeaders = [
+    { label: '10EMA', key: 'above10ema', title: '10-day Exponential Moving Average' },
+    { label: '20EMA', key: 'above20ema', title: '20-day Exponential Moving Average' },
+    { label: '50SMA', key: 'above50sma', title: '50-day Simple Moving Average' },
+    { label: '200SMA', key: 'above200sma', title: '200-day Simple Moving Average' },
+  ];
+
   const renderList = (items: any[], title: string, tf: Timeframe, setTf: (v: Timeframe) => void, switchId: string) => (
-    <div className="glass-card rounded-xl p-4">
+    <div className="glass-card rounded-xl p-4 pb-2">
       <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
         <div className="label-text">{title}</div>
         <TimeframeSwitch value={tf} onChange={setTf} testId={switchId} />
       </div>
       <div>
-        <div className="flex items-center gap-1 px-2 pb-1.5 border-b border-white/[0.06]">
+        <div className="flex items-center px-2 pb-2 mb-1 border-b border-white/[0.06]">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <span className="w-4 shrink-0" />
             <span className="text-[10px] text-white/25 uppercase tracking-wider font-semibold">Industry</span>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-[10px] text-white/25 uppercase tracking-wider font-semibold w-[52px] text-right">Chg%</span>
-            <span className="text-[9px] text-white/20 font-semibold w-[18px] text-center" title="10 EMA">10E</span>
-            <span className="text-[9px] text-white/20 font-semibold w-[18px] text-center" title="20 EMA">20E</span>
-            <span className="text-[9px] text-white/20 font-semibold w-[18px] text-center" title="50 SMA">50S</span>
-            <span className="text-[9px] text-white/20 font-semibold w-[22px] text-center" title="200 SMA">200S</span>
-            <span className="w-3.5 shrink-0" />
+          <div className="flex items-center shrink-0">
+            {maHeaders.map(h => (
+              <span key={h.key} className="text-[8px] text-white/20 font-semibold w-[34px] text-center uppercase tracking-wide" title={h.title}>{h.label}</span>
+            ))}
+            <span className="w-[14px] shrink-0" />
+            <span className="text-[10px] text-white/25 uppercase tracking-wider font-semibold w-[56px] text-right">Chg%</span>
+            <span className="w-5 shrink-0" />
           </div>
         </div>
-        <div className="space-y-0">
+        <div>
           {items.map((ind: any, idx: number) => {
             const change = getChange(ind, tf);
             const isPositive = change >= 0;
@@ -115,26 +122,31 @@ export function SectorPerformance() {
             return (
               <div
                 key={ind.name}
-                className="flex items-center gap-1 py-1.5 px-2 rounded-lg cursor-pointer transition-colors hover:bg-white/[0.03] group"
+                className="flex items-center py-[7px] px-2 rounded-lg cursor-pointer transition-colors hover:bg-white/[0.03] group"
                 onClick={() => setLocation(`/sectors/${encodeURIComponent(ind.sector)}/industries/${encodeURIComponent(ind.name)}`)}
                 data-testid={`row-industry-${ind.name.replace(/\s+/g, '-')}`}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <span className="text-[11px] text-white/20 font-mono w-4 shrink-0">{idx + 1}</span>
+                  <span className="text-[11px] text-white/20 font-mono w-4 shrink-0 text-right">{idx + 1}</span>
                   <div className="min-w-0">
-                    <div className="text-[13px] font-medium text-white/80 group-hover:text-white transition-colors truncate">{ind.name}</div>
-                    <div className="text-[10px] text-white/25 font-mono truncate">{ind.sector}</div>
+                    <div className="text-[13px] font-medium text-white/80 group-hover:text-white transition-colors truncate leading-tight">{ind.name}</div>
+                    <div className="text-[10px] text-white/25 font-mono truncate leading-tight mt-0.5">{ind.sector}</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[13px] font-mono-nums font-semibold w-[52px] text-right" style={{ color: isPositive ? '#2eb850' : '#c05050' }}>
+                <div className="flex items-center shrink-0">
+                  {maHeaders.map(h => (
+                    <span key={h.key} className="w-[34px] flex justify-center" data-testid={`ma-${h.key}-${ind.name.replace(/\s+/g, '-')}`}>
+                      <MAArrow above={ma?.[h.key as keyof typeof ma] as boolean | undefined} />
+                    </span>
+                  ))}
+                  <span className="w-[14px] shrink-0" />
+                  <span
+                    className="text-[13px] font-mono-nums font-semibold w-[56px] text-right"
+                    style={{ color: isPositive ? '#2eb850' : '#c05050' }}
+                  >
                     {isPositive ? '+' : ''}{change.toFixed(2)}%
                   </span>
-                  <span className="w-[18px] flex justify-center" data-testid={`ma-10ema-${ind.name.replace(/\s+/g, '-')}`}><MAArrow above={ma?.above10ema} /></span>
-                  <span className="w-[18px] flex justify-center" data-testid={`ma-20ema-${ind.name.replace(/\s+/g, '-')}`}><MAArrow above={ma?.above20ema} /></span>
-                  <span className="w-[18px] flex justify-center" data-testid={`ma-50sma-${ind.name.replace(/\s+/g, '-')}`}><MAArrow above={ma?.above50sma} /></span>
-                  <span className="w-[22px] flex justify-center" data-testid={`ma-200sma-${ind.name.replace(/\s+/g, '-')}`}><MAArrow above={ma?.above200sma} /></span>
-                  <ChevronRight className="w-3.5 h-3.5 text-white/20 group-hover:text-white/40 transition-colors" />
+                  <ChevronRight className="w-3.5 h-3.5 text-white/15 group-hover:text-white/35 transition-colors ml-1.5" />
                 </div>
               </div>
             );
