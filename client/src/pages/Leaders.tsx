@@ -3,10 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import { Search, X, ChevronUp, ChevronDown } from "lucide-react";
+import { Search, X, ChevronUp, ChevronDown, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface Leader {
   symbol: string;
@@ -59,8 +60,15 @@ export default function Leaders() {
   const [, navigate] = useLocation();
   const [minRS, setMinRS] = useState(90);
   const [search, setSearch] = useState('');
-  const [sectorFilter, setSectorFilter] = useState('All Sectors');
+  const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
   const [minQuality, setMinQuality] = useState(0);
+  const [sectorOpen, setSectorOpen] = useState(false);
+
+  const toggleSector = (sector: string) => {
+    setSelectedSectors(prev =>
+      prev.includes(sector) ? prev.filter(s => s !== sector) : [...prev, sector]
+    );
+  };
   const [sortField, setSortField] = useState<SortField>('rsRating');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
@@ -123,8 +131,8 @@ export default function Leaders() {
     if (leadersWithQuality.length === 0) return [];
     let list = leadersWithQuality;
 
-    if (sectorFilter !== 'All Sectors') {
-      list = list.filter(l => l.sector === sectorFilter);
+    if (selectedSectors.length > 0) {
+      list = list.filter(l => selectedSectors.includes(l.sector));
     }
 
     if (minQuality > 0) {
@@ -153,7 +161,7 @@ export default function Leaders() {
     });
 
     return list;
-  }, [leadersWithQuality, sectorFilter, minQuality, search, sortField, sortDir]);
+  }, [leadersWithQuality, selectedSectors, minQuality, search, sortField, sortDir]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -191,7 +199,7 @@ export default function Leaders() {
             </h1>
             <p className="text-[12px] text-white/40 mt-0.5" data-testid="text-leaders-subtitle">
               {isLoading ? 'Loading...' : `${filtered.length} stocks with RS ${minRS}+`}
-              {sectorFilter !== 'All Sectors' ? ` in ${sectorFilter}` : ''}
+              {selectedSectors.length > 0 ? ` in ${selectedSectors.length === 1 ? selectedSectors[0] : `${selectedSectors.length} sectors`}` : ''}
               {minQuality > 0 ? ` · Quality ${minQuality}+` : ''}
             </p>
           </div>
@@ -237,23 +245,54 @@ export default function Leaders() {
             </SelectContent>
           </Select>
 
-          <Select value={sectorFilter} onValueChange={setSectorFilter}>
-            <SelectTrigger
-              className="w-auto min-w-[120px] max-w-[200px] h-8 text-[12px] bg-white/5 border-white/10 text-white gap-1"
-              data-testid="select-sector-filter"
-            >
-              <span className="text-white/40 mr-0.5">Sector</span>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {SECTORS.filter(s => s === 'All Sectors' || (sectorCounts[s] || 0) > 0).map(s => (
-                <SelectItem key={s} value={s} data-testid={`option-sector-${s.replace(/\s+/g, '-')}`}>
-                  {s === 'All Sectors' ? 'All' : s}
-                  {s !== 'All Sectors' && sectorCounts[s] ? ` (${sectorCounts[s]})` : ''}
-                </SelectItem>
+          <Popover open={sectorOpen} onOpenChange={setSectorOpen}>
+            <PopoverTrigger asChild>
+              <button
+                className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[12px] bg-white/5 border border-white/10 text-white"
+                data-testid="select-sector-filter"
+              >
+                <span className="text-white/40">Sector</span>
+                <span className="truncate max-w-[120px]">
+                  {selectedSectors.length === 0 ? 'All' : selectedSectors.length === 1 ? selectedSectors[0] : `${selectedSectors.length} selected`}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-white/30 shrink-0" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-[220px] p-1.5 bg-[#1a1a1a] border-white/10">
+              <div className="flex items-center justify-between px-2 py-1 mb-1">
+                <span className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Sectors</span>
+                {selectedSectors.length > 0 && (
+                  <button
+                    className="text-[10px] text-white/40 hover:text-white/60"
+                    onClick={() => setSelectedSectors([])}
+                    data-testid="button-clear-sectors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              {SECTORS.filter(s => s !== 'All Sectors' && (sectorCounts[s] || 0) > 0).map(s => (
+                <button
+                  key={s}
+                  className={cn(
+                    "flex items-center gap-2 w-full px-2 py-1.5 rounded text-[12px] text-left transition-colors",
+                    selectedSectors.includes(s) ? "text-white bg-white/10" : "text-white/60 hover:bg-white/5"
+                  )}
+                  onClick={() => toggleSector(s)}
+                  data-testid={`option-sector-${s.replace(/\s+/g, '-')}`}
+                >
+                  <div className={cn(
+                    "w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0",
+                    selectedSectors.includes(s) ? "bg-white/20 border-white/30" : "border-white/15"
+                  )}>
+                    {selectedSectors.includes(s) && <Check className="w-2.5 h-2.5 text-white" />}
+                  </div>
+                  <span className="truncate">{s}</span>
+                  <span className="ml-auto text-[10px] text-white/25 tabular-nums">{sectorCounts[s] || 0}</span>
+                </button>
               ))}
-            </SelectContent>
-          </Select>
+            </PopoverContent>
+          </Popover>
 
           <Select value={String(minQuality)} onValueChange={(v) => setMinQuality(Number(v))}>
             <SelectTrigger
@@ -272,13 +311,13 @@ export default function Leaders() {
             </SelectContent>
           </Select>
 
-          {(sectorFilter !== 'All Sectors' || minQuality > 0 || search) && (
+          {(selectedSectors.length > 0 || minQuality > 0 || search) && (
             <Button
               variant="ghost"
               size="sm"
               className="text-[11px] text-white/40"
               onClick={() => {
-                setSectorFilter('All Sectors');
+                setSelectedSectors([]);
                 setMinQuality(0);
                 setSearch('');
               }}
