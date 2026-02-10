@@ -91,7 +91,7 @@ export default function Leaders() {
     if (!data?.leaders || data.leaders.length === 0) return;
 
     const cacheKey = data.leaders.map(l => l.symbol).sort().join(',');
-    if (loadingForRef.current === cacheKey && scoresReady) return;
+    if (loadingForRef.current === cacheKey) return;
 
     let cancelled = false;
     loadingForRef.current = cacheKey;
@@ -169,21 +169,23 @@ export default function Leaders() {
       );
     }
 
+    const effectiveSort = (sortField === 'composite' && !scoresReady) ? 'rsRating' : sortField;
+
     list = [...list].sort((a, b) => {
       let cmp = 0;
-      switch (sortField) {
+      switch (effectiveSort) {
         case 'composite': cmp = compositeScore(a.rsRating, a.qualityScore) - compositeScore(b.rsRating, b.qualityScore); break;
         case 'symbol': cmp = a.symbol.localeCompare(b.symbol); break;
         case 'sector': cmp = a.sector.localeCompare(b.sector); break;
         case 'industry': cmp = a.industry.localeCompare(b.industry); break;
         case 'qualityScore': cmp = (a.qualityScore ?? -1) - (b.qualityScore ?? -1); break;
-        default: cmp = (a[sortField] as number) - (b[sortField] as number);
+        default: cmp = (a[effectiveSort] as number) - (b[effectiveSort] as number);
       }
       return sortDir === 'desc' ? -cmp : cmp;
     });
 
     return list;
-  }, [leadersWithQuality, selectedSectors, minQuality, search, sortField, sortDir]);
+  }, [leadersWithQuality, selectedSectors, minQuality, search, sortField, sortDir, scoresReady]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -220,9 +222,10 @@ export default function Leaders() {
               Leaders
             </h1>
             <p className="text-[12px] text-white/40 mt-0.5" data-testid="text-leaders-subtitle">
-              {isLoading ? 'Loading...' : !scoresReady ? 'Loading quality scores...' : `${filtered.length} stocks with RS ${minRS}+`}
-              {scoresReady && selectedSectors.length > 0 ? ` in ${selectedSectors.length === 1 ? selectedSectors[0] : `${selectedSectors.length} sectors`}` : ''}
-              {scoresReady && minQuality > 0 ? ` · Quality ${minQuality}+` : ''}
+              {isLoading ? 'Loading...' : `${filtered.length} stocks with RS ${minRS}+`}
+              {!isLoading && !scoresReady ? ' · sorting by quality...' : ''}
+              {selectedSectors.length > 0 ? ` in ${selectedSectors.length === 1 ? selectedSectors[0] : `${selectedSectors.length} sectors`}` : ''}
+              {minQuality > 0 ? ` · Quality ${minQuality}+` : ''}
             </p>
           </div>
         </div>
@@ -351,13 +354,11 @@ export default function Leaders() {
           )}
         </div>
 
-        {isLoading || !scoresReady ? (
+        {isLoading ? (
           <div className="glass-card rounded-xl p-8">
             <div className="flex flex-col items-center justify-center gap-2">
               <div className="w-5 h-5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
-              <div className="text-[13px] text-white/40" data-testid="text-leaders-loading">
-                {isLoading ? 'Loading leaders...' : 'Loading quality scores...'}
-              </div>
+              <div className="text-[13px] text-white/40" data-testid="text-leaders-loading">Loading leaders...</div>
             </div>
           </div>
         ) : (
