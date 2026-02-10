@@ -775,11 +775,11 @@ export default function StockDetail() {
                   </div>
                 </div>
 
-                <div className="lg:col-span-5 flex flex-col gap-2 min-h-0 h-auto lg:h-[calc(100vh-100px)]">
+                <div className="lg:col-span-5 flex flex-col gap-1 min-h-0 h-auto lg:h-[calc(100vh-100px)]">
                   <div className="min-h-[200px] lg:flex-[7] lg:min-h-0 overflow-auto">
                     <StockQualityPanel symbol={symbol} />
                   </div>
-                  <div className="min-h-[150px] lg:flex-[2] lg:min-h-0">
+                  <div className="min-h-[150px] lg:flex-[3] lg:min-h-0">
                     <NewsPanel symbol={symbol} />
                   </div>
                 </div>
