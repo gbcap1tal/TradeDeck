@@ -121,7 +121,7 @@ export function SectorPerformance() {
               <div
                 key={ind.name}
                 className="grid items-center py-[7px] px-2 rounded-lg cursor-pointer transition-colors hover:bg-white/[0.03] group"
-                style={{ gridTemplateColumns: '1fr auto 1fr' }}
+                style={{ gridTemplateColumns: '5fr auto 3fr' }}
                 onClick={() => setLocation(`/sectors/${encodeURIComponent(ind.sector)}/industries/${encodeURIComponent(ind.name)}`)}
                 data-testid={`row-industry-${ind.name.replace(/\s+/g, '-')}`}
               >
