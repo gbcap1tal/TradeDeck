@@ -2,7 +2,7 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 import { useStockHistory } from "@/hooks/use-stocks";
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Loader2, BarChart3, ArrowUp } from "lucide-react";
+import { Loader2, BarChart3, LineChart } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface StockChartProps {
@@ -48,7 +48,7 @@ export function StockChart({ symbol, currentPrice, compact }: StockChartProps) {
               className={cn("p-1 rounded transition-colors", chartType === 'line' ? "bg-white/10 text-white/70" : "text-white/20 hover:text-white/35")}
               data-testid="tab-chart-line"
             >
-              <ArrowUp className="w-3 h-3" />
+              <LineChart className="w-3 h-3" />
             </button>
             <button
               onClick={() => setChartType('candle')}

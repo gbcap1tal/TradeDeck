@@ -98,6 +98,26 @@ export function useIndustryPerformance() {
   });
 }
 
+export function useIndustryMASignals(industryNames: string[]) {
+  return useQuery({
+    queryKey: ['/api/market/industries/ma-signals', ...industryNames.sort()],
+    queryFn: async () => {
+      if (industryNames.length === 0) return {};
+      const res = await fetch('/api/market/industries/ma-signals', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ industries: industryNames }),
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to fetch MA signals');
+      return res.json();
+    },
+    enabled: industryNames.length > 0,
+    staleTime: 120000,
+    refetchInterval: 300000,
+  });
+}
+
 export function useSectorDetail(sectorName: string) {
   return useQuery({
     queryKey: ['/api/sectors', sectorName],

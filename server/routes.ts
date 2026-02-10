@@ -327,6 +327,106 @@ async function computeIndustryPerformance(etfOnly: boolean = false): Promise<any
   return result;
 }
 
+async function computeIndustryMASignals(industryNames: string[]): Promise<Record<string, { above10ema: boolean; above20ema: boolean; above50sma: boolean; above200sma: boolean }>> {
+  const results: Record<string, { above10ema: boolean; above20ema: boolean; above50sma: boolean; above200sma: boolean }> = {};
+
+  const computeEMA = (data: number[], period: number): number => {
+    if (data.length < period) return data[data.length - 1];
+    const sma = data.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    const alpha = 2 / (period + 1);
+    let ema = sma;
+    for (let i = period; i < data.length; i++) {
+      ema = alpha * data[i] + (1 - alpha) * ema;
+    }
+    return ema;
+  };
+
+  const computeSMA = (data: number[], period: number): number => {
+    if (data.length < period) return 0;
+    const slice = data.slice(-period);
+    return slice.reduce((a, b) => a + b, 0) / period;
+  };
+
+  const computeSignalsFromCloses = (closes: number[]): { above10ema: boolean; above20ema: boolean; above50sma: boolean; above200sma: boolean } => {
+    if (closes.length < 20) return { above10ema: false, above20ema: false, above50sma: false, above200sma: false };
+    const price = closes[closes.length - 1];
+    return {
+      above10ema: closes.length >= 10 ? price > computeEMA(closes, 10) : false,
+      above20ema: price > computeEMA(closes, 20),
+      above50sma: closes.length >= 50 ? price > computeSMA(closes, 50) : false,
+      above200sma: closes.length >= 200 ? price > computeSMA(closes, 200) : false,
+    };
+  };
+
+  const tasks = industryNames.map(async (industryName) => {
+    const cacheKey = `ind_ma_${industryName}`;
+    const cached = getCached<{ above10ema: boolean; above20ema: boolean; above50sma: boolean; above200sma: boolean }>(cacheKey);
+    if (cached) {
+      results[industryName] = cached;
+      return;
+    }
+
+    try {
+      const etfTicker = INDUSTRY_ETF_MAP[industryName];
+      if (etfTicker) {
+        const hist = await yahoo.getHistory(etfTicker, '1Y');
+        if (hist && hist.length >= 20) {
+          const closes = hist.map((h: any) => h.close);
+          const signals = computeSignalsFromCloses(closes);
+          results[industryName] = signals;
+          setCache(cacheKey, signals, CACHE_TTL.HISTORY);
+          return;
+        }
+      }
+
+      const stocks = getStocksForIndustry(industryName);
+      if (stocks.length === 0) return;
+
+      const topStocks = [...stocks].sort((a, b) => b.marketCap - a.marketCap).slice(0, 3);
+      const totalCap = topStocks.reduce((s, st) => s + st.marketCap, 0);
+      if (totalCap === 0) return;
+
+      const histResults = await Promise.allSettled(
+        topStocks.map(st => yahoo.getHistory(st.symbol, '1Y'))
+      );
+
+      const minLen = Math.min(...histResults.map(r => r.status === 'fulfilled' && r.value ? r.value.length : 0).filter(l => l > 0));
+      if (minLen < 20) return;
+
+      const compositeCloses: number[] = [];
+      for (let i = 0; i < minLen; i++) {
+        let weightedPrice = 0;
+        let totalWeight = 0;
+        for (let j = 0; j < topStocks.length; j++) {
+          const r = histResults[j];
+          if (r.status === 'fulfilled' && r.value && r.value.length >= minLen) {
+            const idx = r.value.length - minLen + i;
+            const weight = topStocks[j].marketCap / totalCap;
+            weightedPrice += r.value[idx].close * weight;
+            totalWeight += weight;
+          }
+        }
+        if (totalWeight > 0) compositeCloses.push(weightedPrice / totalWeight);
+      }
+
+      if (compositeCloses.length >= 20) {
+        const signals = computeSignalsFromCloses(compositeCloses);
+        results[industryName] = signals;
+        setCache(cacheKey, signals, CACHE_TTL.HISTORY);
+      }
+    } catch (e) {
+      // silently skip
+    }
+  });
+
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < tasks.length; i += BATCH_SIZE) {
+    await Promise.allSettled(tasks.slice(i, i + BATCH_SIZE));
+  }
+
+  return results;
+}
+
 const RRG_SECTOR_ETFS = [
   { name: 'Technology', ticker: 'XLK', color: '#0a84ff' },
   { name: 'Financials', ticker: 'XLF', color: '#30d158' },
@@ -908,6 +1008,21 @@ export async function registerRoutes(
 
     backgroundRefresh(cacheKey, computeIndustryPerformance, CACHE_TTL.INDUSTRY_PERF);
     res.status(202).json({ _warming: true, industries: [] });
+  });
+
+  app.post('/api/market/industries/ma-signals', async (req, res) => {
+    try {
+      const { industries } = req.body;
+      if (!Array.isArray(industries) || industries.length === 0) {
+        return res.status(400).json({ error: 'industries array required' });
+      }
+      const limited = industries.slice(0, 25);
+      const signals = await computeIndustryMASignals(limited);
+      res.json(signals);
+    } catch (e: any) {
+      console.error('[industry-ma] Error:', e.message);
+      res.status(500).json({ error: 'Failed to compute MA signals' });
+    }
   });
 
   app.get('/api/market/breadth', async (req, res) => {
