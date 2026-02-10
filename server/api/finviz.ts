@@ -774,7 +774,7 @@ export interface FinvizQuoteData {
   snapshot: FinvizSnapshot;
 }
 
-const FINVIZ_QUOTE_CACHE_TTL = 3600;
+const FINVIZ_QUOTE_CACHE_TTL = 86400;
 
 export async function scrapeFinvizQuote(symbol: string): Promise<FinvizQuoteData | null> {
   const cacheKey = `finviz_quote_${symbol}`;
