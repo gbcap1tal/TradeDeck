@@ -1437,79 +1437,68 @@ export async function registerRoutes(
         }
       }
 
-      // ---- STOCK QUALITY SCORE ENGINE v3.0 ----
-      // Pillar 1: Trend & Technical Structure (max 2.5)
-      const p1Stage = weinsteinStage === 2 ? 0.75 : weinsteinStage === 1 ? 0.25 : 0.0;
-      const emaCount = (aboveEma10 ? 1 : 0) + (aboveEma20 ? 1 : 0);
-      const p1Ema = emaCount === 2 ? 0.5 : emaCount === 1 ? 0.25 : 0.0;
-      const smaCount = (aboveSma50 ? 1 : 0) + (aboveSma200 ? 1 : 0);
-      const p1Sma = smaCount === 2 ? 0.5 : smaCount === 1 ? 0.25 : 0.0;
-      const p1Dist = distFromSma50 >= 0 && distFromSma50 <= 10 ? 0.375 : distFromSma50 >= 0 && distFromSma50 <= 20 ? 0.25 : distFromSma50 >= 0 && distFromSma50 <= 30 ? 0.125 : 0.0;
-      const p1Atr = atrMultiple <= 2 ? 0.375 : atrMultiple <= 3 ? 0.25 : atrMultiple <= 4 ? 0.125 : 0.0;
-      const pillar1 = p1Stage + p1Ema + p1Sma + p1Dist + p1Atr;
+      // ---- STOCK QUALITY SCORE ENGINE v4.0 (raw/2 system) ----
+      // Raw total = 20, Final score = raw / 2 → 0, 0.5, 1.0 ... 9.5, 10.0
 
-      // Pillar 2: Demand & Institutional Footprint (max 2.0)
-      const p2Rs = rsRating >= 90 ? 1.0 : rsRating >= 80 ? 0.5 : 0.0;
+      // Pillar 1: Trend & Technical Structure (5 raw)
+      const r1Stage = weinsteinStage === 2 ? 2 : weinsteinStage === 1 ? 1 : 0;
+      const r1Ema = (aboveEma10 && aboveEma20) ? 1 : 0;
+      const r1Sma = (aboveSma50 && aboveSma200) ? 1 : 0;
+      const r1Tight = (distFromSma50 >= 0 && distFromSma50 <= 15 && atrMultiple <= 2) ? 1 : 0;
+      const rawP1 = r1Stage + r1Ema + r1Sma + r1Tight;
+
+      // Pillar 2: Demand & Institutional Footprint (4 raw)
+      const r2Rs = rsRating >= 90 ? 2 : rsRating >= 80 ? 1 : 0;
       const mcapB = marketCap / 1e9;
-      let p2Inst = 0;
+      let r2Inst = 0;
       if (mcapB >= 10) {
-        p2Inst = (instOwnership >= 50 && instOwnership <= 95) ? 0.5 : (instOwnership >= 30 && instOwnership <= 50) || instOwnership > 95 ? 0.25 : 0.0;
+        r2Inst = (instOwnership >= 50 && instOwnership <= 95) ? 1 : 0;
       } else if (mcapB >= 2) {
-        p2Inst = (instOwnership >= 30 && instOwnership <= 80) ? 0.5 : (instOwnership >= 15 && instOwnership <= 30) || instOwnership > 80 ? 0.25 : 0.0;
+        r2Inst = (instOwnership >= 30 && instOwnership <= 80) ? 1 : 0;
       } else {
-        p2Inst = (instOwnership >= 20 && instOwnership <= 60) ? 0.5 : (instOwnership >= 10 && instOwnership <= 20) || instOwnership > 60 ? 0.25 : 0.0;
+        r2Inst = (instOwnership >= 20 && instOwnership <= 60) ? 1 : 0;
       }
-      const p2Smart = smartMoney ? 0.5 : 0.0;
-      const pillar2 = p2Rs + p2Inst + p2Smart;
+      const r2Smart = smartMoney ? 1 : 0;
+      const rawP2 = r2Rs + r2Inst + r2Smart;
 
-      // Pillar 3: Earnings & Revenue Momentum (max 3.0)
-      const p3EpsYoY = latestQEpsYoY > 25 ? 0.5 : latestQEpsYoY >= 10 ? 0.25 : 0.0;
-      const p3SalesYoY = latestQSalesYoY > 15 ? 0.5 : latestQSalesYoY >= 5 ? 0.25 : 0.0;
+      // Pillar 3: Earnings & Revenue Momentum (6 raw)
+      const r3EpsYoY = latestQEpsYoY > 25 ? 2 : latestQEpsYoY >= 10 ? 1 : 0;
+      const r3SalesYoY = latestQSalesYoY > 15 ? 1 : 0;
 
       const recentEpsQoQ = epsQoQValues.slice(-3);
-      let p3EpsQoQ = 0;
+      let r3EpsQoQ = 0;
       if (recentEpsQoQ.length >= 2) {
         const last2 = recentEpsQoQ.slice(-2);
-        if (last2.every(v => v > 0) && last2[1] > last2[0]) p3EpsQoQ = 0.5;
-        else if (last2.some(v => v > 0)) p3EpsQoQ = 0.25;
-      } else if (recentEpsQoQ.length === 1 && recentEpsQoQ[0] > 0) {
-        p3EpsQoQ = 0.25;
+        if (last2.every(v => v > 0) && last2[1] > last2[0]) r3EpsQoQ = 1;
       }
 
       const recentSalesQoQ = salesQoQValues.slice(-3);
-      let p3SalesQoQ = 0;
+      let r3SalesQoQ = 0;
       if (recentSalesQoQ.length >= 2) {
         const last2 = recentSalesQoQ.slice(-2);
-        if (last2.every(v => v > 0) && last2[1] > last2[0]) p3SalesQoQ = 0.5;
-        else if (last2.some(v => v > 0)) p3SalesQoQ = 0.25;
-      } else if (recentSalesQoQ.length === 1 && recentSalesQoQ[0] > 0) {
-        p3SalesQoQ = 0.25;
+        if (last2.every(v => v > 0) && last2[1] > last2[0]) r3SalesQoQ = 1;
       }
 
-      const p3EpsAcc = earningsAcceleration >= 2 ? 0.5 : earningsAcceleration === 1 ? 0.25 : 0.0;
-      const p3SalesAcc = salesAccelQuarters >= 2 ? 0.5 : salesAccelQuarters === 1 ? 0.25 : 0.0;
-      const pillar3 = p3EpsYoY + p3SalesYoY + p3EpsQoQ + p3SalesQoQ + p3EpsAcc + p3SalesAcc;
+      const r3EpsAcc = earningsAcceleration >= 2 ? 1 : 0;
+      const rawP3 = r3EpsYoY + r3SalesYoY + r3EpsQoQ + r3SalesQoQ + r3EpsAcc;
 
-      // Pillar 4: Profitability & Business Quality (max 1.5)
-      const p4Margin = operMarginPositive ? 0.5 : 0.0;
-      const p4Fcf = fcfPositive ? 0.5 : 0.0;
-      const mcapMillions = marketCap / 1e6;
-      const p4Cap = mcapMillions >= 10000 ? 0.5 : mcapMillions >= 2000 ? 0.375 : mcapMillions >= 300 ? 0.25 : 0.0;
-      const pillar4 = p4Margin + p4Fcf + p4Cap;
+      // Pillar 4: Profitability & Quality (3 raw)
+      const r4Margin = operMarginPositive ? 1 : 0;
+      const r4Fcf = fcfPositive ? 1 : 0;
+      const r4Cap = mcapB >= 10 ? 1 : 0;
+      const rawP4 = r4Margin + r4Fcf + r4Cap;
 
-      // Pillar 5: Volume & Liquidity (max 1.0)
-      const p5Vol = avgVolume50d >= 2_000_000 ? 0.5 : avgVolume50d >= 1_000_000 ? 0.375 : avgVolume50d >= 500_000 ? 0.25 : 0.0;
-      let p5VolTrend = 0.25;
+      // Pillar 5: Volume & Liquidity (2 raw)
+      const r5Vol = avgVolume50d >= 1_000_000 ? 1 : 0;
+      let r5VolTrend = 0;
       if (avgVolume50d > 0 && avgVolume10d > 0) {
         const volRatio = ((avgVolume10d - avgVolume50d) / avgVolume50d) * 100;
-        if (volRatio >= 20) p5VolTrend = 0.5;
-        else if (volRatio <= -20) p5VolTrend = 0.0;
-        else p5VolTrend = 0.25;
+        if (volRatio >= 20) r5VolTrend = 1;
       }
-      const pillar5 = p5Vol + p5VolTrend;
+      const rawP5 = r5Vol + r5VolTrend;
 
-      const rawTotal = pillar1 + pillar2 + pillar3 + pillar4 + pillar5;
-      const totalScore = Math.round(rawTotal * 8) / 8;
+      const rawTotal = rawP1 + rawP2 + rawP3 + rawP4 + rawP5;
+      const totalScore = rawTotal / 2;
       let interpretation = '';
       if (totalScore >= 8.0) interpretation = 'A+ Setup';
       else if (totalScore >= 6.5) interpretation = 'Strong Setup';
@@ -1520,11 +1509,11 @@ export async function registerRoutes(
         qualityScore: {
           total: totalScore,
           pillars: {
-            trend: Math.round(pillar1 * 1000) / 1000,
-            demand: Math.round(pillar2 * 1000) / 1000,
-            earnings: Math.round(pillar3 * 1000) / 1000,
-            profitability: Math.round(pillar4 * 1000) / 1000,
-            volume: Math.round(pillar5 * 1000) / 1000,
+            trend: rawP1 / 2,
+            demand: rawP2 / 2,
+            earnings: rawP3 / 2,
+            profitability: rawP4 / 2,
+            volume: rawP5 / 2,
           },
           interpretation,
         },
