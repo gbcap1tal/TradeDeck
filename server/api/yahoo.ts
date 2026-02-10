@@ -295,40 +295,79 @@ export async function getIndices() {
   }
 }
 
+export const SECTOR_ETFS = [
+  { name: 'Technology', ticker: 'XLK', color: '#0a84ff' },
+  { name: 'Financials', ticker: 'XLF', color: '#30d158' },
+  { name: 'Healthcare', ticker: 'XLV', color: '#ff453a' },
+  { name: 'Energy', ticker: 'XLE', color: '#ffd60a' },
+  { name: 'Consumer Discretionary', ticker: 'XLY', color: '#bf5af2' },
+  { name: 'Consumer Staples', ticker: 'XLP', color: '#ff9f0a' },
+  { name: 'Industrials', ticker: 'XLI', color: '#64d2ff' },
+  { name: 'Materials', ticker: 'XLB', color: '#ffd60a' },
+  { name: 'Real Estate', ticker: 'XLRE', color: '#32ade6' },
+  { name: 'Utilities', ticker: 'XLU', color: '#30d158' },
+  { name: 'Communication Services', ticker: 'XLC', color: '#bf5af2' },
+];
+
 export async function getSectorETFs() {
   const key = 'yf_sectors';
   const cached = getCached<any[]>(key);
   if (cached) return cached;
 
-  const SECTOR_ETFS = [
-    { name: 'Technology', ticker: 'XLK', color: '#0a84ff' },
-    { name: 'Financials', ticker: 'XLF', color: '#30d158' },
-    { name: 'Healthcare', ticker: 'XLV', color: '#ff453a' },
-    { name: 'Energy', ticker: 'XLE', color: '#ffd60a' },
-    { name: 'Consumer Discretionary', ticker: 'XLY', color: '#bf5af2' },
-    { name: 'Consumer Staples', ticker: 'XLP', color: '#ff9f0a' },
-    { name: 'Industrials', ticker: 'XLI', color: '#64d2ff' },
-    { name: 'Materials', ticker: 'XLB', color: '#ffd60a' },
-    { name: 'Real Estate', ticker: 'XLRE', color: '#32ade6' },
-    { name: 'Utilities', ticker: 'XLU', color: '#30d158' },
-    { name: 'Communication Services', ticker: 'XLC', color: '#bf5af2' },
-  ];
-
   try {
-    const quotes = await Promise.allSettled(
-      SECTOR_ETFS.map(s => throttledYahooCall(() => yf.quote(s.ticker)))
-    );
+    const tickers = SECTOR_ETFS.map(s => s.ticker);
+    const [quotesResult, ytdPrices, histResults] = await Promise.all([
+      Promise.allSettled(SECTOR_ETFS.map(s => throttledYahooCall(() => yf.quote(s.ticker)))),
+      getYearStartPrices(tickers),
+      Promise.allSettled(tickers.map(t => throttledYahooCall(() => yf.chart(t, {
+        period1: new Date(Date.now() - 35 * 86400000),
+        interval: '1d' as const,
+      })))),
+    ]);
+
+    const histMap = new Map<string, number[]>();
+    tickers.forEach((t, i) => {
+      const r = histResults[i];
+      if (r.status === 'fulfilled' && r.value?.quotes) {
+        const closes = r.value.quotes
+          .filter((q: any) => q.close != null)
+          .map((q: any) => q.close as number);
+        histMap.set(t, closes);
+      }
+    });
 
     const results = SECTOR_ETFS.map((sector, i) => {
-      const r = quotes[i];
+      const r = quotesResult[i];
       if (r.status === 'fulfilled' && r.value) {
         const q = r.value;
+        const currentPrice = q.regularMarketPrice ?? 0;
+        const closes = histMap.get(sector.ticker) || [];
+
+        let weeklyChange = 0;
+        let monthlyChange = 0;
+        if (closes.length >= 5) {
+          const weekAgoPrice = closes[closes.length - 5] || closes[0];
+          weeklyChange = Math.round(((currentPrice - weekAgoPrice) / weekAgoPrice) * 10000) / 100;
+        }
+        if (closes.length >= 1) {
+          const monthAgoPrice = closes[0];
+          monthlyChange = Math.round(((currentPrice - monthAgoPrice) / monthAgoPrice) * 10000) / 100;
+        }
+
+        const ytdStartPrice = ytdPrices.get(sector.ticker);
+        const ytdChange = ytdStartPrice
+          ? Math.round(((currentPrice - ytdStartPrice) / ytdStartPrice) * 10000) / 100
+          : 0;
+
         return {
           name: sector.name,
           ticker: sector.ticker,
-          price: Math.round((q.regularMarketPrice ?? 0) * 100) / 100,
+          price: Math.round(currentPrice * 100) / 100,
           change: Math.round((q.regularMarketChange ?? 0) * 100) / 100,
           changePercent: Math.round((q.regularMarketChangePercent ?? 0) * 100) / 100,
+          weeklyChange,
+          monthlyChange,
+          ytdChange,
           marketCap: Math.round((q.marketCap ?? 0) / 1e9 * 10) / 10,
           rs: 0,
           rsMomentum: 0,

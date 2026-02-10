@@ -2,10 +2,10 @@ import { useSectorPerformance } from "@/hooks/use-market";
 import { useLocation } from "wouter";
 import { useState } from "react";
 
-type Timeframe = 'D' | 'W' | 'M';
+type Timeframe = 'D' | 'W' | 'M' | 'YTD';
 
 function TimeframeSwitch({ value, onChange }: { value: Timeframe; onChange: (v: Timeframe) => void }) {
-  const options: Timeframe[] = ['D', 'W', 'M'];
+  const options: Timeframe[] = ['D', 'W', 'M', 'YTD'];
   return (
     <div className="flex items-center gap-0.5 rounded-md bg-white/[0.04] p-0.5" data-testid="switch-heatmap-timeframe">
       {options.map(opt => (
@@ -49,8 +49,9 @@ export function MarketHeatmap() {
   }
 
   const getChange = (sector: any) => {
-    if (timeframe === 'W') return sector.changePercent * 2.3 + (sector.rs % 3 - 1);
-    if (timeframe === 'M') return sector.changePercent * 4.5 + (sector.rs % 5 - 2);
+    if (timeframe === 'W') return sector.weeklyChange ?? 0;
+    if (timeframe === 'M') return sector.monthlyChange ?? 0;
+    if (timeframe === 'YTD') return sector.ytdChange ?? 0;
     return sector.changePercent;
   };
 
