@@ -273,7 +273,7 @@ function NewsPanel({ symbol }: { symbol: string }) {
   const { data: news, isLoading } = useStockNews(symbol);
 
   return (
-    <div className="glass-card rounded-xl px-4 py-3 flex-1 min-h-0 flex flex-col overflow-hidden" data-testid="card-news">
+    <div className="glass-card rounded-xl px-4 py-3 h-full min-h-0 flex flex-col overflow-hidden" data-testid="card-news">
       <div className="flex items-center gap-1.5 mb-2 flex-shrink-0">
         <Newspaper className="w-3.5 h-3.5 text-white/30" />
         <span className="text-[13px] font-semibold text-white/90 tracking-wide">Latest News</span>
