@@ -201,7 +201,7 @@ export function Navbar() {
               <Input
                 ref={inputRef}
                 placeholder="Search ticker..."
-                className="pl-8 h-8 text-[13px] bg-white/5 border-white/10 text-white placeholder:text-white/30 focus-visible:ring-white/20 focus-visible:border-white/20"
+                className="pl-8 h-8 text-[13px] bg-[#1a1a1a] border-white/10 text-white placeholder:text-white/30 focus-visible:ring-white/20 focus-visible:border-white/20"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 onKeyDown={handleKeyDown}
