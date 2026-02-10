@@ -169,12 +169,7 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
       <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
         <h2 className="text-[13px] font-semibold text-white/90 tracking-wide">Stock Quality</h2>
         <div className="flex items-center gap-1 px-3 py-1.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }} data-testid="badge-stock-quality-score">
-          <span className={`text-[15px] font-bold leading-none font-mono-nums ${
-            (quality.qualityScore?.total ?? 0) >= 8 ? 'text-[#30d158]' :
-            (quality.qualityScore?.total ?? 0) >= 6.5 ? 'text-[#0a84ff]' :
-            (quality.qualityScore?.total ?? 0) >= 5 ? 'text-[#ffd60a]' :
-            'text-[#ff453a]'
-          }`}>{quality.qualityScore?.total ?? 0}</span>
+          <span className="text-[15px] font-bold text-white leading-none font-mono-nums">{quality.qualityScore?.total ?? 0}</span>
           <span className="text-[11px] text-white/40 leading-none font-medium">/10</span>
         </div>
       </div>
