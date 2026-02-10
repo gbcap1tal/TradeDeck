@@ -42,12 +42,8 @@ function formatMcap(v: number): string {
   return `$${(v / 1e3).toFixed(0)}K`;
 }
 
-function qualityColor(score: number): string {
-  if (score >= 8) return '#30d158';
-  if (score >= 6) return '#30d158cc';
-  if (score >= 4) return '#aaaaaa';
-  if (score >= 2) return '#ff9f0a';
-  return '#ff453a';
+function qualityColor(_score: number): string {
+  return 'rgba(255,255,255,0.85)';
 }
 
 export default function Leaders() {
