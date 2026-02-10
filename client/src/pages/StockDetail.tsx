@@ -32,8 +32,8 @@ function formatVolume(n: number): string {
 
 function BoolIndicator({ value, label }: { value: boolean; label: string }) {
   return (
-    <div className="flex items-center justify-between py-[3px]">
-      <span className="text-[12px] text-white/50">{label}</span>
+    <div className="flex items-center justify-between py-[1.5px]">
+      <span className="text-[11px] text-white/50">{label}</span>
       {value ? (
         <Check className="w-3.5 h-3.5 text-[#30d158]" />
       ) : (
@@ -45,9 +45,9 @@ function BoolIndicator({ value, label }: { value: boolean; label: string }) {
 
 function QualityRow({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="flex items-center justify-between py-[3px]">
-      <span className="text-[12px] text-white/50">{label}</span>
-      <span className={cn("text-[12px] font-mono-nums font-medium", color || "text-white/80")}>{value}</span>
+    <div className="flex items-center justify-between py-[1.5px]">
+      <span className="text-[11px] text-white/50">{label}</span>
+      <span className={cn("text-[11px] font-mono-nums font-medium", color || "text-white/80")}>{value}</span>
     </div>
   );
 }
@@ -57,8 +57,8 @@ function SmartMoneyIndicator({ symbol }: { symbol: string }) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-between py-[3px]">
-        <span className="text-[12px] text-white/50">Smart Money</span>
+      <div className="flex items-center justify-between py-[1.5px]">
+        <span className="text-[11px] text-white/50">Smart Money</span>
         <span className="text-[11px] text-white/30">...</span>
       </div>
     );
@@ -66,8 +66,8 @@ function SmartMoneyIndicator({ symbol }: { symbol: string }) {
 
   if (!data || !data.hasBuying) {
     return (
-      <div className="flex items-center justify-between py-[3px]">
-        <span className="text-[12px] text-white/50">Smart Money</span>
+      <div className="flex items-center justify-between py-[1.5px]">
+        <span className="text-[11px] text-white/50">Smart Money</span>
         <X className="w-3.5 h-3.5 text-[#ff453a]/60" />
       </div>
     );
@@ -83,8 +83,8 @@ function SmartMoneyIndicator({ symbol }: { symbol: string }) {
   };
 
   return (
-    <div className="flex items-center justify-between py-[3px]">
-      <span className="text-[12px] text-white/50">Smart Money</span>
+    <div className="flex items-center justify-between py-[1.5px]">
+      <span className="text-[11px] text-white/50">Smart Money</span>
       <div className="flex items-center gap-1.5">
         <Check className="w-3.5 h-3.5 text-[#30d158]" />
         {hasFundBuying && (
@@ -165,8 +165,8 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
   };
 
   return (
-    <div className="glass-card rounded-xl px-4 py-3 h-full flex flex-col overflow-hidden" data-testid="card-stock-quality">
-      <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
+    <div className="glass-card rounded-xl px-4 py-2.5 h-full flex flex-col overflow-hidden" data-testid="card-stock-quality">
+      <div className="flex items-center justify-between mb-1.5 flex-shrink-0 gap-2">
         <h2 className="text-[13px] font-semibold text-white/90 tracking-wide">Stock Quality</h2>
         <div className="flex items-center gap-1 px-3 py-1.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }} data-testid="badge-stock-quality-score">
           <span className="text-[15px] font-bold text-white leading-none font-mono-nums">{quality.qualityScore?.total ?? 0}</span>
@@ -175,8 +175,8 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
-        <div className="mb-2">
-          <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Details</div>
+        <div className="mb-1">
+          <div className="text-[10px] text-white/30 uppercase tracking-widest mb-0.5 font-semibold">Details</div>
           <QualityRow label="Market Cap" value={formatLargeNumber(quality.details.marketCap)} />
           <QualityRow label="Float" value={formatVolume(quality.details.floatShares)} />
           <QualityRow
@@ -196,24 +196,24 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
             />
           )}
           <SmartMoneyIndicator symbol={symbol} />
-          <div className="mt-1 pt-1 border-t border-white/[0.06]">
-            <div className="flex items-center justify-between py-[3px]">
+          <div className="mt-0.5 pt-0.5 border-t border-white/[0.06]">
+            <div className="flex items-center justify-between py-[1.5px]">
               <div className="flex items-center gap-1.5">
                 <Calendar className="w-3 h-3 text-white/30" />
-                <span className="text-[12px] text-white/50">Earnings</span>
+                <span className="text-[11px] text-white/50">Earnings</span>
               </div>
-              <span className="text-[12px] font-mono-nums text-white/80">{quality.details.nextEarningsDate} ({quality.details.daysToEarnings}d)</span>
+              <span className="text-[11px] font-mono-nums text-white/80">{quality.details.nextEarningsDate} ({quality.details.daysToEarnings}d)</span>
             </div>
           </div>
         </div>
 
-        <div className="mb-2 pt-2 border-t border-white/[0.06]">
-          <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Fundamentals</div>
+        <div className="mb-1 pt-1.5 border-t border-white/[0.06]">
+          <div className="text-[10px] text-white/30 uppercase tracking-widest mb-0.5 font-semibold">Fundamentals</div>
           <QualityRow label="EPS QoQ" value={`${quality.fundamentals.epsQoQ > 0 ? '+' : ''}${quality.fundamentals.epsQoQ}%`} color={pctColor(quality.fundamentals.epsQoQ)} />
           <QualityRow label="Sales QoQ" value={`${quality.fundamentals.salesQoQ > 0 ? '+' : ''}${quality.fundamentals.salesQoQ}%`} color={pctColor(quality.fundamentals.salesQoQ)} />
           <QualityRow label="EPS YoY" value={`${quality.fundamentals.epsYoY > 0 ? '+' : ''}${quality.fundamentals.epsYoY}%`} color={pctColor(quality.fundamentals.epsYoY)} />
           <QualityRow label="Sales YoY" value={`${quality.fundamentals.salesYoY > 0 ? '+' : ''}${quality.fundamentals.salesYoY}%`} color={pctColor(quality.fundamentals.salesYoY)} />
-          <div className="flex items-center justify-between py-[3px]">
+          <div className="flex items-center justify-between py-[1.5px]">
             <span className="text-[11px] text-white/50">Earnings Accel.</span>
             <span className="text-[11px] font-medium">
               {quality.fundamentals.earningsAcceleration >= 5 ? (
@@ -234,14 +234,14 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
 
         </div>
 
-        <div className="mb-2 pt-2 border-t border-white/[0.06]">
-          <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Profitability</div>
+        <div className="mb-1 pt-1.5 border-t border-white/[0.06]">
+          <div className="text-[10px] text-white/30 uppercase tracking-widest mb-0.5 font-semibold">Profitability</div>
           <BoolIndicator label="Oper. Margin > 0" value={quality.profitability.operMarginPositive} />
           <BoolIndicator label="FCF > 0" value={quality.profitability.fcfPositive} />
         </div>
 
-        <div className="pt-2 border-t border-white/[0.06]">
-          <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Trend</div>
+        <div className="pt-1.5 border-t border-white/[0.06]">
+          <div className="text-[10px] text-white/30 uppercase tracking-widest mb-0.5 font-semibold">Trend</div>
           <QualityRow label="Weinstein Stage" value={`Stage ${quality.trend.weinsteinStage}`} color={stageColors[quality.trend.weinsteinStage]} />
           <BoolIndicator label="Price > 10 EMA" value={quality.trend.aboveEma10} />
           <BoolIndicator label="Price > 20 EMA" value={quality.trend.aboveEma20} />
@@ -252,8 +252,8 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
             value={`${quality.trend.distFromSma50 > 0 ? '+' : ''}${quality.trend.distFromSma50}%`}
             color={quality.trend.distFromSma50 > 0 ? "text-[#30d158]" : "text-[#ff453a]/80"}
           />
-          <div className="flex items-center justify-between py-[3px]">
-            <span className="text-[12px] text-white/50">Overextension</span>
+          <div className="flex items-center justify-between py-[1.5px]">
+            <span className="text-[11px] text-white/50">Overextension</span>
             <div className="flex items-center gap-1.5">
               <span className={cn("text-[12px] font-mono-nums font-medium", overextColors[quality.trend.overextensionFlag])}>
                 {quality.trend.overextensionFlag} ATR
@@ -776,10 +776,10 @@ export default function StockDetail() {
                 </div>
 
                 <div className="lg:col-span-5 flex flex-col gap-2 min-h-0 h-auto lg:h-[calc(100vh-100px)]">
-                  <div className="min-h-[200px] lg:flex-[5] lg:min-h-0 overflow-auto">
+                  <div className="min-h-[200px] lg:flex-[6] lg:min-h-0 overflow-auto">
                     <StockQualityPanel symbol={symbol} />
                   </div>
-                  <div className="min-h-[200px] lg:flex-[3] lg:min-h-0">
+                  <div className="min-h-[200px] lg:flex-[2] lg:min-h-0">
                     <NewsPanel symbol={symbol} />
                   </div>
                 </div>
