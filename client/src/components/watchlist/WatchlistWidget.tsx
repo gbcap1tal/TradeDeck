@@ -1,7 +1,7 @@
 import { useWatchlists, useWatchlist, useCreateWatchlist, useAddToWatchlist, useRemoveFromWatchlist } from "@/hooks/use-watchlists";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, ChevronRight, TrendingUp, TrendingDown, Star } from "lucide-react";
+import { Plus, Trash2, ChevronRight, ArrowUp, ArrowDown, Star } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -44,7 +44,7 @@ function WatchlistItemRow({ symbol, watchlistId }: { symbol: string, watchlistId
             "text-xs font-mono flex items-center justify-end gap-1",
             isPositive ? "text-up" : "text-down"
           )}>
-            {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+            {isPositive ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
             {Math.abs(quote.changePercent).toFixed(2)}%
           </div>
         </div>

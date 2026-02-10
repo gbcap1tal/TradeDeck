@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Search, User, LogOut, Menu, X, BarChart3, TrendingUp, Newspaper, Crown } from "lucide-react";
+import { Search, User, LogOut, Menu, X, BarChart3, ArrowUp, Newspaper, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -138,7 +138,7 @@ export function Navbar() {
 
   const navItems = [
     { label: "Capital Flow", href: "/", icon: BarChart3 },
-    { label: "Megatrends", href: "/markets", icon: TrendingUp },
+    { label: "Megatrends", href: "/markets", icon: ArrowUp },
     { label: "Leaders", href: "/leaders", icon: Crown },
     { label: "News", href: "/news", icon: Newspaper },
   ];

@@ -1,6 +1,6 @@
 import { useSectorPerformance } from "@/hooks/use-market";
 import { useLocation } from "wouter";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ArrowUp, ArrowDown, Minus } from "lucide-react";
 
 function MiniSparkline({ data, color, width = 100, height = 24 }: { data: number[]; color: string; width?: number; height?: number }) {
   if (!data || data.length < 2) return null;
@@ -55,7 +55,7 @@ export function RelativeStrengthLeaders() {
       <div className="section-title mb-4" data-testid="text-rs-leaders-title">RS Leaders</div>
       <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollSnapType: 'x mandatory' }}>
         {topSectors.map((sector: any) => {
-          const MomentumIcon = sector.rsMomentum > 1 ? TrendingUp : sector.rsMomentum < -1 ? TrendingDown : Minus;
+          const MomentumIcon = sector.rsMomentum > 1 ? ArrowUp : sector.rsMomentum < -1 ? ArrowDown : Minus;
           const momColor = sector.rsMomentum > 1 ? '#2eb850' : sector.rsMomentum < -1 ? '#c05050' : '#8e8e93';
           const sparkData = generateRSSparkline(sector.rs);
 

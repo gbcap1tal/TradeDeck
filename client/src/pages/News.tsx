@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { useQuery } from "@tanstack/react-query";
-import { Newspaper, Clock, TrendingUp, AlertCircle, Search, X } from "lucide-react";
+import { Newspaper, Clock, ArrowUp, AlertCircle, Search, X } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -219,7 +219,7 @@ export default function News() {
           {/* Corporate Developments - full width below */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="w-4 h-4 text-[#30d158]" />
+              <ArrowUp className="w-4 h-4 text-[#30d158]" />
               <div className="section-title" data-testid="text-premarket-title">Corporate Developments</div>
               {premarket?.updated && (
                 <span className="text-[10px] text-white/25 font-mono ml-auto" data-testid="text-premarket-updated">

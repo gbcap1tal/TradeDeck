@@ -1,6 +1,6 @@
 import { useMarketIndices } from "@/hooks/use-market";
 import { cn } from "@/lib/utils";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowUp, ArrowDown } from "lucide-react";
 
 function Sparkline({ data, color, width = 80, height = 28 }: { data: number[]; color: string; width?: number; height?: number }) {
   if (!data || data.length < 2) return null;
@@ -61,7 +61,7 @@ export function MarketIndices() {
               <div className="flex items-center justify-between gap-1 mb-2">
                 <span className="text-[11px] text-white/40 font-medium truncate">{index.name}</span>
                 <div className="p-1 rounded-md flex-shrink-0" style={{ background: `${color}1a` }}>
-                  {isPositive ? <TrendingUp className="w-3 h-3" style={{ color }} /> : <TrendingDown className="w-3 h-3" style={{ color }} />}
+                  {isPositive ? <ArrowUp className="w-3 h-3" style={{ color }} /> : <ArrowDown className="w-3 h-3" style={{ color }} />}
                 </div>
               </div>
               <div className="text-lg font-bold font-mono-nums tracking-tight text-white mb-1">

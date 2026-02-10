@@ -1,5 +1,5 @@
 import { useMarketBreadth } from "@/hooks/use-market";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { ArrowUp, ArrowDown, Minus } from "lucide-react";
 
 const MQ = {
   excellent: '#2eb850',
@@ -81,9 +81,9 @@ function TierBar({ name, score, max }: { name: string; score: number; max: numbe
 
 function TrendBadge({ status }: { status: string }) {
   const config: Record<string, { color: string; icon: any; label: string }> = {
-    'T+': { color: MQ.bullish, icon: TrendingUp, label: 'UPTREND' },
+    'T+': { color: MQ.bullish, icon: ArrowUp, label: 'UPTREND' },
     'TS': { color: MQ.neutral, icon: Minus, label: 'SIDEWAYS' },
-    'T-': { color: MQ.bearish, icon: TrendingDown, label: 'DOWNTREND' },
+    'T-': { color: MQ.bearish, icon: ArrowDown, label: 'DOWNTREND' },
   };
   const c = config[status] || config['TS'];
   const BadgeIcon = c.icon;

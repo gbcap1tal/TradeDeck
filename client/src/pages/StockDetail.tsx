@@ -3,7 +3,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { useStockQuote, useStockQuality, useStockEarnings, useStockNews, useInsiderBuying } from "@/hooks/use-stocks";
 import { StockChart } from "@/components/stock/StockChart";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Plus, TrendingDown, TrendingUp, Check, X, AlertTriangle, Calendar, Newspaper, Flame, Zap, Info, Building2 } from "lucide-react";
+import { ChevronRight, Plus, ArrowUp, ArrowDown, Check, X, AlertTriangle, Calendar, Newspaper, Flame, Zap, Info, Building2 } from "lucide-react";
 import { useAddToWatchlist, useWatchlists } from "@/hooks/use-watchlists";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
@@ -739,7 +739,7 @@ export default function StockDetail() {
                       ${quote.price.toFixed(2)}
                     </span>
                     <span className={cn("ml-1.5 sm:ml-2 font-mono-nums text-[11px] sm:text-[12px] font-medium", quote.change >= 0 ? "text-[#30d158]" : "text-[#ff453a]")}>
-                      {quote.change >= 0 ? <TrendingUp className="w-3 h-3 inline mr-0.5" /> : <TrendingDown className="w-3 h-3 inline mr-0.5" />}
+                      {quote.change >= 0 ? <ArrowUp className="w-3 h-3 inline mr-0.5" /> : <ArrowDown className="w-3 h-3 inline mr-0.5" />}
                       {quote.change > 0 ? "+" : ""}{quote.change.toFixed(2)} ({quote.changePercent.toFixed(2)}%)
                     </span>
                   </div>
