@@ -2266,6 +2266,7 @@ export async function registerRoutes(
   app.get('/api/payment/status', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      if (isAdmin(req)) return res.json({ hasPaid: true });
       const [user] = await db.select().from(users).where(eq(users.id, userId));
       if (!user) return res.json({ hasPaid: false });
       res.json({ hasPaid: user.hasPaid === 'true' });
