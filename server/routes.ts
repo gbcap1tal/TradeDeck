@@ -1468,47 +1468,46 @@ export async function registerRoutes(
         }
       }
 
-      // ---- STOCK QUALITY SCORE ENGINE v2.0 ----
+      // ---- STOCK QUALITY SCORE ENGINE v2.1 (no quarter points) ----
       // Pillar 1: Trend & Technical Structure (max 3.0)
-      const p1Stage = weinsteinStage === 2 ? 1.0 : weinsteinStage === 1 ? 0.25 : 0.0;
+      const p1Stage = weinsteinStage === 2 ? 1.0 : weinsteinStage === 1 ? 0.5 : 0.0;
       const emaCount = (aboveEma10 ? 1 : 0) + (aboveEma20 ? 1 : 0);
-      const p1Ema = emaCount === 2 ? 0.5 : emaCount === 1 ? 0.25 : 0.0;
+      const p1Ema = emaCount === 2 ? 0.5 : 0.0;
       const smaCount = (aboveSma50 ? 1 : 0) + (aboveSma200 ? 1 : 0);
-      const p1Sma = smaCount === 2 ? 0.5 : smaCount === 1 ? 0.25 : 0.0;
-      const p1Dist = distFromSma50 >= 0 && distFromSma50 <= 10 ? 0.5 : distFromSma50 >= 0 && distFromSma50 <= 20 ? 0.25 : 0.0;
-      const p1Atr = atrMultiple <= 2 ? 0.5 : atrMultiple <= 4 ? 0.25 : 0.0;
+      const p1Sma = smaCount === 2 ? 0.5 : 0.0;
+      const p1Dist = distFromSma50 >= 0 && distFromSma50 <= 10 ? 0.5 : 0.0;
+      const p1Atr = atrMultiple <= 2 ? 0.5 : 0.0;
       const pillar1 = p1Stage + p1Ema + p1Sma + p1Dist + p1Atr;
 
       // Pillar 2: Demand & Institutional Footprint (max 2.5)
       const p2Rs = rsRating >= 90 ? 1.0 : rsRating >= 80 ? 0.5 : 0.0;
-      const p2Inst = (instOwnership >= 20 && instOwnership <= 60) ? 0.5 : 0.25;
-      const p2Vol = avgVolume50d >= 1_000_000 ? 0.5 : avgVolume50d >= 500_000 ? 0.25 : 0.0;
+      const p2Inst = (instOwnership >= 20 && instOwnership <= 60) ? 0.5 : 0.0;
+      const p2Vol = avgVolume50d >= 1_000_000 ? 0.5 : 0.0;
       const p2Smart = smartMoney ? 0.5 : 0.0;
       const pillar2 = p2Rs + p2Inst + p2Vol + p2Smart;
 
       // Pillar 3: Growth — Quarterly Momentum (max 2.0)
-      const p3Eps = latestQEpsYoY > 25 ? 0.5 : latestQEpsYoY >= 10 ? 0.25 : 0.0;
-      const p3Sales = latestQSalesYoY > 15 ? 0.5 : latestQSalesYoY >= 5 ? 0.25 : 0.0;
-      const p3EpsAcc = earningsAcceleration >= 2 ? 0.5 : earningsAcceleration === 1 ? 0.25 : 0.0;
-      const p3SalesAcc = salesAccelQuarters >= 2 ? 0.5 : salesAccelQuarters === 1 ? 0.25 : 0.0;
+      const p3Eps = latestQEpsYoY > 25 ? 0.5 : 0.0;
+      const p3Sales = latestQSalesYoY > 15 ? 0.5 : 0.0;
+      const p3EpsAcc = earningsAcceleration >= 2 ? 0.5 : 0.0;
+      const p3SalesAcc = salesAccelQuarters >= 2 ? 0.5 : 0.0;
       const pillar3 = p3Eps + p3Sales + p3EpsAcc + p3SalesAcc;
 
       // Pillar 4: Forward Estimates (max 1.5)
-      const p4Eps = epsEstQAbove15 >= 2 ? 0.5 : epsEstQAbove15 === 1 ? 0.25 : 0.0;
-      const p4Sales = salesEstQAbove10 >= 2 ? 0.5 : salesEstQAbove10 === 1 ? 0.25 : 0.0;
-      const p4Acc = estimatesAccelerating === 'yes' ? 0.5 : estimatesAccelerating === 'mixed' ? 0.25 : 0.0;
+      const p4Eps = epsEstQAbove15 >= 2 ? 0.5 : 0.0;
+      const p4Sales = salesEstQAbove10 >= 2 ? 0.5 : 0.0;
+      const p4Acc = estimatesAccelerating === 'yes' ? 0.5 : 0.0;
       const pillar4 = p4Eps + p4Sales + p4Acc;
 
       // Pillar 5: Structure & Risk (max 1.0)
       const floatMillions = floatShares / 1e6;
       const mcapMillions = marketCap / 1e6;
-      const p5Margin = operMarginPositive ? 0.25 : 0.0;
-      const p5Fcf = fcfPositive ? 0.25 : 0.0;
-      const p5Float = floatMillions < 100 ? 0.25 : 0.0;
-      const p5Cap = mcapMillions > 300 ? 0.25 : 0.0;
-      const pillar5 = p5Margin + p5Fcf + p5Float + p5Cap;
+      const p5Profitability = (operMarginPositive || fcfPositive) ? 0.5 : 0.0;
+      const p5Structure = mcapMillions > 300 ? 0.5 : 0.0;
+      const pillar5 = p5Profitability + p5Structure;
 
-      const totalScore = Math.round((pillar1 + pillar2 + pillar3 + pillar4 + pillar5) * 100) / 100;
+      const rawTotal = pillar1 + pillar2 + pillar3 + pillar4 + pillar5;
+      const totalScore = Math.round(rawTotal * 2) / 2;
       let interpretation = '';
       if (totalScore >= 8.0) interpretation = 'A+ Setup';
       else if (totalScore >= 6.5) interpretation = 'Strong Setup';
