@@ -11,6 +11,9 @@ interface StockChartProps {
   compact?: boolean;
 }
 
+type LineRange = '1D' | '1W' | '1M' | '3M' | '1Y' | '5Y';
+type CandleRange = 'D' | 'W' | 'MO';
+
 function TVChart({ data, chartType }: { data: any[]; chartType: 'line' | 'candle' }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -174,12 +177,20 @@ function TVChart({ data, chartType }: { data: any[]; chartType: 'line' | 'candle
   return <div ref={containerRef} className="w-full h-full" data-testid="tv-chart-container" />;
 }
 
-export function StockChart({ symbol, currentPrice, compact }: StockChartProps) {
-  const [range, setRange] = useState<'1D' | '1W' | '1M' | '3M' | '1Y' | '5Y'>('1M');
-  const [chartType, setChartType] = useState<'line' | 'candle'>('candle');
-  const { data: history, isLoading } = useStockHistory(symbol, range);
+const LINE_RANGES: LineRange[] = ['1D', '1W', '1M', '3M', '1Y', '5Y'];
+const CANDLE_RANGES: { value: CandleRange; label: string }[] = [
+  { value: 'D', label: 'Daily' },
+  { value: 'W', label: 'Weekly' },
+  { value: 'MO', label: 'Monthly' },
+];
 
-  const ranges = ['1D', '1W', '1M', '3M', '1Y', '5Y'] as const;
+export function StockChart({ symbol, currentPrice, compact }: StockChartProps) {
+  const [lineRange, setLineRange] = useState<LineRange>('1M');
+  const [candleRange, setCandleRange] = useState<CandleRange>('D');
+  const [chartType, setChartType] = useState<'line' | 'candle'>('candle');
+
+  const activeRange = chartType === 'candle' ? candleRange : lineRange;
+  const { data: history, isLoading } = useStockHistory(symbol, activeRange);
 
   if (isLoading) {
     return (
@@ -212,19 +223,35 @@ export function StockChart({ symbol, currentPrice, compact }: StockChartProps) {
           </div>
         </div>
         <div className="flex items-center gap-0.5 rounded-md bg-white/[0.04] p-0.5" data-testid="switch-chart-range">
-          {ranges.map((r) => (
-            <button
-              key={r}
-              onClick={() => setRange(r)}
-              className={cn(
-                "px-1.5 py-0.5 text-[9px] font-semibold rounded transition-colors",
-                range === r ? 'bg-white/10 text-white/80' : 'text-white/20 hover:text-white/40'
-              )}
-              data-testid={`tab-range-${r}`}
-            >
-              {r}
-            </button>
-          ))}
+          {chartType === 'candle' ? (
+            CANDLE_RANGES.map((r) => (
+              <button
+                key={r.value}
+                onClick={() => setCandleRange(r.value)}
+                className={cn(
+                  "px-2 py-0.5 text-[9px] font-semibold rounded transition-colors",
+                  candleRange === r.value ? 'bg-white/10 text-white/80' : 'text-white/20 hover:text-white/40'
+                )}
+                data-testid={`tab-range-${r.value}`}
+              >
+                {r.label}
+              </button>
+            ))
+          ) : (
+            LINE_RANGES.map((r) => (
+              <button
+                key={r}
+                onClick={() => setLineRange(r)}
+                className={cn(
+                  "px-1.5 py-0.5 text-[9px] font-semibold rounded transition-colors",
+                  lineRange === r ? 'bg-white/10 text-white/80' : 'text-white/20 hover:text-white/40'
+                )}
+                data-testid={`tab-range-${r}`}
+              >
+                {r}
+              </button>
+            ))
+          )}
         </div>
       </div>
 

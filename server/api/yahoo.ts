@@ -203,6 +203,9 @@ export async function getHistory(symbol: string, range: string = '1M') {
     '3M': { period1: new Date(Date.now() - 95 * 86400000), interval: '1d' },
     '1Y': { period1: new Date(Date.now() - 370 * 86400000), interval: '1d' },
     '5Y': { period1: new Date(Date.now() - 1830 * 86400000), interval: '1wk' },
+    'D': { period1: new Date(Date.now() - 370 * 86400000), interval: '1d' },
+    'W': { period1: new Date(Date.now() - 730 * 86400000), interval: '1wk' },
+    'MO': { period1: new Date(Date.now() - 1830 * 86400000), interval: '1mo' },
   };
 
   const config = periodMap[range] || periodMap['1M'];
@@ -217,10 +220,11 @@ export async function getHistory(symbol: string, range: string = '1M') {
 
       if (!result || !result.quotes || result.quotes.length === 0) return [];
 
+      const intradayRanges = ['1D', '1W'];
       const data = result.quotes
         .filter((q: any) => q.close != null)
         .map((q: any) => ({
-          time: range === '1D' || range === '1W'
+          time: intradayRanges.includes(range)
             ? new Date(q.date).toISOString()
             : new Date(q.date).toISOString().split('T')[0],
           value: Math.round((q.close ?? 0) * 100) / 100,
@@ -228,6 +232,7 @@ export async function getHistory(symbol: string, range: string = '1M') {
           high: Math.round((q.high ?? 0) * 100) / 100,
           low: Math.round((q.low ?? 0) * 100) / 100,
           close: Math.round((q.close ?? 0) * 100) / 100,
+          volume: Math.round(q.volume ?? 0),
         }));
 
       setCache(key, data, CACHE_TTL.HISTORY);

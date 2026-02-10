@@ -18,7 +18,7 @@ export function useStockQuote(symbol: string) {
   });
 }
 
-export function useStockHistory(symbol: string, range: '1D' | '1W' | '1M' | '3M' | '1Y' | '5Y' = '1M') {
+export function useStockHistory(symbol: string, range: string = '1M') {
   return useQuery({
     queryKey: ['/api/stocks', symbol, 'history', range],
     queryFn: async () => {
