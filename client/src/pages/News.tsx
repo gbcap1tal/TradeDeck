@@ -2,7 +2,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { useQuery } from "@tanstack/react-query";
 import { Newspaper, Clock, ArrowUp, AlertCircle, Search, X } from "lucide-react";
 import { useLocation } from "wouter";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -109,6 +109,34 @@ function highlightTickers(text: string, onTickerClick: (ticker: string) => void)
   );
 }
 
+function highlightSearchTerm(text: string, searchTerm: string, onTickerClick: (ticker: string) => void) {
+  if (!searchTerm.trim()) return highlightTickers(text, onTickerClick);
+
+  const escaped = searchTerm.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`(${escaped})`, 'gi');
+  const segments = text.split(regex);
+
+  if (segments.length === 1) return highlightTickers(text, onTickerClick);
+
+  return (
+    <span>
+      {segments.map((seg, i) => {
+        if (seg.toLowerCase() === searchTerm.trim().toLowerCase()) {
+          return (
+            <mark
+              key={i}
+              className="bg-yellow-400/25 text-inherit rounded-sm px-0.5"
+            >
+              {seg}
+            </mark>
+          );
+        }
+        return <span key={i}>{highlightTickers(seg, onTickerClick)}</span>;
+      })}
+    </span>
+  );
+}
+
 function getEntryTypeLabel(ticker: string) {
   if (ticker === 'BONDX') return 'Treasury';
   if (ticker === 'SCANX') return 'Gaps';
@@ -145,13 +173,32 @@ export default function News() {
     setLocation(`/stocks/${symbol}`);
   };
 
-  const filteredEntries = premarket?.entries?.filter(entry => {
-    if (!premarketSearch.trim()) return true;
-    const q = premarketSearch.trim().toUpperCase();
-    return entry.ticker?.toUpperCase().includes(q) ||
-      entry.headline?.toUpperCase().includes(q) ||
-      entry.body?.toUpperCase().includes(q);
-  }) || [];
+  const filteredEntries = useMemo(() => {
+    if (!premarket?.entries) return [];
+    const raw = premarketSearch.trim();
+    if (!raw) return premarket.entries;
+    const q = raw.toUpperCase();
+
+    const tickerExact: PreMarketEntry[] = [];
+    const tickerPartial: PreMarketEntry[] = [];
+    const textMatch: PreMarketEntry[] = [];
+
+    for (const entry of premarket.entries) {
+      const t = entry.ticker?.toUpperCase() || '';
+      if (t === q) {
+        tickerExact.push(entry);
+      } else if (t.includes(q)) {
+        tickerPartial.push(entry);
+      } else if (
+        entry.headline?.toUpperCase().includes(q) ||
+        entry.body?.toUpperCase().includes(q)
+      ) {
+        textMatch.push(entry);
+      }
+    }
+
+    return [...tickerExact, ...tickerPartial, ...textMatch];
+  }, [premarket?.entries, premarketSearch]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -309,7 +356,9 @@ export default function News() {
                                   onClick={() => goToStock(entry.ticker)}
                                   data-testid={`premarket-ticker-${entry.ticker}`}
                                 >
-                                  {entry.ticker}
+                                  {premarketSearch.trim() && entry.ticker.toUpperCase().includes(premarketSearch.trim().toUpperCase()) ? (
+                                    <mark className="bg-yellow-400/25 text-[#0a84ff] rounded-sm px-0.5">{entry.ticker}</mark>
+                                  ) : entry.ticker}
                                 </span>
                               )}
                               {typeLabel && (
@@ -319,7 +368,7 @@ export default function News() {
                               )}
                             </div>
                             <p className="text-[13px] text-white/75 leading-relaxed" data-testid={`premarket-headline-${i}`}>
-                              {highlightTickers(entry.headline, goToStock)}
+                              {highlightSearchTerm(entry.headline, premarketSearch, goToStock)}
                             </p>
                             {entry.body && (
                               <div className="mt-2.5 space-y-2" data-testid={`premarket-body-${i}`}>
@@ -332,7 +381,7 @@ export default function News() {
                                         <span className="w-1.5 h-1.5 rounded-full bg-white/20 mt-[7px] flex-shrink-0" />
                                       )}
                                       <span className="text-[12px] text-white/45 leading-relaxed">
-                                        {highlightTickers(text.substring(0, 600), goToStock)}
+                                        {highlightSearchTerm(text.substring(0, 600), premarketSearch, goToStock)}
                                         {text.length > 600 && '...'}
                                       </span>
                                     </div>
