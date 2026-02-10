@@ -57,12 +57,13 @@ export function SectorRotation() {
     const rsSpread = Math.max(Math.max(...allRS) - 100, 100 - Math.min(...allRS), 1.5);
     const momAbsMax = Math.max(Math.abs(Math.max(...allMom)), Math.abs(Math.min(...allMom)), 1);
 
-    const spread = Math.max(rsSpread, momAbsMax) * 1.2;
+    const rsPad = rsSpread * 0.4;
+    const momPad = momAbsMax * 0.4;
 
-    const rsMin = 100 - spread;
-    const rsMax = 100 + spread;
-    const momMin = -spread;
-    const momMax = spread;
+    const rsMin = 100 - rsSpread - rsPad;
+    const rsMax = 100 + rsSpread + rsPad;
+    const momMin = -momAbsMax - momPad;
+    const momMax = momAbsMax + momPad;
 
     return { typedSectors, rsMin, rsMax, momMin, momMax };
   }, [sectors]);
