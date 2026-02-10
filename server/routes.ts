@@ -704,10 +704,10 @@ function initBackgroundTasks() {
     const timeMinutes = hours * 60 + minutes;
     const dateStr = `${et.getFullYear()}-${et.getMonth()}-${et.getDate()}`;
 
-    const marketOpen = 570;
+    const scheduleStart = 240;
     const marketClosePlus5 = 965;
 
-    if (timeMinutes < marketOpen || timeMinutes > marketClosePlus5) return;
+    if (timeMinutes < scheduleStart || timeMinutes > marketClosePlus5) return;
 
     let windowKey = '';
 
