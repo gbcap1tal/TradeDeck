@@ -1,7 +1,7 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Search, X, ChevronUp, ChevronDown, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -82,63 +82,22 @@ export default function Leaders() {
     refetchInterval: 300000,
   });
 
-  const [qualityScores, setQualityScores] = useState<Record<string, number>>({});
-  const [scoresReady, setScoresReady] = useState(false);
-  const fetchedRef = useRef<Set<string>>(new Set());
-  const loadingForRef = useRef<string>('');
+  const { data: qualityData } = useQuery<{ scores: Record<string, number>; ready: boolean }>({
+    queryKey: ['/api/leaders/quality-scores', minRS],
+    queryFn: async () => {
+      const res = await fetch(`/api/leaders/quality-scores?minRS=${minRS}`, { credentials: 'include' });
+      if (!res.ok) return { scores: {}, ready: false };
+      return res.json();
+    },
+    staleTime: 86400000,
+    refetchInterval: (query) => {
+      if (query.state.data?.ready) return false;
+      return 10000;
+    },
+  });
 
-  useEffect(() => {
-    if (!data?.leaders || data.leaders.length === 0) return;
-
-    const cacheKey = data.leaders.map(l => l.symbol).sort().join(',');
-    if (loadingForRef.current === cacheKey) return;
-
-    let cancelled = false;
-    loadingForRef.current = cacheKey;
-    setScoresReady(false);
-
-    async function loadAllScores() {
-      const symbols = data!.leaders.map(l => l.symbol);
-      const toFetch = symbols.filter(s => !fetchedRef.current.has(s));
-
-      if (toFetch.length === 0) {
-        if (!cancelled) setScoresReady(true);
-        return;
-      }
-
-      const allNewScores: Record<string, number> = {};
-
-      for (let i = 0; i < toFetch.length; i += 10) {
-        if (cancelled) return;
-        const batch = toFetch.slice(i, i + 10);
-        const results = await Promise.allSettled(
-          batch.map(async (sym) => {
-            const res = await fetch(`/api/stocks/${sym}/quality`, { credentials: 'include' });
-            if (!res.ok) return null;
-            const d = await res.json();
-            return { sym, score: d?.qualityScore?.total ?? null };
-          })
-        );
-        for (const r of results) {
-          if (r.status === 'fulfilled' && r.value && r.value.score != null) {
-            allNewScores[r.value.sym] = r.value.score;
-            fetchedRef.current.add(r.value.sym);
-          }
-        }
-        if (i + 10 < toFetch.length) {
-          await new Promise(r => setTimeout(r, 200));
-        }
-      }
-
-      if (!cancelled) {
-        setQualityScores(prev => ({ ...prev, ...allNewScores }));
-        setScoresReady(true);
-      }
-    }
-
-    loadAllScores();
-    return () => { cancelled = true; };
-  }, [data]);
+  const qualityScores = qualityData?.scores ?? {};
+  const scoresReady = qualityData?.ready ?? false;
 
   const leadersWithQuality = useMemo(() => {
     if (!data?.leaders) return [];

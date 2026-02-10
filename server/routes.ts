@@ -10,6 +10,7 @@ import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
 import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, scrapeIndustryRS, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe } from "./api/breadth";
 import { getRSScore, getCachedRS, getAllRSRatings } from "./api/rs";
+import { computeLeadersQualityBatch, getCachedLeadersQuality } from "./api/quality";
 import { sendAlert, clearFailures } from "./api/alerts";
 import { scrapeFinvizDigest, scrapeBriefingPreMarket, getPersistedDigest, scrapeDigestRaw, saveDigestFromRaw } from "./api/news-scrapers";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripe/stripeClient";
@@ -1139,6 +1140,47 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error(`[leaders] Error: ${err.message}`);
       res.status(500).json({ message: 'Failed to load leaders' });
+    }
+  });
+
+  app.get('/api/leaders/quality-scores', async (req, res) => {
+    try {
+      const minRS = parseInt(req.query.minRS as string) || 80;
+      const ratings = getAllRSRatings();
+      const finvizData = getFinvizDataSync();
+      const symbols: string[] = [];
+
+      if (finvizData) {
+        const stockLookup: Record<string, number> = {};
+        for (const [sector, sectorData] of Object.entries(finvizData)) {
+          for (const [industry, stocks] of Object.entries(sectorData.stocks)) {
+            for (const stock of stocks) {
+              stockLookup[stock.symbol] = stock.marketCap;
+            }
+          }
+        }
+        for (const [symbol, rs] of Object.entries(ratings)) {
+          if (rs < minRS) continue;
+          if ((stockLookup[symbol] || 0) < 300) continue;
+          symbols.push(symbol);
+        }
+      }
+
+      if (symbols.length === 0) {
+        return res.json({ scores: {}, ready: true });
+      }
+
+      const { scores: cached, complete } = getCachedLeadersQuality(symbols);
+      if (complete) {
+        return res.json({ scores: cached, ready: true });
+      }
+
+      const scores = await computeLeadersQualityBatch(symbols);
+      const allComplete = symbols.every(s => s in scores);
+      res.json({ scores, ready: allComplete });
+    } catch (err: any) {
+      console.error(`[leaders-quality] Error: ${err.message}`);
+      res.json({ scores: {}, ready: false });
     }
   });
 
