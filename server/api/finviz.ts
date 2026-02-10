@@ -480,7 +480,7 @@ function parseFinvizTime(baseDate: Date, timePart: string): number {
   return d.getTime();
 }
 
-export async function getFinvizNews(symbol: string): Promise<Array<{ id: string; headline: string; summary: string; source: string; url: string; timestamp: number; relatedSymbols: string[] }> | null> {
+export async function getFinvizNews(symbol: string): Promise<Array<{ id: string; headline: string; summary: string; source: string; url: string; timestamp: number; relatedSymbols: string[]; breaking?: boolean; breakingTime?: string }> | null> {
   const key = `finviz_news_${symbol}`;
   const cached = getCached<any[]>(key);
   if (cached) return cached;
@@ -491,10 +491,55 @@ export async function getFinvizNews(symbol: string): Promise<Array<{ id: string;
     if (!result.html) return null;
 
     const $ = cheerio.load(result.html);
-    const newsItems: Array<{ id: string; headline: string; summary: string; source: string; url: string; timestamp: number; relatedSymbols: string[] }> = [];
+    const newsItems: Array<{ id: string; headline: string; summary: string; source: string; url: string; timestamp: number; relatedSymbols: string[]; breaking?: boolean; breakingTime?: string }> = [];
+
+    const whyMoving = $('.js-why-stock-moving-static');
+    if (whyMoving.length) {
+      const container = whyMoving.find('.inline-block');
+      const timeSpan = container.find('span[class*="whitespace-nowrap"]');
+      const breakingTime = timeSpan.text().trim();
+
+      let breakingHeadline = '';
+      container.find('span').each((_: number, el: any) => {
+        const txt = $(el).text().trim();
+        if (txt.length > 20 && txt !== breakingTime) {
+          breakingHeadline = txt;
+          return false;
+        }
+      });
+
+      if (breakingHeadline) {
+        let breakingTs = Date.now();
+        const timeMatch = breakingTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+        if (timeMatch) {
+          const now = new Date();
+          const etStr = now.toLocaleString('en-US', { timeZone: 'America/New_York' });
+          const etNow = new Date(etStr);
+          let hours = parseInt(timeMatch[1]);
+          const mins = parseInt(timeMatch[2]);
+          const ampm = timeMatch[3].toUpperCase();
+          if (ampm === 'PM' && hours !== 12) hours += 12;
+          if (ampm === 'AM' && hours === 12) hours = 0;
+          etNow.setHours(hours, mins, 0, 0);
+          breakingTs = etNow.getTime();
+        }
+
+        newsItems.push({
+          id: 'breaking',
+          headline: breakingHeadline,
+          summary: '',
+          source: 'Finviz',
+          url: '',
+          timestamp: breakingTs,
+          relatedSymbols: [symbol],
+          breaking: true,
+          breakingTime: breakingTime,
+        });
+      }
+    }
 
     const newsTable = $('table.fullview-news-outer');
-    if (!newsTable.length) return null;
+    if (!newsTable.length && newsItems.length === 0) return null;
 
     let lastDate = '';
     newsTable.find('tr').each((i, row) => {
