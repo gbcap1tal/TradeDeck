@@ -88,3 +88,7 @@ export function getRSCacheStats(): { totalEntries: number; lastBatchUpdate: stri
     lastBatchUpdate: ratingsData?.metadata?.computedAt || '',
   };
 }
+
+export function getAllRSRatings(): Record<string, number> {
+  return ensureLoaded();
+}

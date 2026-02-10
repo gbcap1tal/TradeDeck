@@ -9,7 +9,7 @@ import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefre
 import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
 import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, scrapeIndustryRS, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe } from "./api/breadth";
-import { getRSScore, getCachedRS } from "./api/rs";
+import { getRSScore, getCachedRS, getAllRSRatings } from "./api/rs";
 import { sendAlert, clearFailures } from "./api/alerts";
 import { scrapeFinvizDigest, scrapeBriefingPreMarket, getPersistedDigest, scrapeDigestRaw, saveDigestFromRaw } from "./api/news-scrapers";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripe/stripeClient";
@@ -951,6 +951,64 @@ export async function registerRoutes(
     const isWeekday = day >= 1 && day <= 5;
     const isOpen = isWeekday && totalMinutes >= 14 * 60 + 30 && totalMinutes < 21 * 60;
     res.json({ isOpen });
+  });
+
+  app.get('/api/leaders', async (req, res) => {
+    try {
+      const minRS = parseInt(req.query.minRS as string) || 80;
+      const ratings = getAllRSRatings();
+      const finvizData = getFinvizDataSync();
+
+      const stockLookup: Record<string, { name: string; sector: string; industry: string; changePercent: number; marketCap: number }> = {};
+      if (finvizData) {
+        for (const [sector, sectorData] of Object.entries(finvizData)) {
+          for (const [industry, stocks] of Object.entries(sectorData.stocks)) {
+            for (const stock of stocks) {
+              stockLookup[stock.symbol] = {
+                name: stock.name,
+                sector,
+                industry,
+                changePercent: stock.changePercent,
+                marketCap: stock.marketCap,
+              };
+            }
+          }
+        }
+      }
+
+      const leaders: Array<{
+        symbol: string;
+        name: string;
+        sector: string;
+        industry: string;
+        rsRating: number;
+        changePercent: number;
+        marketCap: number;
+      }> = [];
+
+      for (const [symbol, rs] of Object.entries(ratings)) {
+        if (rs < minRS) continue;
+        const info = stockLookup[symbol];
+        if (!info) continue;
+        if ((info.marketCap || 0) < 300) continue;
+        leaders.push({
+          symbol,
+          name: info.name,
+          sector: info.sector,
+          industry: info.industry,
+          rsRating: rs,
+          changePercent: info.changePercent,
+          marketCap: info.marketCap,
+        });
+      }
+
+      leaders.sort((a, b) => b.rsRating - a.rsRating || b.marketCap - a.marketCap);
+
+      res.json({ leaders, total: leaders.length });
+    } catch (err: any) {
+      console.error(`[leaders] Error: ${err.message}`);
+      res.status(500).json({ message: 'Failed to load leaders' });
+    }
   });
 
   app.get('/api/news/digest', async (req, res) => {
