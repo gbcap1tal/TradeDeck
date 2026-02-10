@@ -95,16 +95,13 @@ export function SectorPerformance() {
 
   const renderList = (items: any[], title: string, tf: Timeframe, setTf: (v: Timeframe) => void, switchId: string) => (
     <div className="glass-card rounded-xl p-4 pb-2">
-      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+      <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
         <div className="label-text">{title}</div>
         <TimeframeSwitch value={tf} onChange={setTf} testId={switchId} />
       </div>
       <div>
-        <div className="flex items-center px-2 pb-2 mb-1 border-b border-white/[0.06]">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <span className="w-4 shrink-0" />
-            <span className="text-[10px] text-white/25 uppercase tracking-wider font-semibold">Industry</span>
-          </div>
+        <div className="flex items-center px-2 pb-2">
+          <div className="min-w-0 flex-1" />
           <div className="flex items-center shrink-0">
             {maHeaders.map(h => (
               <span key={h.key} className="text-[8px] text-white/20 font-semibold w-[34px] text-center uppercase tracking-wide" title={h.title}>{h.label}</span>
