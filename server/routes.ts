@@ -1264,18 +1264,47 @@ export async function registerRoutes(
       else overextensionFlag = '7+';
 
       let daysToEarnings = 0;
-      let nextEarningsDate = s['Earnings'] || '';
-      if (nextEarningsDate && nextEarningsDate !== '-') {
-        const parts = nextEarningsDate.split(' ');
-        if (parts.length >= 2) {
-          const earningsDateStr = parts.slice(0, 2).join(' ');
-          const currentYear = new Date().getFullYear();
-          const ed = new Date(`${earningsDateStr}, ${currentYear}`);
-          if (ed.getTime() < Date.now() - 86400000 * 30) {
-            ed.setFullYear(currentYear + 1);
+      let nextEarningsDate = '';
+      try {
+        const finnhubKey = process.env.FINNHUB_API_KEY;
+        if (finnhubKey) {
+          const now = new Date();
+          const fromDate = now.toISOString().split('T')[0];
+          const toDate = new Date(now.getTime() + 365 * 86400000).toISOString().split('T')[0];
+          const fhUrl = `https://finnhub.io/api/v1/calendar/earnings?symbol=${symbol}&from=${fromDate}&to=${toDate}&token=${finnhubKey}`;
+          const fhRes = await fetch(fhUrl);
+          const fhData = await fhRes.json();
+          if (fhData.earningsCalendar && fhData.earningsCalendar.length > 0) {
+            const futureEntries = fhData.earningsCalendar
+              .filter((e: any) => new Date(e.date).getTime() > Date.now() - 86400000)
+              .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            if (futureEntries.length > 0) {
+              const next = futureEntries[0];
+              const ed = new Date(next.date);
+              const hourTag = next.hour === 'bmo' ? ' BMO' : next.hour === 'amc' ? ' AMC' : '';
+              nextEarningsDate = ed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + hourTag;
+              daysToEarnings = Math.max(0, Math.ceil((ed.getTime() - Date.now()) / 86400000));
+            }
           }
-          if (!isNaN(ed.getTime())) {
-            daysToEarnings = Math.max(0, Math.ceil((ed.getTime() - Date.now()) / 86400000));
+        }
+      } catch (e) {
+        // Finnhub failed, fall back to Finviz
+      }
+      if (!nextEarningsDate) {
+        const finvizEarnings = s['Earnings'] || '';
+        if (finvizEarnings && finvizEarnings !== '-') {
+          const parts = finvizEarnings.split(' ');
+          if (parts.length >= 2) {
+            const earningsDateStr = parts.slice(0, 2).join(' ');
+            const currentYear = new Date().getFullYear();
+            const ed = new Date(`${earningsDateStr}, ${currentYear}`);
+            if (ed.getTime() < Date.now() - 86400000 * 30) {
+              ed.setFullYear(currentYear + 1);
+            }
+            if (!isNaN(ed.getTime()) && ed.getTime() > Date.now() - 86400000) {
+              nextEarningsDate = finvizEarnings;
+              daysToEarnings = Math.max(0, Math.ceil((ed.getTime() - Date.now()) / 86400000));
+            }
           }
         }
       }
