@@ -1,7 +1,7 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Search, X, ChevronUp, ChevronDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -15,9 +15,10 @@ interface Leader {
   rsRating: number;
   changePercent: number;
   marketCap: number;
+  qualityScore?: number;
 }
 
-type SortField = 'rsRating' | 'changePercent' | 'marketCap' | 'symbol' | 'sector' | 'industry';
+type SortField = 'rsRating' | 'changePercent' | 'marketCap' | 'symbol' | 'sector' | 'industry' | 'qualityScore';
 type SortDir = 'asc' | 'desc';
 
 const RS_FILTERS = [
@@ -35,9 +36,18 @@ const SECTORS = [
 ];
 
 function formatMcap(v: number): string {
-  if (v >= 1000000) return `${(v / 1000000).toFixed(1)}T`;
-  if (v >= 1000) return `${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}B`;
-  return `${v.toFixed(0)}M`;
+  if (v >= 1e12) return `$${(v / 1e12).toFixed(1)}T`;
+  if (v >= 1e9) return `$${(v / 1e9).toFixed(v >= 1e10 ? 0 : 1)}B`;
+  if (v >= 1e6) return `$${(v / 1e6).toFixed(0)}M`;
+  return `$${(v / 1e3).toFixed(0)}K`;
+}
+
+function qualityColor(score: number): string {
+  if (score >= 8) return '#30d158';
+  if (score >= 6) return '#30d158cc';
+  if (score >= 4) return '#aaaaaa';
+  if (score >= 2) return '#ff9f0a';
+  return '#ff453a';
 }
 
 export default function Leaders() {
@@ -54,9 +64,55 @@ export default function Leaders() {
     refetchInterval: 300000,
   });
 
-  const filtered = useMemo(() => {
+  const [qualityScores, setQualityScores] = useState<Record<string, number>>({});
+  const fetchedRef = useRef<Set<string>>(new Set());
+  const inFlightRef = useRef<Set<string>>(new Set());
+  const pendingRef = useRef(false);
+
+  const fetchQualityBatch = useCallback(async (symbols: string[]) => {
+    const needed = symbols.filter(s => !fetchedRef.current.has(s) && !inFlightRef.current.has(s));
+    if (needed.length === 0 || pendingRef.current) return;
+    pendingRef.current = true;
+    const batch = needed.slice(0, 10);
+    batch.forEach(s => inFlightRef.current.add(s));
+    try {
+      const res = await fetch('/api/leaders/quality', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbols: batch }),
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const scores: Record<string, number> = await res.json();
+        setQualityScores(prev => ({ ...prev, ...scores }));
+        batch.forEach(s => fetchedRef.current.add(s));
+      }
+    } catch {}
+    batch.forEach(s => inFlightRef.current.delete(s));
+    pendingRef.current = false;
+    const remaining = symbols.filter(s => !fetchedRef.current.has(s) && !inFlightRef.current.has(s));
+    if (remaining.length > 0) {
+      setTimeout(() => fetchQualityBatch(remaining), 300);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!data?.leaders || data.leaders.length === 0) return;
+    const syms = data.leaders.map(l => l.symbol);
+    fetchQualityBatch(syms);
+  }, [data, fetchQualityBatch]);
+
+  const leadersWithQuality = useMemo(() => {
     if (!data?.leaders) return [];
-    let list = data.leaders;
+    return data.leaders.map(l => ({
+      ...l,
+      qualityScore: qualityScores[l.symbol],
+    }));
+  }, [data, qualityScores]);
+
+  const filtered = useMemo(() => {
+    if (leadersWithQuality.length === 0) return [];
+    let list = leadersWithQuality;
 
     if (sectorFilter !== 'All Sectors') {
       list = list.filter(l => l.sector === sectorFilter);
@@ -77,13 +133,14 @@ export default function Leaders() {
         case 'symbol': cmp = a.symbol.localeCompare(b.symbol); break;
         case 'sector': cmp = a.sector.localeCompare(b.sector); break;
         case 'industry': cmp = a.industry.localeCompare(b.industry); break;
+        case 'qualityScore': cmp = (a.qualityScore ?? -1) - (b.qualityScore ?? -1); break;
         default: cmp = (a[sortField] as number) - (b[sortField] as number);
       }
       return sortDir === 'desc' ? -cmp : cmp;
     });
 
     return list;
-  }, [data, sectorFilter, search, sortField, sortDir]);
+  }, [leadersWithQuality, sectorFilter, search, sortField, sortDir]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -233,6 +290,13 @@ export default function Leaders() {
                     </th>
                     <th
                       className="text-right px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold cursor-pointer select-none"
+                      onClick={() => handleSort('qualityScore')}
+                      data-testid="th-quality"
+                    >
+                      Quality<SortIcon field="qualityScore" />
+                    </th>
+                    <th
+                      className="text-right px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold cursor-pointer select-none"
                       onClick={() => handleSort('changePercent')}
                       data-testid="th-change"
                     >
@@ -279,6 +343,15 @@ export default function Leaders() {
                         )} data-testid={`text-rs-${stock.symbol}`}>
                           {stock.rsRating}
                         </span>
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {stock.qualityScore != null ? (
+                          <span className="text-[12px] font-semibold tabular-nums" style={{ color: qualityColor(stock.qualityScore) }} data-testid={`text-quality-${stock.symbol}`}>
+                            {stock.qualityScore.toFixed(1)}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-white/15" data-testid={`text-quality-${stock.symbol}`}>--</span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-right">
                         <span className={cn(
