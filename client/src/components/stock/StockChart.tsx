@@ -185,7 +185,7 @@ const CANDLE_RANGES: { value: CandleRange; label: string }[] = [
 ];
 
 export function StockChart({ symbol, currentPrice, compact }: StockChartProps) {
-  const [lineRange, setLineRange] = useState<LineRange>('1M');
+  const [lineRange, setLineRange] = useState<LineRange>('3M');
   const [candleRange, setCandleRange] = useState<CandleRange>('D');
   const [chartType, setChartType] = useState<'line' | 'candle'>('candle');
 
