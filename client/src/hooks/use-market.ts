@@ -59,7 +59,7 @@ export function useMarketBreadth(timeframe: 'daily' | 'weekly' | 'monthly' = 'da
     queryFn: () => fetchWithWarmingRetry(url),
     refetchInterval: (query) => {
       const data = query.state.data as any;
-      if (data && !data.fullyEnriched) return 10000;
+      if (data && !data.fullyEnriched) return 15000;
       return 300000;
     },
     retry: (failureCount, error) => {
@@ -87,14 +87,14 @@ export function useIndustryPerformance() {
     queryFn: () => fetchWithWarmingRetry('/api/market/industries/performance'),
     refetchInterval: (query) => {
       const data = query.state.data as any;
-      if (data && !data.fullyEnriched) return 10000;
+      if (data && !data.fullyEnriched) return 15000;
       return 120000;
     },
     retry: (failureCount, error) => {
       if (error?.message === "Data warming up") return failureCount < 60;
       return false;
     },
-    retryDelay: 5000,
+    retryDelay: 3000,
   });
 }
 

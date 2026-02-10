@@ -273,17 +273,19 @@ async function computeIndustryPerformance(etfOnly: boolean = false): Promise<any
   const rsData = getAllIndustryRS();
 
   if (rsData.length > 0) {
-    const industries = rsData.map(ind => {
-      const sectorMatch = SECTORS_DATA.find(s => {
-        const sectorIndustries = getIndustriesForSector(s.name);
-        return sectorIndustries.some(si => si.toLowerCase() === ind.name.toLowerCase());
-      });
+    const industryToSector = new Map<string, string>();
+    for (const sector of SECTORS_DATA) {
+      for (const ind of getIndustriesForSector(sector.name)) {
+        industryToSector.set(ind.toLowerCase(), sector.name);
+      }
+    }
 
+    const industries = rsData.map(ind => {
       const capWeightedDaily = getIndustryAvgChange(ind.name);
 
       return {
         name: ind.name,
-        sector: sectorMatch?.name || '',
+        sector: industryToSector.get(ind.name.toLowerCase()) || '',
         dailyChange: capWeightedDaily !== 0 ? capWeightedDaily : ind.perfDay,
         weeklyChange: ind.perfWeek,
         monthlyChange: ind.perfMonth,
@@ -597,8 +599,8 @@ function initBackgroundTasks() {
     const etMinutes = etNow.getHours() * 60 + etNow.getMinutes();
     const isDuringMarket = etDay >= 1 && etDay <= 5 && etMinutes >= 540 && etMinutes <= 965;
 
-    // Phase 1: Fast Yahoo-only data (sectors, rotation, breadth) — no Finviz needed
-    console.log('[bg] Phase 1: Computing fast Yahoo data (sectors, rotation, breadth)...');
+    // Phase 1: Fast data — Yahoo (sectors, rotation, breadth) + Finviz industry groups page (single request)
+    console.log('[bg] Phase 1: Computing fast data (sectors, rotation, breadth, industry RS)...');
     await Promise.allSettled([
       (async () => {
         const sectors = await computeSectorsData();
@@ -615,12 +617,28 @@ function initBackgroundTasks() {
         setCache('market_breadth', breadthFast, CACHE_TTL.BREADTH);
         console.log(`[bg] Breadth trend-only pre-computed: score=${breadthFast.overallScore} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
       })(),
+      (async () => {
+        try {
+          const rsData = await fetchIndustryRSFromFinviz(isDuringMarket);
+          console.log(`[bg] Industry RS ratings loaded: ${rsData.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+          const perfData = await computeIndustryPerformance();
+          setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
+          console.log(`[bg] Industry performance computed: ${perfData.industries?.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+        } catch (e: any) {
+          console.log(`[bg] Industry RS/perf error: ${e.message}`);
+          const persisted = loadPersistedIndustryPerf();
+          if (persisted) {
+            setCache('industry_perf_all', persisted, CACHE_TTL.INDUSTRY_PERF);
+            console.log(`[bg] Using persisted industry performance: ${persisted.industries?.length} industries`);
+          }
+        }
+      })(),
     ]);
 
     console.log(`[bg] Phase 1 complete in ${((Date.now() - bgStart) / 1000).toFixed(1)}s — dashboard data ready`);
 
-    // Phase 2: Slow Finviz scrape + industry enrichment (runs in background)
-    console.log(`[bg] Phase 2: Loading Finviz data... ${isDuringMarket ? '(market hours — force refresh)' : '(off hours — using cache)'}`);
+    // Phase 2: Slow Finviz full stock universe scrape + industry enrichment
+    console.log(`[bg] Phase 2: Loading Finviz stock universe... ${isDuringMarket ? '(market hours — force refresh)' : '(off hours — using cache)'}`);
     const finvizData = await getFinvizData(isDuringMarket);
     if (finvizData) {
       let totalStocks = 0;
@@ -633,29 +651,15 @@ function initBackgroundTasks() {
       }
       console.log(`[bg] Finviz complete: ${Object.keys(finvizData).length} sectors, ${totalIndustries} industries, ${totalStocks} stocks in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
       clearFailures('finviz_scrape');
+
+      // Re-compute industry perf with cap-weighted daily changes from stock data
+      const perfData = await computeIndustryPerformance();
+      setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
+      console.log(`[bg] Industry performance re-enriched with stock data: ${perfData.industries?.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
     } else {
       console.log('[bg] Finviz data not available yet, sectors will show without industries initially');
       sendAlert('Finviz Scrape Failed on Startup', 'Finviz data could not be loaded during server boot. Industry performance will use persisted cache if available.', 'finviz_scrape');
     }
-
-    try {
-      const rsData = await scrapeIndustryRS();
-      console.log(`[bg] Industry RS ratings loaded: ${rsData.length} industries`);
-    } catch (e: any) {
-      console.log(`[bg] Industry RS scrape error: ${e.message}`);
-    }
-
-    console.log('[bg] Computing industry performance from Finviz data...');
-    let perfData = await computeIndustryPerformance();
-    if (!perfData.fullyEnriched) {
-      const persisted = loadPersistedIndustryPerf();
-      if (persisted) {
-        perfData = persisted;
-        console.log(`[bg] Using persisted industry performance (Finviz data not ready): ${perfData.industries?.length} industries`);
-      }
-    }
-    setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
-    console.log(`[bg] Industry performance computed: ${perfData.industries?.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
 
     // Re-compute sectors with industry enrichment now that Finviz is ready
     const sectors = await computeSectorsData();
