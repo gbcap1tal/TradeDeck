@@ -1,5 +1,5 @@
 import { useSectorRotation } from "@/hooks/use-market";
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useMemo } from "react";
 
 type QuadrantKey = 'leading' | 'improving' | 'lagging' | 'weakening';
 
@@ -37,14 +37,6 @@ interface RRGSector {
 export function SectorRotation() {
   const { data: sectors, isLoading } = useSectorRotation();
   const [hoveredSector, setHoveredSector] = useState<string | null>(null);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    setTooltipPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
-  }, []);
 
   const chartData = useMemo(() => {
     if (!sectors?.length) return null;
@@ -184,7 +176,7 @@ export function SectorRotation() {
           <span className="text-[9px] text-white/20 ml-auto">Weekly · 10-wk tails</span>
         </div>
 
-        <div className="relative overflow-hidden" ref={containerRef} onMouseMove={handleMouseMove}>
+        <div className="relative">
         <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="block flex-1" data-testid="rrg-chart">
           <defs>
             <clipPath id="rrg-plot-clip">
@@ -319,52 +311,34 @@ export function SectorRotation() {
               </g>
             );
           })}
+
+          {hoveredData && (() => {
+            const tipW = 190;
+            const tipH = 90;
+            const tipX = PAD.left + 6;
+            const tipY = PAD.top + plotH - tipH - 6;
+
+            return (
+              <g style={{ pointerEvents: 'none' }}>
+                <rect x={tipX} y={tipY} width={tipW} height={tipH} rx={6} fill="rgba(15,15,15,0.95)" stroke="rgba(255,255,255,0.1)" strokeWidth={1} />
+                <circle cx={tipX + 14} cy={tipY + 16} r={4} fill={hoveredColor} />
+                <text x={tipX + 24} y={tipY + 20} fill="#fff" fontSize="11" fontWeight="700">{hoveredData.name}</text>
+                <text x={tipX + tipW - 8} y={tipY + 20} fill="rgba(255,255,255,0.3)" fontSize="8" fontWeight="600" textAnchor="end">{hoveredData.ticker}</text>
+
+                <text x={tipX + 12} y={tipY + 38} fill="rgba(255,255,255,0.35)" fontSize="7" fontWeight="600">RS-RATIO</text>
+                <text x={tipX + 12} y={tipY + 52} fill={hoveredData.rsRatio >= 100 ? '#2eb850' : '#c05050'} fontSize="12" fontWeight="700" fontFamily="var(--font-mono)">{hoveredData.rsRatio.toFixed(2)}</text>
+
+                <text x={tipX + 105} y={tipY + 38} fill="rgba(255,255,255,0.35)" fontSize="7" fontWeight="600">RS-MOMENTUM</text>
+                <text x={tipX + 105} y={tipY + 52} fill={hoveredData.rsMomentum >= 0 ? '#2eb850' : '#c05050'} fontSize="12" fontWeight="700" fontFamily="var(--font-mono)">{hoveredData.rsMomentum >= 0 ? '+' : ''}{hoveredData.rsMomentum.toFixed(2)}%</text>
+
+                <line x1={tipX + 8} y1={tipY + 62} x2={tipX + tipW - 8} y2={tipY + 62} stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
+                <text x={tipX + 12} y={tipY + 78} fill={hoveredColor} fontSize="8" fontWeight="700" style={{ textTransform: 'uppercase' } as React.CSSProperties}>{hoveredData.quadrant.toUpperCase()}</text>
+                <text x={tipX + tipW - 10} y={tipY + 78} fill="rgba(255,255,255,0.3)" fontSize="8" textAnchor="end">Heading: {hoveredData.heading.toFixed(0)}&deg;</text>
+              </g>
+            );
+          })()}
         </svg>
 
-        {hoveredData && (
-          <div
-            className="absolute z-50 pointer-events-none"
-            style={{
-              left: Math.max(8, Math.min(
-                tooltipPos.x < (containerRef.current?.clientWidth || 0) / 2
-                  ? tooltipPos.x + 16
-                  : tooltipPos.x - 220,
-                (containerRef.current?.clientWidth || 400) - 216
-              )),
-              top: Math.max(8, Math.min(tooltipPos.y - 40, (containerRef.current?.clientHeight || 400) - 120)),
-            }}
-          >
-            <div className="rounded-lg border border-white/10 p-3 min-w-[200px]" style={{ background: 'rgba(20,20,20,0.96)' }}>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: hoveredColor }} />
-                <span className="text-[13px] font-bold text-white">{hoveredData.name}</span>
-                <span className="text-[10px] text-white/30 ml-auto">{hoveredData.ticker}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-                <div>
-                  <div className="text-[9px] text-white/35 uppercase tracking-wider">RS-Ratio</div>
-                  <div className="text-[13px] font-mono-nums font-semibold" style={{ color: hoveredData.rsRatio >= 100 ? '#2eb850' : '#c05050' }}>
-                    {hoveredData.rsRatio.toFixed(2)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[9px] text-white/35 uppercase tracking-wider">RS-Momentum</div>
-                  <div className="text-[13px] font-mono-nums font-semibold" style={{ color: hoveredData.rsMomentum >= 0 ? '#2eb850' : '#c05050' }}>
-                    {hoveredData.rsMomentum >= 0 ? '+' : ''}{hoveredData.rsMomentum.toFixed(2)}%
-                  </div>
-                </div>
-              </div>
-              <div className="mt-2 pt-2 border-t border-white/8 flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: hoveredColor }}>
-                  {hoveredData.quadrant}
-                </span>
-                <span className="text-[10px] text-white/30">
-                  Heading: {hoveredData.heading.toFixed(0)}&deg;
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
         </div>
 
         <div className="flex items-center justify-center gap-6 mt-4 flex-wrap">
