@@ -269,18 +269,15 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
   );
 }
 
-function isMarketHours(): boolean {
+function isTodayET(timestamp: number): boolean {
   const now = new Date();
-  const etStr = now.toLocaleString('en-US', { timeZone: 'America/New_York' });
-  const et = new Date(etStr);
-  const day = et.getDay();
-  const mins = et.getHours() * 60 + et.getMinutes();
-  return day >= 1 && day <= 5 && mins >= 240 && mins <= 960;
+  const todayET = now.toLocaleDateString('en-US', { timeZone: 'America/New_York' });
+  const itemET = new Date(timestamp).toLocaleDateString('en-US', { timeZone: 'America/New_York' });
+  return todayET === itemET;
 }
 
 function NewsPanel({ symbol }: { symbol: string }) {
   const { data: news, isLoading } = useStockNews(symbol);
-  const duringMarket = isMarketHours();
 
   return (
     <div className="glass-card rounded-xl px-4 py-3 h-full min-h-0 flex flex-col overflow-hidden" data-testid="card-news">
@@ -306,7 +303,7 @@ function NewsPanel({ symbol }: { symbol: string }) {
             else if (diffDays < 7) timeLabel = `${diffDays}d ago`;
             else timeLabel = format(itemDate, "MMM d");
 
-            const isBreaking = item.breaking && duringMarket;
+            const isBreaking = item.breaking && isTodayET(item.timestamp);
 
             if (isBreaking) {
               return (

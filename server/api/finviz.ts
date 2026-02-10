@@ -515,6 +515,16 @@ export async function getFinvizNews(symbol: string): Promise<Array<{ id: string;
           const now = new Date();
           const etStr = now.toLocaleString('en-US', { timeZone: 'America/New_York' });
           const etNow = new Date(etStr);
+
+          const dateMatch = breakingTime.match(/([A-Za-z]+)\s+(\d{1,2}),/);
+          if (dateMatch) {
+            const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const monthIdx = monthNames.findIndex(m => dateMatch[1].startsWith(m));
+            if (monthIdx >= 0) {
+              etNow.setMonth(monthIdx, parseInt(dateMatch[2]));
+            }
+          }
+
           let hours = parseInt(timeMatch[1]);
           const mins = parseInt(timeMatch[2]);
           const ampm = timeMatch[3].toUpperCase();
