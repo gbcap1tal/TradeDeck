@@ -24,9 +24,7 @@ type SortField = 'composite' | 'rsRating' | 'changePercent' | 'marketCap' | 'sym
 type SortDir = 'asc' | 'desc';
 
 function compositeScore(rs: number, quality?: number): number {
-  const rsNorm = (rs / 99) * 10;
-  const q = quality ?? 0;
-  return rsNorm + q;
+  return 0.5 * rs + 0.5 * ((quality ?? 0) * 10);
 }
 
 const RS_OPTIONS = [
@@ -85,17 +83,34 @@ export default function Leaders() {
   });
 
   const [qualityScores, setQualityScores] = useState<Record<string, number>>({});
+  const [scoresReady, setScoresReady] = useState(false);
   const fetchedRef = useRef<Set<string>>(new Set());
+  const loadingForRef = useRef<string>('');
 
   useEffect(() => {
     if (!data?.leaders || data.leaders.length === 0) return;
-    let cancelled = false;
 
-    async function loadScores() {
-      const symbols = data!.leaders.map(l => l.symbol).filter(s => !fetchedRef.current.has(s));
-      for (let i = 0; i < symbols.length; i += 5) {
-        if (cancelled) break;
-        const batch = symbols.slice(i, i + 5);
+    const cacheKey = data.leaders.map(l => l.symbol).sort().join(',');
+    if (loadingForRef.current === cacheKey && scoresReady) return;
+
+    let cancelled = false;
+    loadingForRef.current = cacheKey;
+    setScoresReady(false);
+
+    async function loadAllScores() {
+      const symbols = data!.leaders.map(l => l.symbol);
+      const toFetch = symbols.filter(s => !fetchedRef.current.has(s));
+
+      if (toFetch.length === 0) {
+        if (!cancelled) setScoresReady(true);
+        return;
+      }
+
+      const allNewScores: Record<string, number> = {};
+
+      for (let i = 0; i < toFetch.length; i += 10) {
+        if (cancelled) return;
+        const batch = toFetch.slice(i, i + 10);
         const results = await Promise.allSettled(
           batch.map(async (sym) => {
             const res = await fetch(`/api/stocks/${sym}/quality`, { credentials: 'include' });
@@ -104,24 +119,24 @@ export default function Leaders() {
             return { sym, score: d?.qualityScore?.total ?? null };
           })
         );
-        if (cancelled) break;
-        const newScores: Record<string, number> = {};
         for (const r of results) {
           if (r.status === 'fulfilled' && r.value && r.value.score != null) {
-            newScores[r.value.sym] = r.value.score;
+            allNewScores[r.value.sym] = r.value.score;
             fetchedRef.current.add(r.value.sym);
           }
         }
-        if (Object.keys(newScores).length > 0) {
-          setQualityScores(prev => ({ ...prev, ...newScores }));
+        if (i + 10 < toFetch.length) {
+          await new Promise(r => setTimeout(r, 200));
         }
-        if (i + 5 < symbols.length) {
-          await new Promise(r => setTimeout(r, 300));
-        }
+      }
+
+      if (!cancelled) {
+        setQualityScores(prev => ({ ...prev, ...allNewScores }));
+        setScoresReady(true);
       }
     }
 
-    loadScores();
+    loadAllScores();
     return () => { cancelled = true; };
   }, [data]);
 
@@ -205,9 +220,9 @@ export default function Leaders() {
               Leaders
             </h1>
             <p className="text-[12px] text-white/40 mt-0.5" data-testid="text-leaders-subtitle">
-              {isLoading ? 'Loading...' : `${filtered.length} stocks with RS ${minRS}+`}
-              {selectedSectors.length > 0 ? ` in ${selectedSectors.length === 1 ? selectedSectors[0] : `${selectedSectors.length} sectors`}` : ''}
-              {minQuality > 0 ? ` · Quality ${minQuality}+` : ''}
+              {isLoading ? 'Loading...' : !scoresReady ? 'Loading quality scores...' : `${filtered.length} stocks with RS ${minRS}+`}
+              {scoresReady && selectedSectors.length > 0 ? ` in ${selectedSectors.length === 1 ? selectedSectors[0] : `${selectedSectors.length} sectors`}` : ''}
+              {scoresReady && minQuality > 0 ? ` · Quality ${minQuality}+` : ''}
             </p>
           </div>
         </div>
@@ -336,10 +351,13 @@ export default function Leaders() {
           )}
         </div>
 
-        {isLoading ? (
+        {isLoading || !scoresReady ? (
           <div className="glass-card rounded-xl p-8">
-            <div className="flex items-center justify-center">
-              <div className="text-[13px] text-white/40" data-testid="text-leaders-loading">Loading leaders...</div>
+            <div className="flex flex-col items-center justify-center gap-2">
+              <div className="w-5 h-5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+              <div className="text-[13px] text-white/40" data-testid="text-leaders-loading">
+                {isLoading ? 'Loading leaders...' : 'Loading quality scores...'}
+              </div>
             </div>
           </div>
         ) : (
