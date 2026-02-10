@@ -97,7 +97,7 @@ export default function SectorDetail() {
                     return (
                       <div
                         key={industry.name}
-                        className="rounded-lg p-3 cursor-pointer transition-all duration-300 hover:scale-[1.02] flex flex-col justify-between min-h-0 overflow-hidden"
+                        className="rounded-lg p-3 cursor-pointer transition-colors duration-200 flex flex-col justify-between min-h-0 overflow-hidden"
                         style={{ background: bg }}
                         onClick={() => setLocation(`/sectors/${encodeURIComponent(sectorName)}/industries/${encodeURIComponent(industry.name)}`)}
                         data-testid={`heatmap-industry-${industry.name.replace(/\s+/g, '-')}`}

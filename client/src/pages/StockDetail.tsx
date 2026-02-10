@@ -577,7 +577,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                   <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0 h-full"
                     onMouseEnter={() => setHoveredRevIdx(i)} onMouseLeave={() => setHoveredRevIdx(null)}
                     style={{ cursor: 'pointer' }} data-testid={`bar-revenue-${i}`}>
-                    <div className="w-full rounded-t-[3px] transition-all duration-150" style={{
+                    <div className="w-full rounded-t-[3px] transition-colors duration-150" style={{
                       height: `${barPct}%`,
                       backgroundColor: d.isEstimate
                         ? (isHov ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.15)')
@@ -622,7 +622,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                         <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0 h-full"
                           onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
                           style={{ cursor: 'pointer' }} data-testid={`bar-eps-${i}`}>
-                          <div className="w-full rounded-t-[3px] transition-all duration-150" style={{
+                          <div className="w-full rounded-t-[3px] transition-colors duration-150" style={{
                             height: `${barPct}%`,
                             backgroundColor: d.isEstimate
                               ? (isHov ? 'rgba(251,187,4,0.30)' : 'rgba(251,187,4,0.15)')
@@ -643,7 +643,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                         <div key={i} className="flex-1 flex flex-col items-center min-w-0 h-full"
                           onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
                           style={{ cursor: 'pointer' }}>
-                          <div className="w-full rounded-b-[3px] transition-all duration-150" style={{
+                          <div className="w-full rounded-b-[3px] transition-colors duration-150" style={{
                             height: `${barPct}%`,
                             backgroundColor: d.isEstimate
                               ? (isHov ? 'rgba(255,69,58,0.30)' : 'rgba(255,69,58,0.15)')
@@ -667,7 +667,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                         <div key={i} className="flex-1 flex flex-col items-center min-w-0 h-full"
                           onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
                           style={{ cursor: 'pointer' }} data-testid={`bar-eps-${i}`}>
-                          <div className="w-full rounded-b-[3px] transition-all duration-150" style={{
+                          <div className="w-full rounded-b-[3px] transition-colors duration-150" style={{
                             height: `${barPct}%`,
                             backgroundColor: d.isEstimate
                               ? (isHov ? 'rgba(255,69,58,0.30)' : 'rgba(255,69,58,0.15)')
@@ -689,7 +689,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                       <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0 h-full"
                         onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
                         style={{ cursor: 'pointer' }} data-testid={`bar-eps-${i}`}>
-                        <div className="w-full rounded-t-[3px] transition-all duration-150" style={{
+                        <div className="w-full rounded-t-[3px] transition-colors duration-150" style={{
                           height: `${barPct}%`,
                           backgroundColor: d.isEstimate
                             ? (isHov ? 'rgba(251,187,4,0.30)' : 'rgba(251,187,4,0.15)')

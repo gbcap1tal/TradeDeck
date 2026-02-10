@@ -76,7 +76,7 @@ export function MarketHeatmap() {
             return (
               <div
                 key={sector.ticker}
-                className="rounded-lg p-3 cursor-pointer transition-all duration-300 hover:scale-[1.03] flex flex-col justify-between"
+                className="rounded-lg p-3 cursor-pointer transition-colors duration-200 flex flex-col justify-between"
                 style={{ background: bg }}
                 onClick={() => setLocation(`/sectors/${encodeURIComponent(sector.name)}`)}
                 data-testid={`heatmap-sector-${sector.ticker}`}
