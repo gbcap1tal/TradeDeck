@@ -1279,10 +1279,49 @@ export async function registerRoutes(
         }
       }
 
-      const epsQoQ = parsePercent(s['EPS Q/Q']);
-      const salesQoQ = parsePercent(s['Sales Q/Q']);
-      const epsYoY = parsePercent(s['EPS Y/Y TTM']);
-      const salesYoY = parsePercent(s['Sales Y/Y TTM']);
+      let epsQoQ = 0;
+      let salesQoQ = 0;
+      let epsYoY = 0;
+      let salesYoY = 0;
+
+      if (snap && snap.earnings && snap.earnings.length > 0) {
+        const sorted = [...snap.earnings]
+          .filter(e => e.epsActual != null || e.salesActual != null)
+          .sort((a, b) => a.fiscalEndDate.localeCompare(b.fiscalEndDate));
+
+        if (sorted.length >= 2) {
+          const latest = sorted[sorted.length - 1];
+          const prev = sorted[sorted.length - 2];
+
+          if (prev.epsActual != null && prev.epsActual !== 0 && latest.epsActual != null) {
+            epsQoQ = Math.round(((latest.epsActual - prev.epsActual) / Math.abs(prev.epsActual)) * 10000) / 100;
+          }
+          if (prev.salesActual != null && prev.salesActual !== 0 && latest.salesActual != null) {
+            salesQoQ = Math.round(((latest.salesActual - prev.salesActual) / Math.abs(prev.salesActual)) * 10000) / 100;
+          }
+        }
+
+        if (sorted.length >= 1) {
+          const latest = sorted[sorted.length - 1];
+          const mLatest = latest.fiscalPeriod.match(/(\d{4})Q(\d)/);
+          if (mLatest) {
+            const yr = parseInt(mLatest[1]);
+            const q = parseInt(mLatest[2]);
+            const yoyMatch = sorted.find(e => {
+              const m = e.fiscalPeriod.match(/(\d{4})Q(\d)/);
+              return m && parseInt(m[1]) === yr - 1 && parseInt(m[2]) === q;
+            });
+            if (yoyMatch) {
+              if (yoyMatch.epsActual != null && yoyMatch.epsActual !== 0 && latest.epsActual != null) {
+                epsYoY = Math.round(((latest.epsActual - yoyMatch.epsActual) / Math.abs(yoyMatch.epsActual)) * 10000) / 100;
+              }
+              if (yoyMatch.salesActual != null && yoyMatch.salesActual !== 0 && latest.salesActual != null) {
+                salesYoY = Math.round(((latest.salesActual - yoyMatch.salesActual) / Math.abs(yoyMatch.salesActual)) * 10000) / 100;
+              }
+            }
+          }
+        }
+      }
 
       let epsGrowthStreak = 0;
       if (snap && snap.earnings && snap.earnings.length > 0) {
