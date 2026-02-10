@@ -178,12 +178,13 @@ export function SectorRotation() {
   return (
     <div>
       <div className="section-title mb-4" data-testid="text-rotation-title">Sector Rotation</div>
-      <div className="glass-card rounded-xl p-3 sm:p-5 relative flex flex-col" ref={containerRef} onMouseMove={handleMouseMove}>
+      <div className="glass-card rounded-xl p-3 sm:p-5 flex flex-col">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">RRG vs SPY</span>
           <span className="text-[9px] text-white/20 ml-auto">Weekly · 10-wk tails</span>
         </div>
 
+        <div className="relative overflow-hidden" ref={containerRef} onMouseMove={handleMouseMove}>
         <svg width="100%" viewBox={`0 0 ${W} ${H}`} className="block flex-1" data-testid="rrg-chart">
           <defs>
             <clipPath id="rrg-plot-clip">
@@ -324,13 +325,16 @@ export function SectorRotation() {
           <div
             className="absolute z-50 pointer-events-none"
             style={{
-              left: tooltipPos.x < (containerRef.current?.clientWidth || 0) / 2
-                ? tooltipPos.x + 16
-                : tooltipPos.x - 220,
-              top: Math.max(8, Math.min(tooltipPos.y - 40, (containerRef.current?.clientHeight || 400) - 150)),
+              left: Math.max(8, Math.min(
+                tooltipPos.x < (containerRef.current?.clientWidth || 0) / 2
+                  ? tooltipPos.x + 16
+                  : tooltipPos.x - 220,
+                (containerRef.current?.clientWidth || 400) - 216
+              )),
+              top: Math.max(8, Math.min(tooltipPos.y - 40, (containerRef.current?.clientHeight || 400) - 120)),
             }}
           >
-            <div className="rounded-lg border border-white/10 p-3 min-w-[200px]" style={{ background: 'rgba(20,20,20,0.96)', backdropFilter: 'blur(12px)' }}>
+            <div className="rounded-lg border border-white/10 p-3 min-w-[200px]" style={{ background: 'rgba(20,20,20,0.96)' }}>
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: hoveredColor }} />
                 <span className="text-[13px] font-bold text-white">{hoveredData.name}</span>
@@ -361,6 +365,7 @@ export function SectorRotation() {
             </div>
           </div>
         )}
+        </div>
 
         <div className="flex items-center justify-center gap-6 mt-4 flex-wrap">
           {([
