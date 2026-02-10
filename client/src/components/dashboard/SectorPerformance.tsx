@@ -100,7 +100,7 @@ export function SectorPerformance() {
         <TimeframeSwitch value={tf} onChange={setTf} testId={switchId} />
       </div>
       <div>
-        <div className="grid px-2 pb-2" style={{ gridTemplateColumns: '1fr auto 1fr' }}>
+        <div className="grid px-2 pb-2" style={{ gridTemplateColumns: '5fr auto 3fr' }}>
           <div />
           <div className="flex items-center justify-center">
             {maHeaders.map(h => (
