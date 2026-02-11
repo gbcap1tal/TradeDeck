@@ -192,7 +192,7 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
             <QualityRow
               label="Short Interest"
               value={`${formatVolume(quality.details.shortInterest)} (${quality.details.shortPercentOfFloat}%)`}
-              color={quality.details.shortPercentOfFloat >= 20 ? "text-[#ff453a]" : quality.details.shortPercentOfFloat >= 10 ? "text-[#ffd60a]" : "text-white/80"}
+              color="text-white/80"
             />
           )}
           <SmartMoneyIndicator symbol={symbol} />
@@ -250,7 +250,7 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
           <QualityRow
             label="Dist 50 SMA"
             value={`${quality.trend.distFromSma50 > 0 ? '+' : ''}${quality.trend.distFromSma50}%`}
-            color={quality.trend.distFromSma50 > 0 ? "text-[#30d158]" : "text-[#ff453a]/80"}
+            color="text-white/80"
           />
           <div className="flex items-center justify-between py-[3px]">
             <span className="text-[12px] text-white/50">Overextension</span>
