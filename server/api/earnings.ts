@@ -185,7 +185,16 @@ async function fetchFromFinnhubAndFMP(dateStr: string): Promise<EarningsCalendar
 
   const items: EarningsCalendarItem[] = [];
 
+  const MIN_STOCK_PRICE = 1.0;
+
   for (const d of calendarData) {
+    const priceCheck = priceDataMap.get(d.ticker);
+    if (priceCheck) {
+      const stockPrice = priceCheck.openPrice || priceCheck.priorClose;
+      if (stockPrice !== null && stockPrice < MIN_STOCK_PRICE) {
+        continue;
+      }
+    }
     const epsSurprisePct = (d.epsEstimate && d.epsReported != null)
       ? ((d.epsReported - d.epsEstimate) / Math.abs(d.epsEstimate || 1)) * 100
       : null;
@@ -802,7 +811,12 @@ export function calculateEpScore(input: EpScoreInput): EpScoreResult {
 
 async function enrichWithEpScores(reports: any[]): Promise<EarningsCalendarItem[]> {
   const items: EarningsCalendarItem[] = [];
+  const MIN_STOCK_PRICE = 1.0;
   for (const r of reports) {
+    const stockPrice = r.openPrice || r.priorClose;
+    if (stockPrice !== null && stockPrice !== undefined && stockPrice < MIN_STOCK_PRICE) {
+      continue;
+    }
     const eps = await db.select().from(epScores)
       .where(eq(epScores.earningsReportId, r.id));
     const ep = eps[0] || null;
