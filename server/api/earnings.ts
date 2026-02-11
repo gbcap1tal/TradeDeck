@@ -208,6 +208,8 @@ async function fetchFromFinnhubAndFMP(dateStr: string): Promise<EarningsCalendar
       openPrice: null, high52w: null, price2MonthsAgo: null,
     };
 
+    const hasReported = d.epsReported != null;
+
     const item: EarningsCalendarItem = {
       ticker: d.ticker,
       companyName: companyNames.get(d.ticker) || d.ticker,
@@ -219,11 +221,11 @@ async function fetchFromFinnhubAndFMP(dateStr: string): Promise<EarningsCalendar
       revenueEstimate: d.revenueEstimate,
       revenueReported: d.revenueReported,
       revenueSurprisePct: revSurprisePct ? Math.round(revSurprisePct * 100) / 100 : null,
-      priceChangePct: priceData.priceChangePct,
-      volumeOnDay: priceData.volumeOnDay,
-      avgDailyVolume20d: priceData.avgDailyVolume20d,
-      volumeIncreasePct: priceData.volumeIncreasePct,
-      gapPct: priceData.gapPct,
+      priceChangePct: hasReported ? priceData.priceChangePct : null,
+      volumeOnDay: hasReported ? priceData.volumeOnDay : null,
+      avgDailyVolume20d: hasReported ? priceData.avgDailyVolume20d : null,
+      volumeIncreasePct: hasReported ? priceData.volumeIncreasePct : null,
+      gapPct: hasReported ? priceData.gapPct : null,
       epScore: null,
       aiSummary: null,
     };
@@ -821,6 +823,8 @@ async function enrichWithEpScores(reports: any[]): Promise<EarningsCalendarItem[
       .where(eq(epScores.earningsReportId, r.id));
     const ep = eps[0] || null;
 
+    const hasReported = r.epsReported != null;
+
     items.push({
       ticker: r.ticker,
       companyName: r.companyName,
@@ -832,11 +836,11 @@ async function enrichWithEpScores(reports: any[]): Promise<EarningsCalendarItem[
       revenueEstimate: r.revenueEstimate,
       revenueReported: r.revenueReported,
       revenueSurprisePct: r.revenueSurprisePct,
-      priceChangePct: r.priceChangePct,
-      volumeOnDay: r.volumeOnDay,
-      avgDailyVolume20d: r.avgDailyVolume20d,
-      volumeIncreasePct: r.volumeIncreasePct,
-      gapPct: r.gapPct,
+      priceChangePct: hasReported ? r.priceChangePct : null,
+      volumeOnDay: hasReported ? r.volumeOnDay : null,
+      avgDailyVolume20d: hasReported ? r.avgDailyVolume20d : null,
+      volumeIncreasePct: hasReported ? r.volumeIncreasePct : null,
+      gapPct: hasReported ? r.gapPct : null,
       epScore: ep ? {
         totalScore: ep.totalScore,
         classification: ep.classification,
