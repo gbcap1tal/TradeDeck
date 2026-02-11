@@ -2,9 +2,33 @@ import { scrapeFinvizQuote, scrapeFinvizInsiderBuying } from './finviz';
 import { getCached, setCache } from './cache';
 import { getRSScore } from './rs';
 import * as yahoo from './yahoo';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const LEADERS_QUALITY_CACHE_PREFIX = 'leaders_quality_scores';
 const LEADERS_QUALITY_TTL = 86400;
+
+const QUALITY_PERSIST_PATH = path.join(process.cwd(), '.cache', 'quality_scores.json');
+
+function persistQualityScores(scores: Record<string, number>): void {
+  try {
+    const dir = path.dirname(QUALITY_PERSIST_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(QUALITY_PERSIST_PATH, JSON.stringify({ scores, savedAt: Date.now() }), 'utf-8');
+  } catch {}
+}
+
+function loadPersistedQualityScores(): Record<string, number> | null {
+  try {
+    if (!fs.existsSync(QUALITY_PERSIST_PATH)) return null;
+    const raw = JSON.parse(fs.readFileSync(QUALITY_PERSIST_PATH, 'utf-8'));
+    if (raw?.scores && typeof raw.scores === 'object') {
+      const ageMs = Date.now() - (raw.savedAt || 0);
+      if (ageMs < 7 * 24 * 3600 * 1000) return raw.scores;
+    }
+    return null;
+  } catch { return null; }
+}
 
 export interface QualityResult {
   total: number;
@@ -253,6 +277,20 @@ export function getCachedLeadersQuality(symbols: string[]): { scores: Record<str
       allFound = false;
     }
   }
+
+  if (!allFound) {
+    const persisted = loadPersistedQualityScores();
+    if (persisted) {
+      for (const sym of symbols) {
+        if (!(sym in scores) && sym in persisted) {
+          scores[sym] = persisted[sym];
+          setCache(`${PER_SYMBOL_CACHE_PREFIX}${sym}`, persisted[sym], PER_SYMBOL_TTL);
+        }
+      }
+      allFound = symbols.every(s => s in scores);
+    }
+  }
+
   return { scores, complete: allFound };
 }
 
@@ -260,10 +298,15 @@ export async function computeLeadersQualityBatch(symbols: string[]): Promise<Rec
   const scores: Record<string, number> = {};
   const toCompute: string[] = [];
 
+  const persisted = loadPersistedQualityScores();
+
   for (const sym of symbols) {
     const cached = getCached<number>(`${PER_SYMBOL_CACHE_PREFIX}${sym}`);
     if (cached !== undefined) {
       scores[sym] = cached;
+    } else if (persisted && sym in persisted) {
+      scores[sym] = persisted[sym];
+      setCache(`${PER_SYMBOL_CACHE_PREFIX}${sym}`, persisted[sym], PER_SYMBOL_TTL);
     } else {
       toCompute.push(sym);
     }
@@ -297,6 +340,7 @@ export async function computeLeadersQualityBatch(symbols: string[]): Promise<Rec
     }
 
     console.log(`[quality] Finished computing ${toCompute.length} quality scores. Total: ${Object.keys(scores).length}`);
+    persistQualityScores(scores);
   } finally {
     batchComputeInProgress = false;
   }

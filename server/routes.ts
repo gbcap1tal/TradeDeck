@@ -1225,6 +1225,14 @@ export async function registerRoutes(
         return res.json({ scores: cached, ready: true });
       }
 
+      const hasSomeScores = Object.keys(cached).length > 0;
+      if (hasSomeScores) {
+        computeLeadersQualityBatch(symbols).catch(err =>
+          console.error(`[leaders-quality] Background compute failed: ${err.message}`)
+        );
+        return res.json({ scores: cached, ready: false });
+      }
+
       const scores = await computeLeadersQualityBatch(symbols);
       const allComplete = symbols.every(s => s in scores);
       res.json({ scores, ready: allComplete });
