@@ -2,7 +2,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, FileText, Loader2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, Loader2, X } from "lucide-react";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -40,9 +40,6 @@ interface EarningsItem {
   } | null;
   aiSummary: string | null;
 }
-
-type SortField = 'priceChangePct' | 'epsSurprisePct' | 'revenueSurprisePct' | 'ticker' | 'timing' | 'epScore';
-type SortDir = 'asc' | 'desc';
 
 function formatRevenue(v: number | null): string {
   if (v == null) return '—';
@@ -92,8 +89,6 @@ export default function Earnings() {
   const [selectedDate, setSelectedDate] = useState(today.toISOString().split('T')[0]);
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth() + 1);
-  const [sortField, setSortField] = useState<SortField>('priceChangePct');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [modalItem, setModalItem] = useState<EarningsItem | null>(null);
   const [, setLocation] = useLocation();
 
@@ -120,54 +115,26 @@ export default function Earnings() {
 
   const earningsDatesSet = useMemo(() => new Set(earningsDates), [earningsDates]);
 
-  const sorted = useMemo(() => {
-    const arr = [...earnings];
-    arr.sort((a, b) => {
-      let av: number, bv: number;
-      switch (sortField) {
-        case 'priceChangePct':
-          av = a.priceChangePct ?? -999;
-          bv = b.priceChangePct ?? -999;
-          break;
-        case 'epsSurprisePct':
-          av = a.epsSurprisePct ?? -999;
-          bv = b.epsSurprisePct ?? -999;
-          break;
-        case 'revenueSurprisePct':
-          av = a.revenueSurprisePct ?? -999;
-          bv = b.revenueSurprisePct ?? -999;
-          break;
-        case 'epScore':
-          av = a.epScore?.totalScore ?? -1;
-          bv = b.epScore?.totalScore ?? -1;
-          break;
-        case 'ticker':
-          return sortDir === 'asc' ? a.ticker.localeCompare(b.ticker) : b.ticker.localeCompare(a.ticker);
-        case 'timing':
-          return sortDir === 'asc' ? a.timing.localeCompare(b.timing) : b.timing.localeCompare(a.timing);
-        default:
-          av = 0; bv = 0;
+  const sortByPriceChange = (a: EarningsItem, b: EarningsItem) => {
+    const av = Math.abs(a.priceChangePct ?? 0);
+    const bv = Math.abs(b.priceChangePct ?? 0);
+    return bv - av;
+  };
+
+  const { freshResults, alreadyTraded } = useMemo(() => {
+    const deduped = new Map<string, EarningsItem>();
+    for (const item of earnings) {
+      if (!deduped.has(item.ticker)) {
+        deduped.set(item.ticker, item);
       }
-      return sortDir === 'asc' ? av - bv : bv - av;
-    });
-    return arr;
-  }, [earnings, sortField, sortDir]);
-
-  const toggleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDir('desc');
     }
-  };
+    const all = Array.from(deduped.values());
 
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ChevronDown className="w-3 h-3 text-white/15" />;
-    return sortDir === 'asc'
-      ? <ChevronUp className="w-3 h-3 text-white/50" />
-      : <ChevronDown className="w-3 h-3 text-white/50" />;
-  };
+    const fresh = all.filter(e => e.timing === 'AMC').sort(sortByPriceChange);
+    const traded = all.filter(e => e.timing !== 'AMC').sort(sortByPriceChange);
+
+    return { freshResults: fresh, alreadyTraded: traded };
+  }, [earnings]);
 
   const prevMonth = () => {
     if (currentMonth === 1) {
@@ -273,13 +240,13 @@ export default function Earnings() {
         </div>
 
         <div className="glass-card rounded-xl overflow-hidden" data-testid="card-earnings-table">
-          <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between">
+          <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <span className="text-[13px] font-medium text-white/70" data-testid="text-selected-date">
                 {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
               </span>
               <span className="text-[11px] text-white/30">
-                {earnings.length} report{earnings.length !== 1 ? 's' : ''}
+                {freshResults.length + alreadyTraded.length} report{(freshResults.length + alreadyTraded.length) !== 1 ? 's' : ''}
               </span>
             </div>
           </div>
@@ -288,150 +255,38 @@ export default function Earnings() {
             <div className="flex items-center justify-center py-16">
               <Loader2 className="w-5 h-5 animate-spin text-white/20" />
             </div>
-          ) : earnings.length === 0 ? (
+          ) : (freshResults.length + alreadyTraded.length) === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-white/30">
               <p className="text-[13px]">No earnings reports for this date</p>
               <p className="text-[11px] mt-1 text-white/20">Select a date with earnings data</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full" data-testid="table-earnings">
-                <thead>
-                  <tr className="border-b border-white/[0.06]">
-                    <th className="text-left px-4 py-2">
-                      <button onClick={() => toggleSort('ticker')} className="flex items-center gap-1 text-[10px] text-white/40 uppercase tracking-wider font-semibold" data-testid="sort-ticker">
-                        Company <SortIcon field="ticker" />
-                      </button>
-                    </th>
-                    <th className="text-center px-2 py-2">
-                      <button onClick={() => toggleSort('timing')} className="flex items-center gap-1 text-[10px] text-white/40 uppercase tracking-wider font-semibold mx-auto" data-testid="sort-timing">
-                        Time <SortIcon field="timing" />
-                      </button>
-                    </th>
-                    <th className="text-right px-3 py-2">
-                      <span className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">Reported</span>
-                    </th>
-                    <th className="text-right px-3 py-2">
-                      <span className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">Estimate</span>
-                    </th>
-                    <th className="text-right px-3 py-2">
-                      <button onClick={() => toggleSort('epsSurprisePct')} className="flex items-center gap-1 text-[10px] text-white/40 uppercase tracking-wider font-semibold ml-auto" data-testid="sort-surprise">
-                        Surprise <SortIcon field="epsSurprisePct" />
-                      </button>
-                    </th>
-                    <th className="text-right px-3 py-2">
-                      <button onClick={() => toggleSort('priceChangePct')} className="flex items-center gap-1 text-[10px] text-white/40 uppercase tracking-wider font-semibold ml-auto" data-testid="sort-price-change">
-                        Price Chg <SortIcon field="priceChangePct" />
-                      </button>
-                    </th>
-                    <th className="text-center px-3 py-2">
-                      <button onClick={() => toggleSort('epScore')} className="flex items-center gap-1 text-[10px] text-white/40 uppercase tracking-wider font-semibold mx-auto" data-testid="sort-ep">
-                        EP <SortIcon field="epScore" />
-                      </button>
-                    </th>
-                    <th className="w-10 px-2 py-2" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {sorted.map((item) => {
-                    const isEpQualified = item.epScore?.classification === 'strong_ep';
+              {freshResults.length > 0 && (
+                <>
+                  <div className="px-4 py-2 bg-purple-500/[0.05] border-b border-white/[0.06]" data-testid="section-fresh-results">
+                    <div className="flex items-center gap-2">
+                      <span className="px-1.5 py-0.5 text-[9px] font-semibold rounded bg-purple-500/10 text-purple-400/80">AMC</span>
+                      <span className="text-[11px] font-medium text-white/50">Fresh Results — Reported After Close</span>
+                      <span className="text-[10px] text-white/25">{freshResults.length}</span>
+                    </div>
+                  </div>
+                  <EarningsTable items={freshResults} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
+                </>
+              )}
 
-                    return (
-                      <tr
-                        key={item.ticker}
-                        className={cn(
-                          "group border-b border-white/[0.03] transition-colors",
-                          isEpQualified && "bg-[rgba(34,197,94,0.04)] border-l-2 border-l-[#30d158]/40",
-                          !isEpQualified && "hover:bg-white/[0.02]"
-                        )}
-                        data-testid={`row-earnings-${item.ticker}`}
-                      >
-                        <td className="px-4 py-2.5">
-                          <div className="flex flex-col gap-0.5">
-                            <div className="flex items-center gap-2">
-                              <span
-                                className="text-[13px] font-semibold text-white/90 font-mono-nums cursor-pointer hover:text-[#FBBB04] transition-colors"
-                                onClick={() => setLocation(`/stocks/${item.ticker}`)}
-                                data-testid={`link-ticker-${item.ticker}`}
-                              >
-                                {item.ticker}
-                              </span>
-                              {isEpQualified && (
-                                <span className="px-1.5 py-0.5 text-[8px] font-bold rounded bg-[#30d158]/15 text-[#30d158] border border-[#30d158]/20" data-testid={`badge-ep-${item.ticker}`}>
-                                  EP {item.epScore?.totalScore?.toFixed(0)}
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-white/30 truncate max-w-[200px]">{item.companyName}</span>
-                          </div>
-
-                          <div className="mt-1 flex items-center gap-1">
-                            <span className="text-[9px] text-white/25 w-8">EPS</span>
-                            <span className="text-[9px] text-white/20 w-3">|</span>
-                            <span className="text-[9px] text-white/25 w-8">Rev</span>
-                          </div>
-                        </td>
-
-                        <td className="text-center px-2 py-2.5">
-                          <span className={cn(
-                            "px-1.5 py-0.5 text-[9px] font-semibold rounded",
-                            item.timing === 'BMO' ? "bg-blue-500/10 text-blue-400/80" :
-                            item.timing === 'AMC' ? "bg-purple-500/10 text-purple-400/80" :
-                            "bg-white/5 text-white/30"
-                          )} data-testid={`badge-timing-${item.ticker}`}>
-                            {item.timing}
-                          </span>
-                        </td>
-
-                        <td className="text-right px-3 py-2.5 font-mono-nums">
-                          <div className="text-[12px] text-white/70">{formatEps(item.epsReported)}</div>
-                          <div className="text-[10px] text-white/40 mt-0.5">{formatRevenue(item.revenueReported)}</div>
-                        </td>
-
-                        <td className="text-right px-3 py-2.5 font-mono-nums">
-                          <div className="text-[12px] text-white/50">{formatEps(item.epsEstimate)}</div>
-                          <div className="text-[10px] text-white/30 mt-0.5">{formatRevenue(item.revenueEstimate)}</div>
-                        </td>
-
-                        <td className="text-right px-3 py-2.5 font-mono-nums">
-                          <div className={cn("text-[12px] font-medium", surpriseColor(item.epsSurprisePct))}>
-                            {item.epsSurprisePct != null ? `${item.epsSurprisePct > 0 ? '+' : ''}${item.epsSurprisePct.toFixed(1)}%` : '—'}
-                          </div>
-                          <div className={cn("text-[10px] mt-0.5", surpriseColor(item.revenueSurprisePct))}>
-                            {item.revenueSurprisePct != null ? `${item.revenueSurprisePct > 0 ? '+' : ''}${item.revenueSurprisePct.toFixed(1)}%` : '—'}
-                          </div>
-                        </td>
-
-                        <td className="text-right px-3 py-2.5 font-mono-nums">
-                          <span className={cn("text-[13px] font-semibold", priceChangeColor(item.priceChangePct))} data-testid={`text-price-change-${item.ticker}`}>
-                            {item.priceChangePct != null ? `${item.priceChangePct > 0 ? '+' : ''}${item.priceChangePct.toFixed(1)}%` : '—'}
-                          </span>
-                        </td>
-
-                        <td className="text-center px-3 py-2.5">
-                          {isEpQualified && item.epScore?.totalScore != null ? (
-                            <span className="text-[11px] font-bold font-mono-nums text-[#30d158]" data-testid={`text-ep-score-${item.ticker}`}>
-                              {item.epScore.totalScore.toFixed(0)}
-                            </span>
-                          ) : (
-                            <span className="text-[11px] text-white/15">—</span>
-                          )}
-                        </td>
-
-                        <td className="px-2 py-2.5">
-                          <button
-                            onClick={() => openModal(item)}
-                            className="p-1.5 rounded hover:bg-white/5 text-white/25 hover:text-white/50 transition-colors"
-                            data-testid={`button-details-${item.ticker}`}
-                          >
-                            <FileText className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              {alreadyTraded.length > 0 && (
+                <>
+                  <div className="px-4 py-2 bg-blue-500/[0.05] border-b border-white/[0.06]" data-testid="section-already-traded">
+                    <div className="flex items-center gap-2">
+                      <span className="px-1.5 py-0.5 text-[9px] font-semibold rounded bg-blue-500/10 text-blue-400/80">BMO</span>
+                      <span className="text-[11px] font-medium text-white/50">Already Traded — Reported Before Open</span>
+                      <span className="text-[10px] text-white/25">{alreadyTraded.length}</span>
+                    </div>
+                  </div>
+                  <EarningsTable items={alreadyTraded} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
+                </>
+              )}
             </div>
           )}
         </div>
@@ -446,6 +301,127 @@ export default function Earnings() {
         />
       )}
     </div>
+  );
+}
+
+function EarningsTable({ items, onTickerClick, onDetailsClick }: {
+  items: EarningsItem[];
+  onTickerClick: (ticker: string) => void;
+  onDetailsClick: (item: EarningsItem) => void;
+}) {
+  return (
+    <table className="w-full" data-testid="table-earnings">
+      <thead>
+        <tr className="border-b border-white/[0.06]">
+          <th className="text-left px-4 py-2">
+            <span className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">Company</span>
+          </th>
+          <th className="text-right px-3 py-2">
+            <span className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">Reported</span>
+          </th>
+          <th className="text-right px-3 py-2">
+            <span className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">Estimate</span>
+          </th>
+          <th className="text-right px-3 py-2">
+            <span className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">Surprise</span>
+          </th>
+          <th className="text-right px-3 py-2">
+            <span className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">Price Chg</span>
+          </th>
+          <th className="text-center px-3 py-2">
+            <span className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">EP</span>
+          </th>
+          <th className="w-10 px-2 py-2" />
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((item) => {
+          const isEpQualified = item.epScore?.classification === 'strong_ep';
+
+          return (
+            <tr
+              key={item.ticker}
+              className={cn(
+                "group border-b border-white/[0.03] transition-colors",
+                isEpQualified && "bg-[rgba(34,197,94,0.04)] border-l-2 border-l-[#30d158]/40",
+                !isEpQualified && "hover:bg-white/[0.02]"
+              )}
+              data-testid={`row-earnings-${item.ticker}`}
+            >
+              <td className="px-4 py-2.5">
+                <div className="flex flex-col gap-0.5">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-[13px] font-semibold text-white/90 font-mono-nums cursor-pointer hover:text-[#FBBB04] transition-colors"
+                      onClick={() => onTickerClick(item.ticker)}
+                      data-testid={`link-ticker-${item.ticker}`}
+                    >
+                      {item.ticker}
+                    </span>
+                    {isEpQualified && (
+                      <span className="px-1.5 py-0.5 text-[8px] font-bold rounded bg-[#30d158]/15 text-[#30d158] border border-[#30d158]/20" data-testid={`badge-ep-${item.ticker}`}>
+                        EP {item.epScore?.totalScore?.toFixed(0)}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-white/30 truncate max-w-[200px]">{item.companyName}</span>
+                </div>
+                <div className="mt-1 flex items-center gap-1">
+                  <span className="text-[9px] text-white/25 w-8">EPS</span>
+                  <span className="text-[9px] text-white/20 w-3">|</span>
+                  <span className="text-[9px] text-white/25 w-8">Rev</span>
+                </div>
+              </td>
+
+              <td className="text-right px-3 py-2.5 font-mono-nums">
+                <div className="text-[12px] text-white/70">{formatEps(item.epsReported)}</div>
+                <div className="text-[10px] text-white/40 mt-0.5">{formatRevenue(item.revenueReported)}</div>
+              </td>
+
+              <td className="text-right px-3 py-2.5 font-mono-nums">
+                <div className="text-[12px] text-white/50">{formatEps(item.epsEstimate)}</div>
+                <div className="text-[10px] text-white/30 mt-0.5">{formatRevenue(item.revenueEstimate)}</div>
+              </td>
+
+              <td className="text-right px-3 py-2.5 font-mono-nums">
+                <div className={cn("text-[12px] font-medium", surpriseColor(item.epsSurprisePct))}>
+                  {item.epsSurprisePct != null ? `${item.epsSurprisePct > 0 ? '+' : ''}${item.epsSurprisePct.toFixed(1)}%` : '—'}
+                </div>
+                <div className={cn("text-[10px] mt-0.5", surpriseColor(item.revenueSurprisePct))}>
+                  {item.revenueSurprisePct != null ? `${item.revenueSurprisePct > 0 ? '+' : ''}${item.revenueSurprisePct.toFixed(1)}%` : '—'}
+                </div>
+              </td>
+
+              <td className="text-right px-3 py-2.5 font-mono-nums">
+                <span className={cn("text-[13px] font-semibold", priceChangeColor(item.priceChangePct))} data-testid={`text-price-change-${item.ticker}`}>
+                  {item.priceChangePct != null ? `${item.priceChangePct > 0 ? '+' : ''}${item.priceChangePct.toFixed(1)}%` : '—'}
+                </span>
+              </td>
+
+              <td className="text-center px-3 py-2.5">
+                {isEpQualified && item.epScore?.totalScore != null ? (
+                  <span className="text-[11px] font-bold font-mono-nums text-[#30d158]" data-testid={`text-ep-score-${item.ticker}`}>
+                    {item.epScore.totalScore.toFixed(0)}
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-white/15">—</span>
+                )}
+              </td>
+
+              <td className="px-2 py-2.5">
+                <button
+                  onClick={() => onDetailsClick(item)}
+                  className="p-1.5 rounded hover:bg-white/5 text-white/25 hover:text-white/50 transition-colors"
+                  data-testid={`button-details-${item.ticker}`}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                </button>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
 

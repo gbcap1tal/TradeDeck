@@ -134,6 +134,13 @@ async function fetchFromFinnhubAndFMP(dateStr: string): Promise<EarningsCalendar
 
   if (calendarData.length === 0) return [];
 
+  const seen = new Set<string>();
+  calendarData = calendarData.filter(d => {
+    if (seen.has(d.ticker)) return false;
+    seen.add(d.ticker);
+    return true;
+  });
+
   const companyNames = await fetchCompanyNames(calendarData.map(d => d.ticker));
 
   const BATCH_SIZE = 5;
