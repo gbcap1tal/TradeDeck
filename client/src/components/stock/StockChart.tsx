@@ -114,12 +114,12 @@ function TVChart({ data, chartType }: { data: any[]; chartType: 'line' | 'candle
 
     if (chartType === 'candle') {
       const candleSeries = chart.addSeries(CandlestickSeries, {
-        upColor: '#30d158',
-        downColor: '#ff453a',
-        borderDownColor: '#ff453a',
-        borderUpColor: '#30d158',
-        wickDownColor: 'rgba(255,69,58,0.6)',
-        wickUpColor: 'rgba(48,209,88,0.6)',
+        upColor: '#26a641',
+        downColor: '#d44040',
+        borderDownColor: '#d44040',
+        borderUpColor: '#26a641',
+        wickDownColor: 'rgba(212,64,64,0.5)',
+        wickUpColor: 'rgba(38,166,65,0.5)',
       });
 
       const candleData: CandlestickData[] = data.map(d => ({
@@ -140,13 +140,13 @@ function TVChart({ data, chartType }: { data: any[]; chartType: 'line' | 'candle
         });
 
         chart.priceScale('volume').applyOptions({
-          scaleMargins: { top: 0.85, bottom: 0 },
+          scaleMargins: { top: 0.75, bottom: 0 },
         });
 
         volumeSeries.setData(data.map(d => ({
           time: toTime(d.time),
           value: d.volume || 0,
-          color: d.close >= d.open ? 'rgba(48,209,88,0.15)' : 'rgba(255,69,58,0.15)',
+          color: d.close >= d.open ? 'rgba(38,166,65,0.35)' : 'rgba(212,64,64,0.35)',
         })));
 
         volumeSeriesRef.current = volumeSeries;
