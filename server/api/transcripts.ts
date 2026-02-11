@@ -22,16 +22,19 @@ export async function fetchEarningsTranscript(ticker: string, reportDate: string
 
   let result = await fetchFromMotleyFool(ticker, reportDate);
   if (result.transcript) {
+    console.log(`[Transcript] ${ticker}: Found via Motley Fool (${result.transcript.length} chars)`);
     setCache(cacheKey, result, 86400);
     return result;
   }
 
   result = await fetchFromApiNinjas(ticker, reportDate);
   if (result.transcript) {
+    console.log(`[Transcript] ${ticker}: Found via API Ninjas (${result.transcript.length} chars)`);
     setCache(cacheKey, result, 86400);
     return result;
   }
 
+  console.log(`[Transcript] ${ticker}: No transcript found from any source`);
   return { transcript: null, source: 'none', url: null };
 }
 
