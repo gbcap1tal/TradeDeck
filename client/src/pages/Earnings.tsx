@@ -123,6 +123,7 @@ export default function Earnings() {
 
   const { data: earnings = [], isLoading } = useQuery<EarningsItem[]>({
     queryKey: [`/api/earnings/calendar?date=${selectedDate}`],
+    refetchInterval: selectedDate === todayStr ? 120000 : false,
   });
 
   const { data: earningsDates = [] } = useQuery<string[]>({
