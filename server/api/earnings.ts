@@ -633,13 +633,15 @@ export async function generateAiSummary(ticker: string, reportDate: string): Pro
   const { fetchEarningsTranscript } = await import('./transcripts');
 
   const isPlaceholderSummary = report.aiSummary && report.aiSummary.includes('Transcript not yet available');
+  const hasMediaCoverage = report.aiSummary && report.aiSummary.includes('sourced from media coverage');
+  const isOldStylePlaceholder = isPlaceholderSummary && !hasMediaCoverage;
 
   if (report.aiSummary && !isPlaceholderSummary) return report.aiSummary;
 
   const transcriptResult = await fetchEarningsTranscript(ticker, reportDate);
   const hasTranscript = transcriptResult.transcript && transcriptResult.transcript.length > 200;
 
-  if (!hasTranscript && isPlaceholderSummary) return report.aiSummary;
+  if (!hasTranscript && hasMediaCoverage) return report.aiSummary;
 
   let prompt: string;
 
@@ -686,15 +688,18 @@ Format as JSON:
       const { getFinvizNews } = await import('./finviz');
       const news = await getFinvizNews(ticker);
       if (news && news.length > 0) {
-        const earningsKeywords = ['earning', 'quarter', 'revenue', 'profit', 'eps', 'guidance', 'outlook', 'beat', 'miss', 'result', 'report', 'forecast', 'q1', 'q2', 'q3', 'q4', 'fiscal', 'income', 'sales', 'margin'];
-        const relevantNews = news
-          .filter(n => {
-            const h = n.headline.toLowerCase();
-            return earningsKeywords.some(kw => h.includes(kw)) || n.breaking;
-          })
-          .slice(0, 6);
+        const tickerLower = ticker.toLowerCase();
+        const companyLower = (report.companyName || '').toLowerCase();
+        const companyFirstWord = companyLower.split(/\s+/)[0];
 
-        const allNews = relevantNews.length > 0 ? relevantNews : news.slice(0, 4);
+        const stockSpecific = news.filter(n => {
+          const h = n.headline.toLowerCase();
+          return n.breaking || h.includes(tickerLower) || (companyFirstWord.length > 2 && h.includes(companyFirstWord));
+        });
+
+        const allNews = stockSpecific.length >= 3
+          ? stockSpecific.slice(0, 8)
+          : news.slice(0, 6);
 
         if (allNews.length > 0) {
           newsContext = '\n\nMEDIA COVERAGE:\n' + allNews.map(n =>
@@ -706,23 +711,40 @@ Format as JSON:
       console.error(`[earnings] News fetch for ${ticker}:`, e.message);
     }
 
-    prompt = `You are a financial analyst. Provide a brief earnings analysis for ${report.companyName} (${ticker}).
+    prompt = newsContext
+      ? `You are a financial analyst writing a brief for a trader. Summarize what happened with ${report.companyName} (${ticker}) earnings using ONLY the news headlines below.
 
-REPORT DATE: ${report.reportDate}
-PRICE CHANGE: ${report.priceChangePct ?? 'N/A'}%
-GAP: ${report.gapPct ?? 'N/A'}%
-VOLUME vs ADV: ${report.volumeIncreasePct ?? 'N/A'}%
+PRICE CHANGE: ${report.priceChangePct ?? 'N/A'}% | GAP: ${report.gapPct ?? 'N/A'}% | VOLUME: ${volMultiple} avg
 ${newsContext}
 
-No earnings call transcript is available yet. Write 5-7 bullet points (each starting with "• ").
-${newsContext ? 'Use the MEDIA COVERAGE headlines to extract key takeaways — summarize the most important points from the news in your own words. Do NOT just repeat headlines verbatim.' : ''}
-Also analyze what price action and volume suggest about market sentiment.
-Do NOT repeat exact EPS/revenue numbers — the user already sees those.
-The first bullet MUST be: "• Transcript not yet available — sourced from media coverage"${!newsContext ? '\nThe first bullet should instead be: "• Transcript not yet available"' : ''}
+Write exactly 5-7 bullet points (each starting with "• "):
+- Bullet 1 MUST be: "• Transcript not yet available — sourced from media coverage"
+- Bullets 2-5: Extract ONE specific fact per bullet from the headlines above. Name names (analysts, board members, products). Example good bullet: "• Oppenheimer upgraded to Outperform citing improved monetization". Example BAD bullet: "• Analysts are watching the stock closely" (too vague).
+- Last 1-2 bullets: What the ${report.priceChangePct ?? 0}% price move and ${volMultiple} volume signal about sentiment.
+
+Do NOT repeat EPS/revenue numbers. Do NOT write generic filler.
 
 Format as JSON:
 {
-  "earnings_summary": "• Transcript not yet available — sourced from media coverage\\n• [key takeaway from news]\\n• [another insight]\\n• [market reaction analysis]\\n• ...",
+  "earnings_summary": "• Transcript not yet available — sourced from media coverage\\n• [specific fact from news]\\n• ...",
+  "guidance_score": 5,
+  "guidance_assessment": "No transcript available to assess guidance",
+  "narrative_score": 5,
+  "narrative_assessment": "No transcript available to assess narrative",
+  "ep_verdict": "Cannot fully assess EP without transcript data"
+}`
+      : `You are a financial analyst. Provide a brief earnings analysis for ${report.companyName} (${ticker}).
+
+PRICE CHANGE: ${report.priceChangePct ?? 'N/A'}% | GAP: ${report.gapPct ?? 'N/A'}% | VOLUME: ${volMultiple} avg
+
+No earnings call transcript or media coverage is available yet. Write 3-4 bullet points (each starting with "• ") analyzing ONLY the market reaction.
+- Bullet 1 MUST be: "• Transcript not yet available"
+- Remaining bullets: analyze what price action and volume suggest.
+Do NOT repeat EPS/revenue numbers.
+
+Format as JSON:
+{
+  "earnings_summary": "• Transcript not yet available\\n• [market reaction insight]\\n• ...",
   "guidance_score": 5,
   "guidance_assessment": "No transcript available to assess guidance",
   "narrative_score": 5,
