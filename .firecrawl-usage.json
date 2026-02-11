@@ -1,0 +1,23 @@
+{
+  "totalCreditsUsed": 3,
+  "calls": [
+    {
+      "ticker": "HOOD",
+      "date": "2026-02-10",
+      "timestamp": "2026-02-11T16:53:52.839Z",
+      "credits": 1
+    },
+    {
+      "ticker": "hood",
+      "date": "2026-02-10_search",
+      "timestamp": "2026-02-11T17:02:07.616Z",
+      "credits": 1
+    },
+    {
+      "ticker": "dgx",
+      "date": "2026-02-10_search",
+      "timestamp": "2026-02-11T17:02:34.195Z",
+      "credits": 1
+    }
+  ]
+}

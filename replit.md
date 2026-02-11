@@ -60,6 +60,9 @@ Preferred communication style: Simple, everyday language.
 - **Yahoo Finance**: Primary source for stock quotes, history, indices, sector ETFs, and earnings data.
 - **Financial Modeling Prep**: Provides earnings, income statements, cash flow, and company profiles.
 - **Finviz**: Scraped for comprehensive US stock universe, sector/industry classification, and daily market digest.
+- **Firecrawl API**: Used for search queries to find Motley Fool transcript URLs (1 credit per search). Usage tracked in `.firecrawl-usage.json`. Free tier: 500 credits.
+- **Motley Fool**: Primary source for earnings call transcripts (free, public pages). Found via Firecrawl search, fetched directly via HTTP.
+- **Zacks Premium**: Login session cached for 1h. Previously used for Aiera transcript URLs, but Aiera transcripts are paywalled. Zacks integration retained for future use.
 - **NPM Packages**:
     - `drizzle-orm`, `drizzle-kit`: ORM and migration.
     - `express`, `express-session`: Backend server and session management.

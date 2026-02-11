@@ -13,6 +13,7 @@ import { getRSScore, getCachedRS, getAllRSRatings } from "./api/rs";
 import { computeLeadersQualityBatch, getCachedLeadersQuality } from "./api/quality";
 import { sendAlert, clearFailures } from "./api/alerts";
 import { fetchEarningsCalendar, generateAiSummary, getEarningsDatesWithData } from "./api/earnings";
+import { getFirecrawlUsage } from "./api/transcripts";
 import { scrapeFinvizDigest, scrapeBriefingPreMarket, getPersistedDigest, scrapeDigestRaw, saveDigestFromRaw } from "./api/news-scrapers";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripe/stripeClient";
 import { db } from "./db";
@@ -1132,6 +1133,15 @@ export async function registerRoutes(
     } catch (e: any) {
       console.error('Earnings summary error:', e.message);
       res.status(500).json({ error: 'Failed to generate summary' });
+    }
+  });
+
+  app.get('/api/firecrawl/usage', async (req, res) => {
+    try {
+      const usage = getFirecrawlUsage();
+      res.json(usage);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
     }
   });
 
