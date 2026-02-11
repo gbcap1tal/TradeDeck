@@ -12,6 +12,7 @@ import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe
 import { getRSScore, getCachedRS, getAllRSRatings } from "./api/rs";
 import { computeLeadersQualityBatch, getCachedLeadersQuality } from "./api/quality";
 import { sendAlert, clearFailures } from "./api/alerts";
+import { fetchEarningsCalendar, generateAiSummary, getEarningsDatesWithData } from "./api/earnings";
 import { scrapeFinvizDigest, scrapeBriefingPreMarket, getPersistedDigest, scrapeDigestRaw, saveDigestFromRaw } from "./api/news-scrapers";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripe/stripeClient";
 import { db } from "./db";
@@ -1083,6 +1084,45 @@ export async function registerRoutes(
     const isWeekday = day >= 1 && day <= 5;
     const isOpen = isWeekday && totalMinutes >= 14 * 60 + 30 && totalMinutes < 21 * 60;
     res.json({ isOpen });
+  });
+
+  // === EARNINGS API ROUTES ===
+
+  app.get('/api/earnings/calendar', async (req, res) => {
+    try {
+      const dateStr = (req.query.date as string) || new Date().toISOString().split('T')[0];
+      const data = await fetchEarningsCalendar(dateStr);
+      res.json(data);
+    } catch (e: any) {
+      console.error('Earnings calendar error:', e.message);
+      res.json([]);
+    }
+  });
+
+  app.get('/api/earnings/dates', async (req, res) => {
+    try {
+      const year = parseInt(req.query.year as string) || new Date().getFullYear();
+      const month = parseInt(req.query.month as string) || (new Date().getMonth() + 1);
+      const dates = await getEarningsDatesWithData(year, month);
+      res.json(dates);
+    } catch (e: any) {
+      console.error('Earnings dates error:', e.message);
+      res.json([]);
+    }
+  });
+
+  app.post('/api/earnings/summary', async (req, res) => {
+    try {
+      const { ticker, reportDate } = req.body;
+      if (!ticker || !reportDate) {
+        return res.status(400).json({ error: 'ticker and reportDate required' });
+      }
+      const summary = await generateAiSummary(ticker, reportDate);
+      res.json({ summary });
+    } catch (e: any) {
+      console.error('Earnings summary error:', e.message);
+      res.status(500).json({ error: 'Failed to generate summary' });
+    }
   });
 
   app.get('/api/leaders', async (req, res) => {

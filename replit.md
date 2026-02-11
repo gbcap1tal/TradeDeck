@@ -20,6 +20,7 @@ Preferred communication style: Simple, everyday language.
 - **Key Features**:
     - **Capital Flow Dashboard**: Major indices, heatmap, market breadth, sector rotation, RS leaders, sector performance.
     - **Megatrends**: Top/worst industry performance, customizable megatrend baskets with CRUD functionality.
+    - **Earnings Page**: Monthly calendar navigation, earnings table with double-row EPS/Revenue layout, EP (Episodic Pivot) scoring and highlighting, AI-powered earnings summaries via OpenAI.
     - **Detailed Pages**: Sector, industry, and individual stock detail pages with charts, Stock Quality metrics, and earnings visualization.
 
 ### Backend
