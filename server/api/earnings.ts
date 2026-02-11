@@ -341,10 +341,10 @@ async function fetchPriceDataForEarnings(ticker: string, dateStr: string, timing
 
     const isAMC = timing === 'AMC';
     const today = new Date().toISOString().split('T')[0];
-    const reportDate = new Date(dateStr);
-    const isRecentAMC = isAMC && (today > dateStr);
+    const useQuoteForAMC = isAMC && (today >= dateStr);
+    let gotQuoteData = false;
 
-    if (isRecentAMC) {
+    if (useQuoteForAMC) {
       try {
         const quote = await yf.quote(ticker);
         if (quote) {
@@ -361,14 +361,24 @@ async function fetchPriceDataForEarnings(ticker: string, dateStr: string, timing
           result.high52w = quote.fiftyTwoWeekHigh ? Math.round(quote.fiftyTwoWeekHigh * 100) / 100 : null;
 
           if (prevClose && prevClose > 0) {
-            if (marketState === 'PRE' && preMarketPrice) {
+            if ((marketState === 'PRE' || marketState === 'PREPRE') && preMarketPrice) {
               result.priceChangePct = Math.round(((preMarketPrice - prevClose) / prevClose) * 10000) / 100;
               result.gapPct = result.priceChangePct;
+              gotQuoteData = true;
+            } else if (marketState === 'POST' || marketState === 'POSTPOST' || marketState === 'CLOSED') {
+              if (currentPrice) {
+                result.priceChangePct = Math.round(((currentPrice - prevClose) / prevClose) * 10000) / 100;
+                if (openPrice) {
+                  result.gapPct = Math.round(((openPrice - prevClose) / prevClose) * 10000) / 100;
+                }
+                gotQuoteData = true;
+              }
             } else if (currentPrice) {
               result.priceChangePct = Math.round(((currentPrice - prevClose) / prevClose) * 10000) / 100;
               if (openPrice) {
                 result.gapPct = Math.round(((openPrice - prevClose) / prevClose) * 10000) / 100;
               }
+              gotQuoteData = true;
             }
           }
 
@@ -409,7 +419,7 @@ async function fetchPriceDataForEarnings(ticker: string, dateStr: string, timing
       earningsIdx = hist.length - 1;
     }
 
-    if (!isRecentAMC && earningsIdx >= 0) {
+    if (!gotQuoteData && earningsIdx >= 0) {
       const reactionIdx = isAMC ? earningsIdx + 1 : earningsIdx;
       const priorIdx = isAMC ? earningsIdx : earningsIdx - 1;
 
@@ -423,25 +433,11 @@ async function fetchPriceDataForEarnings(ticker: string, dateStr: string, timing
           result.priceChangePct = Math.round(((reactionDay.close - result.priorClose) / result.priorClose) * 10000) / 100;
           result.gapPct = Math.round(((reactionDay.open - result.priorClose) / result.priorClose) * 10000) / 100;
         }
-      } else {
+      } else if (earningsIdx > 0) {
         const day = hist[earningsIdx];
+        const prevDay = hist[earningsIdx - 1];
         result.openPrice = Math.round((day.open ?? 0) * 100) / 100;
         result.volumeOnDay = day.volume ?? null;
-        if (earningsIdx > 0) {
-          const prevDay = hist[earningsIdx - 1];
-          result.priorClose = Math.round((prevDay.close ?? 0) * 100) / 100;
-          if (result.priorClose && result.priorClose > 0) {
-            result.priceChangePct = Math.round(((day.close - result.priorClose) / result.priorClose) * 10000) / 100;
-            result.gapPct = Math.round(((day.open - result.priorClose) / result.priorClose) * 10000) / 100;
-          }
-        }
-      }
-    } else if (!isAMC && earningsIdx >= 0) {
-      const day = hist[earningsIdx];
-      result.openPrice = Math.round((day.open ?? 0) * 100) / 100;
-      result.volumeOnDay = day.volume ?? null;
-      if (earningsIdx > 0) {
-        const prevDay = hist[earningsIdx - 1];
         result.priorClose = Math.round((prevDay.close ?? 0) * 100) / 100;
         if (result.priorClose && result.priorClose > 0) {
           result.priceChangePct = Math.round(((day.close - result.priorClose) / result.priorClose) * 10000) / 100;
@@ -680,46 +676,60 @@ Format your response as JSON:
       max_tokens: 1024,
     });
 
-    const content = response.choices[0]?.message?.content;
+    const content = response.choices?.[0]?.message?.content;
     if (!content) return null;
 
-    const parsed = JSON.parse(content);
-
-    await db.update(earningsReports)
-      .set({ aiSummary: parsed.earnings_summary, updatedAt: new Date() })
-      .where(eq(earningsReports.id, report.id));
-
-    const eps = await db.select().from(epScores)
-      .where(eq(epScores.earningsReportId, report.id));
-
-    if (eps.length > 0) {
-      const ep = eps[0];
-      const updatedScore = calculateEpScore({
-        volumeIncreasePct: report.volumeIncreasePct,
-        gapPct: report.gapPct,
-        epsSurprisePct: report.epsSurprisePct,
-        revenueSurprisePct: report.revenueSurprisePct,
-        high52w: report.high52w,
-        currentPrice: report.openPrice,
-        price2MonthsAgo: report.price2MonthsAgo,
-        guidanceScore: parsed.guidance_score,
-        narrativeScore: parsed.narrative_score,
-      });
-
-      await db.update(epScores)
-        .set({
-          guidanceScore: parsed.guidance_score,
-          narrativeScore: parsed.narrative_score,
-          totalScore: updatedScore.totalScore,
-          classification: updatedScore.classification,
-          aiVerdict: parsed.ep_verdict,
-          aiGuidanceAssessment: parsed.guidance_assessment,
-          aiNarrativeAssessment: parsed.narrative_assessment,
-        })
-        .where(eq(epScores.id, ep.id));
+    let parsed: any;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      console.error(`AI summary JSON parse error for ${ticker}:`, content.substring(0, 200));
+      return null;
     }
 
-    return parsed.earnings_summary;
+    const summary = parsed.earnings_summary || null;
+    if (!summary) return null;
+
+    await db.update(earningsReports)
+      .set({ aiSummary: summary, updatedAt: new Date() })
+      .where(eq(earningsReports.id, report.id));
+
+    const guidanceScore = typeof parsed.guidance_score === 'number' ? parsed.guidance_score : null;
+    const narrativeScore = typeof parsed.narrative_score === 'number' ? parsed.narrative_score : null;
+
+    if (guidanceScore !== null && narrativeScore !== null) {
+      const eps = await db.select().from(epScores)
+        .where(eq(epScores.earningsReportId, report.id));
+
+      if (eps.length > 0) {
+        const ep = eps[0];
+        const updatedScore = calculateEpScore({
+          volumeIncreasePct: report.volumeIncreasePct,
+          gapPct: report.gapPct,
+          epsSurprisePct: report.epsSurprisePct,
+          revenueSurprisePct: report.revenueSurprisePct,
+          high52w: report.high52w,
+          currentPrice: report.openPrice,
+          price2MonthsAgo: report.price2MonthsAgo,
+          guidanceScore,
+          narrativeScore,
+        });
+
+        await db.update(epScores)
+          .set({
+            guidanceScore,
+            narrativeScore,
+            totalScore: updatedScore.totalScore,
+            classification: updatedScore.classification,
+            aiVerdict: parsed.ep_verdict ?? null,
+            aiGuidanceAssessment: parsed.guidance_assessment ?? null,
+            aiNarrativeAssessment: parsed.narrative_assessment ?? null,
+          })
+          .where(eq(epScores.id, ep.id));
+      }
+    }
+
+    return summary;
   } catch (e: any) {
     console.error(`AI summary error for ${ticker}:`, e.message);
     return null;
