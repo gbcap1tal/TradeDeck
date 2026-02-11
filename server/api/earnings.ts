@@ -630,11 +630,16 @@ export async function generateAiSummary(ticker: string, reportDate: string): Pro
   if (reports.length === 0) return null;
   const report = reports[0];
 
-  if (report.aiSummary) return report.aiSummary;
-
   const { fetchEarningsTranscript } = await import('./transcripts');
+
+  const isPlaceholderSummary = report.aiSummary && report.aiSummary.includes('Transcript not yet available');
+
+  if (report.aiSummary && !isPlaceholderSummary) return report.aiSummary;
+
   const transcriptResult = await fetchEarningsTranscript(ticker, reportDate);
   const hasTranscript = transcriptResult.transcript && transcriptResult.transcript.length > 200;
+
+  if (!hasTranscript && isPlaceholderSummary) return report.aiSummary;
 
   let prompt: string;
 
