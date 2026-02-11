@@ -680,19 +680,49 @@ Format as JSON:
 }`;
   } else {
     const volMultiple = report.volumeIncreasePct ? (report.volumeIncreasePct / 100).toFixed(1) + 'x' : 'N/A';
+
+    let newsContext = '';
+    try {
+      const { getFinvizNews } = await import('./finviz');
+      const news = await getFinvizNews(ticker);
+      if (news && news.length > 0) {
+        const earningsKeywords = ['earning', 'quarter', 'revenue', 'profit', 'eps', 'guidance', 'outlook', 'beat', 'miss', 'result', 'report', 'forecast', 'q1', 'q2', 'q3', 'q4', 'fiscal', 'income', 'sales', 'margin'];
+        const relevantNews = news
+          .filter(n => {
+            const h = n.headline.toLowerCase();
+            return earningsKeywords.some(kw => h.includes(kw)) || n.breaking;
+          })
+          .slice(0, 6);
+
+        const allNews = relevantNews.length > 0 ? relevantNews : news.slice(0, 4);
+
+        if (allNews.length > 0) {
+          newsContext = '\n\nMEDIA COVERAGE:\n' + allNews.map(n =>
+            `- ${n.breaking ? '[BREAKING] ' : ''}${n.headline} (${n.source})`
+          ).join('\n');
+        }
+      }
+    } catch (e: any) {
+      console.error(`[earnings] News fetch for ${ticker}:`, e.message);
+    }
+
     prompt = `You are a financial analyst. Provide a brief earnings analysis for ${report.companyName} (${ticker}).
 
 REPORT DATE: ${report.reportDate}
 PRICE CHANGE: ${report.priceChangePct ?? 'N/A'}%
 GAP: ${report.gapPct ?? 'N/A'}%
 VOLUME vs ADV: ${report.volumeIncreasePct ?? 'N/A'}%
+${newsContext}
 
-No earnings call transcript is available yet. Write 3-4 bullet points (each starting with "• ") analyzing the market reaction.
-Do NOT repeat exact EPS/revenue numbers. Focus on what price action and volume suggest about market sentiment.
+No earnings call transcript is available yet. Write 5-7 bullet points (each starting with "• ").
+${newsContext ? 'Use the MEDIA COVERAGE headlines to extract key takeaways — summarize the most important points from the news in your own words. Do NOT just repeat headlines verbatim.' : ''}
+Also analyze what price action and volume suggest about market sentiment.
+Do NOT repeat exact EPS/revenue numbers — the user already sees those.
+The first bullet MUST be: "• Transcript not yet available — sourced from media coverage"${!newsContext ? '\nThe first bullet should instead be: "• Transcript not yet available"' : ''}
 
 Format as JSON:
 {
-  "earnings_summary": "• Transcript not yet available\\n• Market reaction: ${report.priceChangePct ?? 0}% move on ${volMultiple} average volume\\n• [bullet about what this suggests]\\n• [bullet about sentiment]",
+  "earnings_summary": "• Transcript not yet available — sourced from media coverage\\n• [key takeaway from news]\\n• [another insight]\\n• [market reaction analysis]\\n• ...",
   "guidance_score": 5,
   "guidance_assessment": "No transcript available to assess guidance",
   "narrative_score": 5,
