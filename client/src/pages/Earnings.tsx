@@ -119,6 +119,7 @@ export default function Earnings() {
   const [currentMonth, setCurrentMonth] = useState(today.getMonth() + 1);
   const [modalItem, setModalItem] = useState<EarningsItem | null>(null);
   const [, setLocation] = useLocation();
+  const todayStr = today.toISOString().split('T')[0];
 
   const { data: earnings = [], isLoading } = useQuery<EarningsItem[]>({
     queryKey: [`/api/earnings/calendar?date=${selectedDate}`],
@@ -149,7 +150,7 @@ export default function Earnings() {
     return bv - av;
   };
 
-  const { freshResults, alreadyTraded } = useMemo(() => {
+  const { section1, section2, section1Label, section2Label, section1Badge, section2Badge } = useMemo(() => {
     const deduped = new Map<string, EarningsItem>();
     for (const item of earnings) {
       if (!deduped.has(item.ticker)) {
@@ -158,11 +159,31 @@ export default function Earnings() {
     }
     const all = Array.from(deduped.values());
 
-    const fresh = all.filter(e => e.timing === 'AMC').sort(sortByPriceChange);
-    const traded = all.filter(e => e.timing !== 'AMC').sort(sortByPriceChange);
+    const amcItems = all.filter(e => e.timing === 'AMC').sort(sortByPriceChange);
+    const bmoItems = all.filter(e => e.timing !== 'AMC').sort(sortByPriceChange);
 
-    return { freshResults: fresh, alreadyTraded: traded };
-  }, [earnings]);
+    const isPast = selectedDate < todayStr;
+
+    if (isPast) {
+      return {
+        section1: amcItems,
+        section2: bmoItems,
+        section1Label: 'Fresh Results — After Close',
+        section2Label: 'Already Traded — Before Open',
+        section1Badge: 'AMC' as const,
+        section2Badge: 'BMO' as const,
+      };
+    } else {
+      return {
+        section1: bmoItems,
+        section2: amcItems,
+        section1Label: selectedDate === todayStr ? 'Pre-Market Movers — Before Open' : 'Before Market Open',
+        section2Label: selectedDate === todayStr ? 'After Close — Upcoming' : 'After Market Close',
+        section1Badge: 'BMO' as const,
+        section2Badge: 'AMC' as const,
+      };
+    }
+  }, [earnings, selectedDate, todayStr]);
 
   const prevMonth = () => {
     if (currentMonth === 1) {
@@ -184,7 +205,6 @@ export default function Earnings() {
 
   const daysInMonth = getDaysInMonth(currentYear, currentMonth);
   const firstDayOfWeek = getDayOfWeek(currentYear, currentMonth, 1);
-  const todayStr = today.toISOString().split('T')[0];
 
   const openModal = (item: EarningsItem) => {
     setModalItem(item);
@@ -274,7 +294,7 @@ export default function Earnings() {
                 {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
               </span>
               <span className="text-[10px] sm:text-[11px] text-white/30">
-                {freshResults.length + alreadyTraded.length} report{(freshResults.length + alreadyTraded.length) !== 1 ? 's' : ''}
+                {section1.length + section2.length} report{(section1.length + section2.length) !== 1 ? 's' : ''}
               </span>
             </div>
           </div>
@@ -283,45 +303,45 @@ export default function Earnings() {
             <div className="flex items-center justify-center py-16">
               <Loader2 className="w-5 h-5 animate-spin text-white/20" />
             </div>
-          ) : (freshResults.length + alreadyTraded.length) === 0 ? (
+          ) : (section1.length + section2.length) === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-white/30">
               <p className="text-[13px]">No earnings reports for this date</p>
               <p className="text-[11px] mt-1 text-white/20">Select a date with earnings data</p>
             </div>
           ) : (
             <div>
-              {freshResults.length > 0 && (
+              {section1.length > 0 && (
                 <>
-                  <div className="px-3 sm:px-4 py-2 bg-purple-500/[0.05] border-b border-white/[0.06]" data-testid="section-fresh-results">
+                  <div className={cn("px-3 sm:px-4 py-2 border-b border-white/[0.06]", section1Badge === 'AMC' ? "bg-purple-500/[0.05]" : "bg-blue-500/[0.05]")} data-testid="section-primary">
                     <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.5 text-[9px] font-semibold rounded bg-purple-500/10 text-purple-400/80">AMC</span>
-                      <span className="text-[10px] sm:text-[11px] font-medium text-white/50">Fresh Results — After Close</span>
-                      <span className="text-[10px] text-white/25">{freshResults.length}</span>
+                      <span className={cn("px-1.5 py-0.5 text-[9px] font-semibold rounded", section1Badge === 'AMC' ? "bg-purple-500/10 text-purple-400/80" : "bg-blue-500/10 text-blue-400/80")}>{section1Badge}</span>
+                      <span className="text-[10px] sm:text-[11px] font-medium text-white/50">{section1Label}</span>
+                      <span className="text-[10px] text-white/25">{section1.length}</span>
                     </div>
                   </div>
                   <div className="hidden sm:block overflow-x-auto">
-                    <EarningsTable items={freshResults} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
+                    <EarningsTable items={section1} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
                   </div>
                   <div className="sm:hidden">
-                    <EarningsMobileList items={freshResults} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
+                    <EarningsMobileList items={section1} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
                   </div>
                 </>
               )}
 
-              {alreadyTraded.length > 0 && (
+              {section2.length > 0 && (
                 <>
-                  <div className="px-3 sm:px-4 py-2 bg-blue-500/[0.05] border-b border-white/[0.06]" data-testid="section-already-traded">
+                  <div className={cn("px-3 sm:px-4 py-2 border-b border-white/[0.06]", section2Badge === 'AMC' ? "bg-purple-500/[0.05]" : "bg-blue-500/[0.05]")} data-testid="section-secondary">
                     <div className="flex items-center gap-2">
-                      <span className="px-1.5 py-0.5 text-[9px] font-semibold rounded bg-blue-500/10 text-blue-400/80">BMO</span>
-                      <span className="text-[10px] sm:text-[11px] font-medium text-white/50">Already Traded — Before Open</span>
-                      <span className="text-[10px] text-white/25">{alreadyTraded.length}</span>
+                      <span className={cn("px-1.5 py-0.5 text-[9px] font-semibold rounded", section2Badge === 'AMC' ? "bg-purple-500/10 text-purple-400/80" : "bg-blue-500/10 text-blue-400/80")}>{section2Badge}</span>
+                      <span className="text-[10px] sm:text-[11px] font-medium text-white/50">{section2Label}</span>
+                      <span className="text-[10px] text-white/25">{section2.length}</span>
                     </div>
                   </div>
                   <div className="hidden sm:block overflow-x-auto">
-                    <EarningsTable items={alreadyTraded} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
+                    <EarningsTable items={section2} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
                   </div>
                   <div className="sm:hidden">
-                    <EarningsMobileList items={alreadyTraded} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
+                    <EarningsMobileList items={section2} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
                   </div>
                 </>
               )}
