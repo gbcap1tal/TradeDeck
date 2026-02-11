@@ -70,14 +70,22 @@ export async function fetchEarningsCalendar(dateStr: string, forceRefresh: boole
 
   if (existingReports.length > 0) {
     const today = new Date().toISOString().split('T')[0];
-    const hasMissingActuals = dateStr >= today && existingReports.some(r => r.epsReported === null);
+    const isToday = dateStr === today;
 
+    const hasMissingActuals = dateStr >= today && existingReports.some(r => r.epsReported === null);
     if (hasMissingActuals) {
       await refreshActualsFromFinnhub(dateStr, existingReports);
+    }
+
+    if (isToday) {
+      await refreshLivePrices(dateStr);
+    }
+
+    if (hasMissingActuals || isToday) {
       const refreshed = await db.select().from(earningsReports)
         .where(eq(earningsReports.reportDate, dateStr));
       const items = await enrichWithEpScores(refreshed);
-      setCache(cacheKey, items, 120);
+      setCache(cacheKey, items, 90);
       return items;
     }
 
@@ -289,6 +297,127 @@ async function fetchFromFinnhubAndFMP(dateStr: string): Promise<EarningsCalendar
   return items;
 }
 
+async function refreshLivePrices(dateStr: string): Promise<void> {
+  const priceRefreshKey = `refresh_prices_${dateStr}`;
+  const lastPriceRefresh = getCached<number>(priceRefreshKey);
+  if (lastPriceRefresh) return;
+
+  try {
+    const reports = await db.select().from(earningsReports)
+      .where(eq(earningsReports.reportDate, dateStr));
+
+    if (reports.length === 0) return;
+
+    const YahooFinance = await import('yahoo-finance2').then(m => m.default);
+    const yf: any = new (YahooFinance as any)();
+
+    const tickers = reports.map(r => r.ticker);
+    const BATCH = 20;
+    const quoteMap = new Map<string, any>();
+
+    for (let i = 0; i < tickers.length; i += BATCH) {
+      const batch = tickers.slice(i, i + BATCH);
+      try {
+        const quotes = await yf.quote(batch);
+        if (Array.isArray(quotes)) {
+          for (const q of quotes) {
+            if (q?.symbol) quoteMap.set(q.symbol, q);
+          }
+        }
+      } catch (e: any) {
+        for (const t of batch) {
+          try {
+            const q = await yf.quote(t);
+            if (q?.symbol) quoteMap.set(q.symbol, q);
+          } catch {}
+        }
+      }
+    }
+
+    let updated = 0;
+    for (const report of reports) {
+      const q = quoteMap.get(report.ticker);
+      if (!q) continue;
+
+      const prevClose = q.regularMarketPreviousClose;
+      const regularPrice = q.regularMarketPrice;
+      const openPrice = q.regularMarketOpen;
+      const volume = q.regularMarketVolume;
+      const avgVolume = q.averageDailyVolume10Day;
+      const marketState = q.marketState;
+      const preMarketPrice = q.preMarketPrice;
+      const postMarketPrice = q.postMarketPrice;
+
+      if (!prevClose || prevClose <= 0) continue;
+
+      let bestPrice = regularPrice;
+      if ((marketState === 'PRE' || marketState === 'PREPRE') && preMarketPrice) {
+        bestPrice = preMarketPrice;
+      } else if ((marketState === 'POST' || marketState === 'POSTPOST') && postMarketPrice) {
+        bestPrice = postMarketPrice;
+      }
+
+      if (!bestPrice) continue;
+
+      const newPriceChange = Math.round(((bestPrice - prevClose) / prevClose) * 10000) / 100;
+      const newGap = openPrice ? Math.round(((openPrice - prevClose) / prevClose) * 10000) / 100 : report.gapPct;
+      const newVolIncrease = (avgVolume && avgVolume > 0 && volume)
+        ? Math.round((volume / avgVolume) * 10000) / 100
+        : report.volumeIncreasePct;
+
+      if (report.priceChangePct === null || Math.abs(newPriceChange - (report.priceChangePct || 0)) > 0.1) {
+        await db.update(earningsReports)
+          .set({
+            priceChangePct: newPriceChange,
+            gapPct: newGap,
+            volumeOnDay: volume ?? report.volumeOnDay,
+            avgDailyVolume20d: avgVolume ?? report.avgDailyVolume20d,
+            volumeIncreasePct: newVolIncrease,
+            priorClose: prevClose ? Math.round(prevClose * 100) / 100 : report.priorClose,
+            openPrice: openPrice ? Math.round(openPrice * 100) / 100 : report.openPrice,
+            high52w: q.fiftyTwoWeekHigh ? Math.round(q.fiftyTwoWeekHigh * 100) / 100 : report.high52w,
+            updatedAt: new Date(),
+          })
+          .where(eq(earningsReports.id, report.id));
+
+        if (report.epsReported !== null) {
+          const epResult = calculateEpScore({
+            volumeIncreasePct: newVolIncrease ?? report.volumeIncreasePct,
+            gapPct: newGap ?? report.gapPct,
+            epsSurprisePct: report.epsSurprisePct,
+            revenueSurprisePct: report.revenueSurprisePct,
+            high52w: q.fiftyTwoWeekHigh ? Math.round(q.fiftyTwoWeekHigh * 100) / 100 : report.high52w,
+            currentPrice: openPrice ? Math.round(openPrice * 100) / 100 : report.openPrice,
+            price2MonthsAgo: report.price2MonthsAgo,
+          });
+
+          await db.update(epScores)
+            .set({
+              totalScore: epResult.totalScore,
+              volumeScore: epResult.volumeScore,
+              earningsQualityScore: epResult.earningsQualityScore,
+              gapScore: epResult.gapScore,
+              baseQualityScore: epResult.baseQualityScore,
+              bonusPoints: epResult.bonusPoints,
+              isDisqualified: epResult.isDisqualified,
+              disqualificationReason: epResult.disqualificationReason,
+              classification: epResult.classification,
+            })
+            .where(eq(epScores.earningsReportId, report.id));
+        }
+
+        updated++;
+      }
+    }
+
+    console.log(`[earnings] Live prices refreshed for ${dateStr}: ${updated}/${reports.length} updated from ${quoteMap.size} quotes`);
+    setCache(priceRefreshKey, Date.now(), 90);
+  } catch (e: any) {
+    console.error(`[earnings] Live price refresh error for ${dateStr}:`, e.message);
+    setCache(priceRefreshKey, Date.now(), 60);
+  }
+}
+
 async function refreshActualsFromFinnhub(dateStr: string, existing: typeof earningsReports.$inferSelect[]): Promise<void> {
   const refreshKey = `refresh_actuals_${dateStr}`;
   const lastRefresh = getCached<number>(refreshKey);
@@ -439,17 +568,18 @@ async function fetchPriceDataForEarnings(ticker: string, dateStr: string, timing
 
     const isAMC = timing === 'AMC';
     const today = new Date().toISOString().split('T')[0];
-    const useQuoteForAMC = isAMC && (today >= dateStr);
+    const useQuote = today >= dateStr;
     let gotQuoteData = false;
 
-    if (useQuoteForAMC) {
+    if (useQuote) {
       try {
         const quote = await yf.quote(ticker);
         if (quote) {
           const prevClose = quote.regularMarketPreviousClose;
-          const currentPrice = quote.regularMarketPrice;
+          const regularPrice = quote.regularMarketPrice;
           const openPrice = quote.regularMarketOpen;
           const preMarketPrice = quote.preMarketPrice;
+          const postMarketPrice = quote.postMarketPrice;
           const marketState = quote.marketState;
 
           result.priorClose = prevClose ? Math.round(prevClose * 100) / 100 : null;
@@ -459,22 +589,19 @@ async function fetchPriceDataForEarnings(ticker: string, dateStr: string, timing
           result.high52w = quote.fiftyTwoWeekHigh ? Math.round(quote.fiftyTwoWeekHigh * 100) / 100 : null;
 
           if (prevClose && prevClose > 0) {
+            let bestPrice = regularPrice;
             if ((marketState === 'PRE' || marketState === 'PREPRE') && preMarketPrice) {
-              result.priceChangePct = Math.round(((preMarketPrice - prevClose) / prevClose) * 10000) / 100;
-              result.gapPct = result.priceChangePct;
-              gotQuoteData = true;
-            } else if (marketState === 'POST' || marketState === 'POSTPOST' || marketState === 'CLOSED') {
-              if (currentPrice) {
-                result.priceChangePct = Math.round(((currentPrice - prevClose) / prevClose) * 10000) / 100;
-                if (openPrice) {
-                  result.gapPct = Math.round(((openPrice - prevClose) / prevClose) * 10000) / 100;
-                }
-                gotQuoteData = true;
-              }
-            } else if (currentPrice) {
-              result.priceChangePct = Math.round(((currentPrice - prevClose) / prevClose) * 10000) / 100;
+              bestPrice = preMarketPrice;
+            } else if ((marketState === 'POST' || marketState === 'POSTPOST') && postMarketPrice) {
+              bestPrice = postMarketPrice;
+            }
+
+            if (bestPrice) {
+              result.priceChangePct = Math.round(((bestPrice - prevClose) / prevClose) * 10000) / 100;
               if (openPrice) {
                 result.gapPct = Math.round(((openPrice - prevClose) / prevClose) * 10000) / 100;
+              } else {
+                result.gapPct = result.priceChangePct;
               }
               gotQuoteData = true;
             }
@@ -485,7 +612,7 @@ async function fetchPriceDataForEarnings(ticker: string, dateStr: string, timing
           }
         }
       } catch (quoteErr: any) {
-        console.error(`Yahoo quote error for AMC ${ticker}:`, quoteErr.message);
+        console.error(`Yahoo quote error for ${ticker}:`, quoteErr.message);
       }
     }
 
