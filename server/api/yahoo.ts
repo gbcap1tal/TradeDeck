@@ -570,6 +570,7 @@ export async function getAllUSEquities(): Promise<any[]> {
               price: q.regularMarketPrice ?? 0,
               change: q.regularMarketChange ?? 0,
               changePercent: q.regularMarketChangePercent ?? 0,
+              previousClose: q.regularMarketPreviousClose ?? 0,
               volume: q.regularMarketVolume ?? 0,
               marketCap: q.marketCap ?? 0,
               week52High: q.fiftyTwoWeekHigh ?? 0,

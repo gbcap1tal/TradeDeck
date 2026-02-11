@@ -301,8 +301,14 @@ export async function computeQuoteBreadth(): Promise<{
     if (s.changePercent >= 4) bulls4++;
     if (s.changePercent <= -4) bears4++;
 
-    if (s.changePercent > 0) advancing++;
-    else if (s.changePercent < 0) declining++;
+    if (s.previousClose > 0 && s.price > 0) {
+      if (s.price > s.previousClose) advancing++;
+      else if (s.price < s.previousClose) declining++;
+    } else if (s.changePercent > 0) {
+      advancing++;
+    } else if (s.changePercent < 0) {
+      declining++;
+    }
   }
 
   const pctAbove50 = total50 > 0 ? Math.round((above50 / total50) * 1000) / 10 : 50;
