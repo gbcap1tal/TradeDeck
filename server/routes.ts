@@ -5,7 +5,7 @@ import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import * as yahoo from "./api/yahoo";
 import * as fmp from "./api/fmp";
-import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL } from "./api/cache";
+import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL, clearCache } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
 import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, scrapeIndustryRS, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe } from "./api/breadth";
@@ -1091,7 +1091,17 @@ export async function registerRoutes(
   app.get('/api/earnings/calendar', async (req, res) => {
     try {
       const dateStr = (req.query.date as string) || new Date().toISOString().split('T')[0];
-      const data = await fetchEarningsCalendar(dateStr);
+      const forceRefresh = req.query.refresh === 'true';
+      
+      if (forceRefresh) {
+        const { earningsReports, epScores } = await import('@shared/schema');
+        await db.delete(epScores).where(
+          sql`${epScores.earningsReportId} IN (SELECT id FROM earnings_reports WHERE report_date = ${dateStr})`
+        );
+        await db.delete(earningsReports).where(eq(earningsReports.reportDate, dateStr));
+      }
+
+      const data = await fetchEarningsCalendar(dateStr, forceRefresh);
       res.json(data);
     } catch (e: any) {
       console.error('Earnings calendar error:', e.message);

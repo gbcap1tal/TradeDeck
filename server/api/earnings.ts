@@ -57,10 +57,13 @@ export interface EarningsCalendarItem {
   aiSummary: string | null;
 }
 
-export async function fetchEarningsCalendar(dateStr: string): Promise<EarningsCalendarItem[]> {
+export async function fetchEarningsCalendar(dateStr: string, forceRefresh: boolean = false): Promise<EarningsCalendarItem[]> {
   const cacheKey = `earnings_cal_${dateStr}`;
-  const cached = getCached<EarningsCalendarItem[]>(cacheKey);
-  if (cached) return cached;
+  
+  if (!forceRefresh) {
+    const cached = getCached<EarningsCalendarItem[]>(cacheKey);
+    if (cached) return cached;
+  }
 
   const existingReports = await db.select().from(earningsReports)
     .where(eq(earningsReports.reportDate, dateStr));
@@ -148,7 +151,7 @@ async function fetchFromFinnhubAndFMP(dateStr: string): Promise<EarningsCalendar
   for (let i = 0; i < calendarData.length; i += BATCH_SIZE) {
     const batch = calendarData.slice(i, i + BATCH_SIZE);
     const results = await Promise.allSettled(
-      batch.map(d => fetchPriceDataForEarnings(d.ticker, dateStr))
+      batch.map(d => fetchPriceDataForEarnings(d.ticker, dateStr, d.timing))
     );
     batch.forEach((d, j) => {
       const r = results[j];
@@ -319,7 +322,7 @@ interface PriceData {
   price2MonthsAgo: number | null;
 }
 
-async function fetchPriceDataForEarnings(ticker: string, dateStr: string): Promise<PriceData> {
+async function fetchPriceDataForEarnings(ticker: string, dateStr: string, timing: string = 'BMO'): Promise<PriceData> {
   const result: PriceData = {
     priceChangePct: null,
     volumeOnDay: null,
@@ -364,20 +367,38 @@ async function fetchPriceDataForEarnings(ticker: string, dateStr: string): Promi
     }
 
     if (earningsIdx >= 0) {
-      const day = hist[earningsIdx];
-      result.openPrice = Math.round((day.open ?? 0) * 100) / 100;
-      result.volumeOnDay = day.volume ?? null;
+      const isAMC = timing === 'AMC';
+      const reactionIdx = isAMC ? earningsIdx + 1 : earningsIdx;
+      const priorIdx = isAMC ? earningsIdx : earningsIdx - 1;
 
-      if (earningsIdx > 0) {
-        const prevDay = hist[earningsIdx - 1];
-        result.priorClose = Math.round((prevDay.close ?? 0) * 100) / 100;
+      if (reactionIdx < hist.length && priorIdx >= 0) {
+        const reactionDay = hist[reactionIdx];
+        const priorDay = hist[priorIdx];
+
+        result.priorClose = Math.round((priorDay.close ?? 0) * 100) / 100;
+        result.openPrice = Math.round((reactionDay.open ?? 0) * 100) / 100;
+        result.volumeOnDay = reactionDay.volume ?? null;
+
         if (result.priorClose && result.priorClose > 0) {
-          result.priceChangePct = Math.round(((day.close - result.priorClose) / result.priorClose) * 10000) / 100;
-          result.gapPct = Math.round(((day.open - result.priorClose) / result.priorClose) * 10000) / 100;
+          result.priceChangePct = Math.round(((reactionDay.close - result.priorClose) / result.priorClose) * 10000) / 100;
+          result.gapPct = Math.round(((reactionDay.open - result.priorClose) / result.priorClose) * 10000) / 100;
+        }
+      } else if (earningsIdx >= 0) {
+        const day = hist[earningsIdx];
+        result.openPrice = Math.round((day.open ?? 0) * 100) / 100;
+        result.volumeOnDay = day.volume ?? null;
+        if (earningsIdx > 0) {
+          const prevDay = hist[earningsIdx - 1];
+          result.priorClose = Math.round((prevDay.close ?? 0) * 100) / 100;
+          if (result.priorClose && result.priorClose > 0) {
+            result.priceChangePct = Math.round(((day.close - result.priorClose) / result.priorClose) * 10000) / 100;
+            result.gapPct = Math.round(((day.open - result.priorClose) / result.priorClose) * 10000) / 100;
+          }
         }
       }
 
-      const volumeSlice = hist.slice(Math.max(0, earningsIdx - 20), earningsIdx);
+      const volIdx = isAMC && reactionIdx < hist.length ? reactionIdx : earningsIdx;
+      const volumeSlice = hist.slice(Math.max(0, volIdx - 20), volIdx);
       if (volumeSlice.length > 0) {
         const totalVol = volumeSlice.reduce((sum, d) => sum + (d.volume || 0), 0);
         result.avgDailyVolume20d = Math.round(totalVol / volumeSlice.length);

@@ -116,8 +116,8 @@ export default function Earnings() {
   const earningsDatesSet = useMemo(() => new Set(earningsDates), [earningsDates]);
 
   const sortByPriceChange = (a: EarningsItem, b: EarningsItem) => {
-    const av = Math.abs(a.priceChangePct ?? 0);
-    const bv = Math.abs(b.priceChangePct ?? 0);
+    const av = a.priceChangePct ?? 0;
+    const bv = b.priceChangePct ?? 0;
     return bv - av;
   };
 
