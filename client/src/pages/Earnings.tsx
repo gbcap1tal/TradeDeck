@@ -334,18 +334,15 @@ export default function Earnings() {
                 </thead>
                 <tbody>
                   {sorted.map((item) => {
-                    const epClass = item.epScore?.classification;
-                    const isStrongEp = epClass === 'strong_ep';
-                    const isPotentialEp = epClass === 'potential_ep';
+                    const isEpQualified = item.epScore?.classification === 'strong_ep';
 
                     return (
                       <tr
                         key={item.ticker}
                         className={cn(
                           "group border-b border-white/[0.03] transition-colors",
-                          isStrongEp && "bg-[rgba(34,197,94,0.04)] border-l-2 border-l-[#30d158]/40",
-                          isPotentialEp && "bg-[rgba(245,158,11,0.03)] border-l-2 border-l-[#FBBB04]/30",
-                          !isStrongEp && !isPotentialEp && "hover:bg-white/[0.02]"
+                          isEpQualified && "bg-[rgba(34,197,94,0.04)] border-l-2 border-l-[#30d158]/40",
+                          !isEpQualified && "hover:bg-white/[0.02]"
                         )}
                         data-testid={`row-earnings-${item.ticker}`}
                       >
@@ -359,14 +356,9 @@ export default function Earnings() {
                               >
                                 {item.ticker}
                               </span>
-                              {isStrongEp && (
+                              {isEpQualified && (
                                 <span className="px-1.5 py-0.5 text-[8px] font-bold rounded bg-[#30d158]/15 text-[#30d158] border border-[#30d158]/20" data-testid={`badge-ep-${item.ticker}`}>
                                   EP {item.epScore?.totalScore?.toFixed(0)}
-                                </span>
-                              )}
-                              {isPotentialEp && (
-                                <span className="px-1.5 py-0.5 text-[8px] font-bold rounded bg-[#FBBB04]/10 text-[#FBBB04] border border-[#FBBB04]/20" data-testid={`badge-ep-${item.ticker}`}>
-                                  EP? {item.epScore?.totalScore?.toFixed(0)}
                                 </span>
                               )}
                             </div>
@@ -417,13 +409,8 @@ export default function Earnings() {
                         </td>
 
                         <td className="text-center px-3 py-2.5">
-                          {item.epScore && !item.epScore.isDisqualified && item.epScore.totalScore != null && item.epScore.totalScore > 0 ? (
-                            <span className={cn(
-                              "text-[11px] font-bold font-mono-nums",
-                              isStrongEp ? "text-[#30d158]" :
-                              isPotentialEp ? "text-[#FBBB04]" :
-                              "text-white/25"
-                            )} data-testid={`text-ep-score-${item.ticker}`}>
+                          {isEpQualified && item.epScore?.totalScore != null ? (
+                            <span className="text-[11px] font-bold font-mono-nums text-[#30d158]" data-testid={`text-ep-score-${item.ticker}`}>
                               {item.epScore.totalScore.toFixed(0)}
                             </span>
                           ) : (
@@ -470,12 +457,12 @@ function EarningsModal({ item, onClose, isLoadingSummary, summaryData }: {
 }) {
   const summary = item.aiSummary || summaryData?.summary;
   const ep = item.epScore;
-  const isEp = ep && !ep.isDisqualified && (ep.classification === 'strong_ep' || ep.classification === 'potential_ep');
+  const isEp = ep && !ep.isDisqualified && ep.classification === 'strong_ep';
 
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4" data-testid="modal-earnings-summary">
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
-      <div className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto glass-card rounded-xl border border-white/10">
+      <div className="absolute inset-0 bg-black/90" onClick={onClose} />
+      <div className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-[#111111] rounded-xl border border-white/10 shadow-2xl">
         <div className="sticky top-0 z-10 bg-[#0e0e0e] border-b border-white/[0.06] px-5 py-3 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
@@ -524,20 +511,10 @@ function EarningsModal({ item, onClose, isLoadingSummary, summaryData }: {
           </div>
 
           {isEp && ep && (
-            <div className={cn(
-              "rounded-lg p-4 border",
-              ep.classification === 'strong_ep'
-                ? "bg-[rgba(34,197,94,0.04)] border-[#30d158]/20"
-                : "bg-[rgba(245,158,11,0.03)] border-[#FBBB04]/20"
-            )} data-testid="section-ep-analysis">
+            <div className="rounded-lg p-4 border bg-[rgba(34,197,94,0.04)] border-[#30d158]/20" data-testid="section-ep-analysis">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-[13px] font-semibold text-white/80">Episodic Pivot Analysis</h3>
-                <span className={cn(
-                  "px-2 py-0.5 text-[11px] font-bold rounded",
-                  ep.classification === 'strong_ep'
-                    ? "bg-[#30d158]/15 text-[#30d158]"
-                    : "bg-[#FBBB04]/10 text-[#FBBB04]"
-                )}>
+                <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-[#30d158]/15 text-[#30d158]">
                   EP Score: {ep.totalScore?.toFixed(0)}/100
                 </span>
               </div>

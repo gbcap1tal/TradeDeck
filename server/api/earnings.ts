@@ -481,8 +481,7 @@ export function calculateEpScore(input: EpScoreInput): EpScoreResult {
   ) * 10 + bonusPoints;
 
   let classification = 'none';
-  if (total >= 75) classification = 'strong_ep';
-  else if (total >= 55) classification = 'potential_ep';
+  if (total >= 80) classification = 'strong_ep';
 
   return {
     totalScore: Math.round(total * 10) / 10,
