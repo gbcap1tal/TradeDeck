@@ -338,6 +338,49 @@ async function fetchPriceDataForEarnings(ticker: string, dateStr: string, timing
   try {
     const YahooFinance = await import('yahoo-finance2').then(m => m.default);
     const yf: any = new (YahooFinance as any)();
+
+    const isAMC = timing === 'AMC';
+    const today = new Date().toISOString().split('T')[0];
+    const reportDate = new Date(dateStr);
+    const isRecentAMC = isAMC && (today > dateStr);
+
+    if (isRecentAMC) {
+      try {
+        const quote = await yf.quote(ticker);
+        if (quote) {
+          const prevClose = quote.regularMarketPreviousClose;
+          const currentPrice = quote.regularMarketPrice;
+          const openPrice = quote.regularMarketOpen;
+          const preMarketPrice = quote.preMarketPrice;
+          const marketState = quote.marketState;
+
+          result.priorClose = prevClose ? Math.round(prevClose * 100) / 100 : null;
+          result.openPrice = openPrice ? Math.round(openPrice * 100) / 100 : null;
+          result.volumeOnDay = quote.regularMarketVolume ?? null;
+          result.avgDailyVolume20d = quote.averageDailyVolume10Day ?? null;
+          result.high52w = quote.fiftyTwoWeekHigh ? Math.round(quote.fiftyTwoWeekHigh * 100) / 100 : null;
+
+          if (prevClose && prevClose > 0) {
+            if (marketState === 'PRE' && preMarketPrice) {
+              result.priceChangePct = Math.round(((preMarketPrice - prevClose) / prevClose) * 10000) / 100;
+              result.gapPct = result.priceChangePct;
+            } else if (currentPrice) {
+              result.priceChangePct = Math.round(((currentPrice - prevClose) / prevClose) * 10000) / 100;
+              if (openPrice) {
+                result.gapPct = Math.round(((openPrice - prevClose) / prevClose) * 10000) / 100;
+              }
+            }
+          }
+
+          if (result.avgDailyVolume20d && result.avgDailyVolume20d > 0 && result.volumeOnDay) {
+            result.volumeIncreasePct = Math.round((result.volumeOnDay / result.avgDailyVolume20d) * 10000) / 100;
+          }
+        }
+      } catch (quoteErr: any) {
+        console.error(`Yahoo quote error for AMC ${ticker}:`, quoteErr.message);
+      }
+    }
+
     const endDate = new Date(dateStr);
     endDate.setDate(endDate.getDate() + 5);
     const startDate = new Date(dateStr);
@@ -366,24 +409,21 @@ async function fetchPriceDataForEarnings(ticker: string, dateStr: string, timing
       earningsIdx = hist.length - 1;
     }
 
-    if (earningsIdx >= 0) {
-      const isAMC = timing === 'AMC';
+    if (!isRecentAMC && earningsIdx >= 0) {
       const reactionIdx = isAMC ? earningsIdx + 1 : earningsIdx;
       const priorIdx = isAMC ? earningsIdx : earningsIdx - 1;
 
       if (reactionIdx < hist.length && priorIdx >= 0) {
         const reactionDay = hist[reactionIdx];
         const priorDay = hist[priorIdx];
-
         result.priorClose = Math.round((priorDay.close ?? 0) * 100) / 100;
         result.openPrice = Math.round((reactionDay.open ?? 0) * 100) / 100;
         result.volumeOnDay = reactionDay.volume ?? null;
-
         if (result.priorClose && result.priorClose > 0) {
           result.priceChangePct = Math.round(((reactionDay.close - result.priorClose) / result.priorClose) * 10000) / 100;
           result.gapPct = Math.round(((reactionDay.open - result.priorClose) / result.priorClose) * 10000) / 100;
         }
-      } else if (earningsIdx >= 0) {
+      } else {
         const day = hist[earningsIdx];
         result.openPrice = Math.round((day.open ?? 0) * 100) / 100;
         result.volumeOnDay = day.volume ?? null;
@@ -396,10 +436,23 @@ async function fetchPriceDataForEarnings(ticker: string, dateStr: string, timing
           }
         }
       }
+    } else if (!isAMC && earningsIdx >= 0) {
+      const day = hist[earningsIdx];
+      result.openPrice = Math.round((day.open ?? 0) * 100) / 100;
+      result.volumeOnDay = day.volume ?? null;
+      if (earningsIdx > 0) {
+        const prevDay = hist[earningsIdx - 1];
+        result.priorClose = Math.round((prevDay.close ?? 0) * 100) / 100;
+        if (result.priorClose && result.priorClose > 0) {
+          result.priceChangePct = Math.round(((day.close - result.priorClose) / result.priorClose) * 10000) / 100;
+          result.gapPct = Math.round(((day.open - result.priorClose) / result.priorClose) * 10000) / 100;
+        }
+      }
+    }
 
-      const volIdx = isAMC && reactionIdx < hist.length ? reactionIdx : earningsIdx;
-      const volumeSlice = hist.slice(Math.max(0, volIdx - 20), volIdx);
-      if (volumeSlice.length > 0) {
+    if (earningsIdx >= 0) {
+      const volumeSlice = hist.slice(Math.max(0, earningsIdx - 20), earningsIdx);
+      if (volumeSlice.length > 0 && !result.avgDailyVolume20d) {
         const totalVol = volumeSlice.reduce((sum, d) => sum + (d.volume || 0), 0);
         result.avgDailyVolume20d = Math.round(totalVol / volumeSlice.length);
         if (result.avgDailyVolume20d > 0 && result.volumeOnDay) {
@@ -408,11 +461,13 @@ async function fetchPriceDataForEarnings(ticker: string, dateStr: string, timing
       }
     }
 
-    let high52w = 0;
-    for (const d of hist) {
-      if (d.high > high52w) high52w = d.high;
+    if (!result.high52w) {
+      let high52w = 0;
+      for (const d of hist) {
+        if (d.high > high52w) high52w = d.high;
+      }
+      result.high52w = Math.round(high52w * 100) / 100;
     }
-    result.high52w = Math.round(high52w * 100) / 100;
 
     if (hist.length >= 40) {
       result.price2MonthsAgo = Math.round(hist[0].close * 100) / 100;
@@ -619,10 +674,10 @@ Format your response as JSON:
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-5-mini',
+      model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
-      max_completion_tokens: 1024,
+      max_tokens: 1024,
     });
 
     const content = response.choices[0]?.message?.content;
