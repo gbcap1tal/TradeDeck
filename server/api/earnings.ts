@@ -641,22 +641,23 @@ export async function generateAiSummary(ticker: string, reportDate: string): Pro
   if (hasTranscript) {
     prompt = `You are a financial analyst. Analyze this EARNINGS CALL TRANSCRIPT for ${report.companyName} (${ticker}).
 
-IMPORTANT: Do NOT repeat EPS or revenue numbers — the user already sees those. Instead focus ENTIRELY on insights from the transcript:
+IMPORTANT: Do NOT repeat EPS or revenue numbers — the user already sees those. Instead focus ENTIRELY on insights from the transcript.
 
 TRANSCRIPT (${transcriptResult.source}):
 ${transcriptResult.transcript}
 
 Generate TWO outputs:
 
-OUTPUT 1 — EARNINGS CALL ANALYSIS (150-250 words):
-Focus exclusively on management commentary from the call:
-- Forward guidance: What did management say about next quarter/year outlook?
-- Key growth drivers or headwinds mentioned
-- New products, markets, or strategic initiatives discussed
-- Management's tone and confidence level
-- Any notable analyst questions or management responses
-- Competitive positioning comments
-Do NOT restate EPS/revenue figures.
+OUTPUT 1 — EARNINGS CALL ANALYSIS:
+Write 5-7 bullet points (each starting with "• "). Each bullet should be one concise insight (1-2 sentences max). Cover:
+• Forward guidance / outlook for next quarter or year
+• Key growth drivers or acceleration areas
+• Headwinds, risks, or challenges mentioned
+• New products, markets, or strategic initiatives
+• Management tone and confidence level
+• Notable analyst questions or concerns raised
+• Competitive positioning or market share comments
+Do NOT restate EPS/revenue figures. Do NOT write a paragraph — ONLY bullet points.
 
 OUTPUT 2 — EPISODIC PIVOT ASSESSMENT:
 - GUIDANCE_SCORE: [1-10] — How strong/positive was forward guidance from management?
@@ -665,7 +666,7 @@ OUTPUT 2 — EPISODIC PIVOT ASSESSMENT:
 
 Format as JSON:
 {
-  "earnings_summary": "...",
+  "earnings_summary": "• bullet 1\\n• bullet 2\\n• bullet 3\\n...",
   "guidance_score": X,
   "guidance_assessment": "...",
   "narrative_score": X,
@@ -673,6 +674,7 @@ Format as JSON:
   "ep_verdict": "..."
 }`;
   } else {
+    const volMultiple = report.volumeIncreasePct ? (report.volumeIncreasePct / 100).toFixed(1) + 'x' : 'N/A';
     prompt = `You are a financial analyst. Provide a brief earnings analysis for ${report.companyName} (${ticker}).
 
 REPORT DATE: ${report.reportDate}
@@ -680,11 +682,12 @@ PRICE CHANGE: ${report.priceChangePct ?? 'N/A'}%
 GAP: ${report.gapPct ?? 'N/A'}%
 VOLUME vs ADV: ${report.volumeIncreasePct ?? 'N/A'}%
 
-Note: No earnings call transcript is available yet. Provide a brief analysis based on the market reaction.
+No earnings call transcript is available yet. Write 3-4 bullet points (each starting with "• ") analyzing the market reaction.
+Do NOT repeat exact EPS/revenue numbers. Focus on what price action and volume suggest about market sentiment.
 
 Format as JSON:
 {
-  "earnings_summary": "Transcript not yet available. Market reaction: ${report.priceChangePct ?? 0}% move on ${report.volumeIncreasePct ? (report.volumeIncreasePct / 100).toFixed(1) + 'x' : 'N/A'} average volume. [Add 1-2 sentences about what the price/volume action suggests]",
+  "earnings_summary": "• Transcript not yet available\\n• Market reaction: ${report.priceChangePct ?? 0}% move on ${volMultiple} average volume\\n• [bullet about what this suggests]\\n• [bullet about sentiment]",
   "guidance_score": 5,
   "guidance_assessment": "No transcript available to assess guidance",
   "narrative_score": 5,

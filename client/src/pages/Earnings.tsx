@@ -84,6 +84,34 @@ function isWeekend(year: number, month: number, day: number): boolean {
   return dow === 0 || dow === 6;
 }
 
+function renderBulletSummary(summary: string) {
+  const lines = summary.split('\n').filter(l => l.trim().length > 0);
+  const hasBullets = lines.some(l => l.trim().startsWith('•') || l.trim().startsWith('-'));
+
+  if (hasBullets) {
+    return (
+      <ul className="space-y-2" data-testid="text-ai-summary">
+        {lines.map((line, i) => {
+          const text = line.replace(/^[•\-]\s*/, '').trim();
+          if (!text) return null;
+          return (
+            <li key={i} className="flex gap-2 text-[12px] text-white/55 leading-relaxed">
+              <span className="text-[#FBBB04]/60 mt-0.5 shrink-0">&#8226;</span>
+              <span>{text}</span>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <p className="text-[12px] text-white/55 leading-relaxed" data-testid="text-ai-summary">
+      {summary}
+    </p>
+  );
+}
+
 export default function Earnings() {
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState(today.toISOString().split('T')[0]);
@@ -168,27 +196,27 @@ export default function Earnings() {
   return (
     <div className="min-h-screen bg-background" data-testid="page-earnings">
       <Navbar />
-      <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-6">
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
+      <div className="max-w-[1400px] mx-auto px-2 sm:px-6 py-3 sm:py-6">
+        <div className="flex items-center justify-between mb-3 sm:mb-6 px-1 sm:px-0">
           <div>
-            <h1 className="text-lg sm:text-xl font-semibold text-white/90 tracking-tight" data-testid="text-earnings-title">
+            <h1 className="text-base sm:text-xl font-semibold text-white/90 tracking-tight" data-testid="text-earnings-title">
               Earnings Calendar
             </h1>
-            <p className="text-[12px] text-white/30 mt-0.5">
-              Earnings reports, surprises & Episodic Pivot detection
+            <p className="text-[11px] sm:text-[12px] text-white/30 mt-0.5">
+              Earnings reports, surprises & EP detection
             </p>
           </div>
         </div>
 
-        <div className="glass-card rounded-xl p-4 mb-4" data-testid="card-date-navigation">
-          <div className="flex items-center justify-between mb-3">
-            <button onClick={prevMonth} className="p-1 rounded hover:bg-white/5 text-white/40 hover:text-white/60 transition-colors" data-testid="button-prev-month">
+        <div className="glass-card rounded-xl p-3 sm:p-4 mb-3 sm:mb-4" data-testid="card-date-navigation">
+          <div className="flex items-center justify-between mb-2 sm:mb-3">
+            <button onClick={prevMonth} className="p-1.5 rounded hover:bg-white/5 text-white/40 hover:text-white/60 transition-colors" data-testid="button-prev-month">
               <ChevronLeft className="w-4 h-4" />
             </button>
             <span className="text-[13px] font-medium text-white/70" data-testid="text-current-month">
               {getMonthName(currentMonth)} {currentYear}
             </span>
-            <button onClick={nextMonth} className="p-1 rounded hover:bg-white/5 text-white/40 hover:text-white/60 transition-colors" data-testid="button-next-month">
+            <button onClick={nextMonth} className="p-1.5 rounded hover:bg-white/5 text-white/40 hover:text-white/60 transition-colors" data-testid="button-next-month">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -240,12 +268,12 @@ export default function Earnings() {
         </div>
 
         <div className="glass-card rounded-xl overflow-hidden" data-testid="card-earnings-table">
-          <div className="px-4 py-3 border-b border-white/[0.06] flex items-center justify-between flex-wrap gap-2">
+          <div className="px-3 sm:px-4 py-2.5 sm:py-3 border-b border-white/[0.06] flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
-              <span className="text-[13px] font-medium text-white/70" data-testid="text-selected-date">
+              <span className="text-[12px] sm:text-[13px] font-medium text-white/70" data-testid="text-selected-date">
                 {new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
               </span>
-              <span className="text-[11px] text-white/30">
+              <span className="text-[10px] sm:text-[11px] text-white/30">
                 {freshResults.length + alreadyTraded.length} report{(freshResults.length + alreadyTraded.length) !== 1 ? 's' : ''}
               </span>
             </div>
@@ -261,30 +289,40 @@ export default function Earnings() {
               <p className="text-[11px] mt-1 text-white/20">Select a date with earnings data</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div>
               {freshResults.length > 0 && (
                 <>
-                  <div className="px-4 py-2 bg-purple-500/[0.05] border-b border-white/[0.06]" data-testid="section-fresh-results">
+                  <div className="px-3 sm:px-4 py-2 bg-purple-500/[0.05] border-b border-white/[0.06]" data-testid="section-fresh-results">
                     <div className="flex items-center gap-2">
                       <span className="px-1.5 py-0.5 text-[9px] font-semibold rounded bg-purple-500/10 text-purple-400/80">AMC</span>
-                      <span className="text-[11px] font-medium text-white/50">Fresh Results — Reported After Close</span>
+                      <span className="text-[10px] sm:text-[11px] font-medium text-white/50">Fresh Results — After Close</span>
                       <span className="text-[10px] text-white/25">{freshResults.length}</span>
                     </div>
                   </div>
-                  <EarningsTable items={freshResults} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
+                  <div className="hidden sm:block overflow-x-auto">
+                    <EarningsTable items={freshResults} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
+                  </div>
+                  <div className="sm:hidden">
+                    <EarningsMobileList items={freshResults} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
+                  </div>
                 </>
               )}
 
               {alreadyTraded.length > 0 && (
                 <>
-                  <div className="px-4 py-2 bg-blue-500/[0.05] border-b border-white/[0.06]" data-testid="section-already-traded">
+                  <div className="px-3 sm:px-4 py-2 bg-blue-500/[0.05] border-b border-white/[0.06]" data-testid="section-already-traded">
                     <div className="flex items-center gap-2">
                       <span className="px-1.5 py-0.5 text-[9px] font-semibold rounded bg-blue-500/10 text-blue-400/80">BMO</span>
-                      <span className="text-[11px] font-medium text-white/50">Already Traded — Reported Before Open</span>
+                      <span className="text-[10px] sm:text-[11px] font-medium text-white/50">Already Traded — Before Open</span>
                       <span className="text-[10px] text-white/25">{alreadyTraded.length}</span>
                     </div>
                   </div>
-                  <EarningsTable items={alreadyTraded} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
+                  <div className="hidden sm:block overflow-x-auto">
+                    <EarningsTable items={alreadyTraded} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
+                  </div>
+                  <div className="sm:hidden">
+                    <EarningsMobileList items={alreadyTraded} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
+                  </div>
                 </>
               )}
             </div>
@@ -300,6 +338,80 @@ export default function Earnings() {
           summaryData={summaryMutation.data}
         />
       )}
+    </div>
+  );
+}
+
+function EarningsMobileList({ items, onTickerClick, onDetailsClick }: {
+  items: EarningsItem[];
+  onTickerClick: (ticker: string) => void;
+  onDetailsClick: (item: EarningsItem) => void;
+}) {
+  return (
+    <div className="divide-y divide-white/[0.04]">
+      {items.map((item) => {
+        const isEpQualified = item.epScore?.classification === 'strong_ep';
+
+        return (
+          <div
+            key={item.ticker}
+            className={cn(
+              "px-3 py-3",
+              isEpQualified && "bg-[rgba(34,197,94,0.04)] border-l-2 border-l-[#30d158]/40"
+            )}
+            data-testid={`row-earnings-mobile-${item.ticker}`}
+          >
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span
+                  className="text-[13px] font-semibold text-white/90 font-mono-nums cursor-pointer hover:text-[#FBBB04] transition-colors shrink-0"
+                  onClick={() => onTickerClick(item.ticker)}
+                  data-testid={`link-ticker-mobile-${item.ticker}`}
+                >
+                  {item.ticker}
+                </span>
+                {isEpQualified && (
+                  <span className="px-1.5 py-0.5 text-[8px] font-bold rounded bg-[#30d158]/15 text-[#30d158] border border-[#30d158]/20 shrink-0">
+                    EP {item.epScore?.totalScore?.toFixed(0)}
+                  </span>
+                )}
+                <span className="text-[10px] text-white/30 truncate">{item.companyName}</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className={cn("text-[13px] font-semibold font-mono-nums", priceChangeColor(item.priceChangePct))}>
+                  {item.priceChangePct != null ? `${item.priceChangePct > 0 ? '+' : ''}${item.priceChangePct.toFixed(1)}%` : '—'}
+                </span>
+                <button
+                  onClick={() => onDetailsClick(item)}
+                  className="p-1 rounded hover:bg-white/5 text-white/25 hover:text-white/50 transition-colors"
+                  data-testid={`button-details-mobile-${item.ticker}`}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-[10px]">
+              <div>
+                <span className="text-white/25">EPS </span>
+                <span className="text-white/60 font-mono-nums">{formatEps(item.epsReported)}</span>
+                <span className={cn(" ml-1 font-mono-nums", surpriseColor(item.epsSurprisePct))}>
+                  {item.epsSurprisePct != null ? `${item.epsSurprisePct > 0 ? '+' : ''}${item.epsSurprisePct.toFixed(0)}%` : ''}
+                </span>
+              </div>
+              <div>
+                <span className="text-white/25">Rev </span>
+                <span className="text-white/60 font-mono-nums">{formatRevenue(item.revenueReported)}</span>
+              </div>
+              <div className="text-right">
+                <span className="text-white/25">Vol </span>
+                <span className="text-white/50 font-mono-nums">
+                  {item.volumeIncreasePct != null ? `${item.volumeIncreasePct.toFixed(0)}%` : '—'}
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -436,16 +548,16 @@ function EarningsModal({ item, onClose, isLoadingSummary, summaryData }: {
   const isEp = ep && !ep.isDisqualified && ep.classification === 'strong_ep';
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4" data-testid="modal-earnings-summary">
+    <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center sm:p-4" data-testid="modal-earnings-summary">
       <div className="absolute inset-0 bg-black/90" onClick={onClose} />
-      <div className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-[#111111] rounded-xl border border-white/10 shadow-2xl">
-        <div className="sticky top-0 z-10 bg-[#0e0e0e] border-b border-white/[0.06] px-5 py-3 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[15px] font-semibold text-white/90">{item.companyName}</span>
-              <span className="text-[13px] font-mono-nums text-[#FBBB04]">{item.ticker}</span>
+      <div className="relative w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[85vh] overflow-y-auto bg-[#111111] rounded-t-xl sm:rounded-xl border border-white/10 shadow-2xl">
+        <div className="sticky top-0 z-10 bg-[#0e0e0e] border-b border-white/[0.06] px-4 sm:px-5 py-3 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[14px] sm:text-[15px] font-semibold text-white/90 truncate">{item.companyName}</span>
+              <span className="text-[12px] sm:text-[13px] font-mono-nums text-[#FBBB04] shrink-0">{item.ticker}</span>
               <span className={cn(
-                "px-1.5 py-0.5 text-[8px] font-semibold rounded",
+                "px-1.5 py-0.5 text-[8px] font-semibold rounded shrink-0",
                 item.timing === 'BMO' ? "bg-blue-500/10 text-blue-400/80" : "bg-purple-500/10 text-purple-400/80"
               )}>
                 {item.timing}
@@ -453,13 +565,13 @@ function EarningsModal({ item, onClose, isLoadingSummary, summaryData }: {
             </div>
             <span className="text-[11px] text-white/30">{item.reportDate}</span>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-white/5 text-white/40 hover:text-white/60" data-testid="button-close-modal">
+          <button onClick={onClose} className="p-1.5 rounded hover:bg-white/5 text-white/40 hover:text-white/60 shrink-0" data-testid="button-close-modal">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="p-5 space-y-5">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="p-4 sm:p-5 space-y-4 sm:space-y-5">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
             <MetricCard
               label="EPS"
               value={formatEps(item.epsReported)}
@@ -487,10 +599,10 @@ function EarningsModal({ item, onClose, isLoadingSummary, summaryData }: {
           </div>
 
           {isEp && ep && (
-            <div className="rounded-lg p-4 border bg-[rgba(34,197,94,0.04)] border-[#30d158]/20" data-testid="section-ep-analysis">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-[13px] font-semibold text-white/80">Episodic Pivot Analysis</h3>
-                <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-[#30d158]/15 text-[#30d158]">
+            <div className="rounded-lg p-3 sm:p-4 border bg-[rgba(34,197,94,0.04)] border-[#30d158]/20" data-testid="section-ep-analysis">
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <h3 className="text-[12px] sm:text-[13px] font-semibold text-white/80">Episodic Pivot Analysis</h3>
+                <span className="px-2 py-0.5 text-[10px] sm:text-[11px] font-bold rounded bg-[#30d158]/15 text-[#30d158]">
                   EP Score: {ep.totalScore?.toFixed(0)}/100
                 </span>
               </div>
@@ -509,24 +621,22 @@ function EarningsModal({ item, onClose, isLoadingSummary, summaryData }: {
               )}
 
               {ep.aiVerdict && (
-                <p className="text-[12px] text-white/60 leading-relaxed mt-2">{ep.aiVerdict}</p>
+                <p className="text-[11px] sm:text-[12px] text-white/60 leading-relaxed mt-2">{ep.aiVerdict}</p>
               )}
             </div>
           )}
 
           <div data-testid="section-ai-summary">
-            <h3 className="text-[13px] font-semibold text-white/70 mb-2">Earnings Summary</h3>
+            <h3 className="text-[12px] sm:text-[13px] font-semibold text-white/70 mb-2">Earnings Summary</h3>
             {isLoadingSummary ? (
               <div className="flex items-center gap-2 py-6 justify-center">
                 <Loader2 className="w-4 h-4 animate-spin text-white/20" />
-                <span className="text-[12px] text-white/30">Generating AI analysis...</span>
+                <span className="text-[11px] sm:text-[12px] text-white/30">Analyzing earnings call...</span>
               </div>
             ) : summary ? (
-              <p className="text-[12px] text-white/55 leading-relaxed whitespace-pre-wrap" data-testid="text-ai-summary">
-                {summary}
-              </p>
+              renderBulletSummary(summary)
             ) : (
-              <p className="text-[12px] text-white/30 py-4 text-center">
+              <p className="text-[11px] sm:text-[12px] text-white/30 py-4 text-center">
                 No summary available. Click to generate one.
               </p>
             )}
@@ -551,15 +661,15 @@ function MetricCard({ label, value, sub, surprise, highlight }: {
       : 'text-white/70';
 
   return (
-    <div className="bg-white/[0.03] rounded-lg p-3">
-      <p className="text-[9px] text-white/30 uppercase tracking-wider font-semibold mb-1">{label}</p>
-      <p className={cn("text-[14px] font-semibold font-mono-nums", color)}>{value}</p>
+    <div className="bg-white/[0.03] rounded-lg p-2.5 sm:p-3">
+      <p className="text-[8px] sm:text-[9px] text-white/30 uppercase tracking-wider font-semibold mb-1">{label}</p>
+      <p className={cn("text-[13px] sm:text-[14px] font-semibold font-mono-nums", color)}>{value}</p>
       {surprise != null && (
-        <p className={cn("text-[10px] font-mono-nums mt-0.5", surprise > 0 ? 'text-[#30d158]/70' : surprise < 0 ? 'text-[#ff453a]/70' : 'text-white/30')}>
+        <p className={cn("text-[9px] sm:text-[10px] font-mono-nums mt-0.5", surprise > 0 ? 'text-[#30d158]/70' : surprise < 0 ? 'text-[#ff453a]/70' : 'text-white/30')}>
           {surprise > 0 ? '+' : ''}{surprise.toFixed(1)}% surprise
         </p>
       )}
-      {sub && <p className="text-[10px] text-white/25 mt-0.5">{sub}</p>}
+      {sub && <p className="text-[9px] sm:text-[10px] text-white/25 mt-0.5">{sub}</p>}
     </div>
   );
 }
