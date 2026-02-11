@@ -306,10 +306,13 @@ function NewsPanel({ symbol }: { symbol: string }) {
             const isBreaking = item.breaking && isTodayET(item.timestamp);
 
             if (isBreaking) {
+              const BreakingWrapper = item.url ? 'a' : 'div';
+              const breakingLinkProps = item.url ? { href: item.url, target: '_blank' as const, rel: 'noreferrer' } : {};
               return (
-                <div
+                <BreakingWrapper
                   key={item.id}
-                  className="px-2.5 py-1.5 -mx-1"
+                  {...breakingLinkProps}
+                  className="block px-2.5 py-1.5 -mx-1 cursor-pointer"
                   style={{ background: 'rgba(251, 187, 4, 0.08)', borderLeft: '2px solid #FBBB04' }}
                   data-testid="news-item-breaking"
                 >
@@ -321,7 +324,7 @@ function NewsPanel({ symbol }: { symbol: string }) {
                   <p className="text-[13px] text-[#FBBB04]/90 leading-snug">
                     {item.headline}
                   </p>
-                </div>
+                </BreakingWrapper>
               );
             }
 
