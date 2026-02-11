@@ -632,41 +632,66 @@ export async function generateAiSummary(ticker: string, reportDate: string): Pro
 
   if (report.aiSummary) return report.aiSummary;
 
-  const prompt = `You are a financial analyst specializing in earnings analysis and Episodic Pivot detection.
+  const { fetchEarningsTranscript } = await import('./transcripts');
+  const transcriptResult = await fetchEarningsTranscript(ticker, reportDate);
+  const hasTranscript = transcriptResult.transcript && transcriptResult.transcript.length > 200;
 
-COMPANY: ${report.companyName} (${report.ticker})
-REPORT DATE: ${report.reportDate}
-EPS: ${report.epsReported ?? 'N/A'} vs estimate ${report.epsEstimate ?? 'N/A'} (surprise: ${report.epsSurprisePct ?? 'N/A'}%)
-REVENUE: ${report.revenueReported ? formatLargeNumber(report.revenueReported) : 'N/A'} vs estimate ${report.revenueEstimate ? formatLargeNumber(report.revenueEstimate) : 'N/A'} (surprise: ${report.revenueSurprisePct ?? 'N/A'}%)
-PRICE CHANGE: ${report.priceChangePct ?? 'N/A'}%
-GAP: ${report.gapPct ?? 'N/A'}%
-VOLUME vs ADV: ${report.volumeIncreasePct ?? 'N/A'}%
+  let prompt: string;
+
+  if (hasTranscript) {
+    prompt = `You are a financial analyst. Analyze this EARNINGS CALL TRANSCRIPT for ${report.companyName} (${ticker}).
+
+IMPORTANT: Do NOT repeat EPS or revenue numbers — the user already sees those. Instead focus ENTIRELY on insights from the transcript:
+
+TRANSCRIPT (${transcriptResult.source}):
+${transcriptResult.transcript}
 
 Generate TWO outputs:
 
-OUTPUT 1 — EARNINGS SUMMARY:
-Write a concise but comprehensive summary (150-250 words) covering:
-- Key highlights and beats/misses
-- Notable aspects of the results
-- Overall tone: bullish/neutral/bearish
+OUTPUT 1 — EARNINGS CALL ANALYSIS (150-250 words):
+Focus exclusively on management commentary from the call:
+- Forward guidance: What did management say about next quarter/year outlook?
+- Key growth drivers or headwinds mentioned
+- New products, markets, or strategic initiatives discussed
+- Management's tone and confidence level
+- Any notable analyst questions or management responses
+- Competitive positioning comments
+Do NOT restate EPS/revenue figures.
 
 OUTPUT 2 — EPISODIC PIVOT ASSESSMENT:
-Score each criterion (1-10):
-- GUIDANCE_SCORE: [1-10] — Based on available data about forward outlook
-- NARRATIVE_SCORE: [1-10] — Is there a fundamental story shift?
-- EARNINGS_QUALITY_SCORE: [1-10] — Beat magnitude and quality
-- VERDICT: [2-3 sentences on EP potential]
+- GUIDANCE_SCORE: [1-10] — How strong/positive was forward guidance from management?
+- NARRATIVE_SCORE: [1-10] — Is there a fundamental story change evident in the call?
+- VERDICT: [2-3 sentences on whether this call signals a major inflection point]
 
-Format your response as JSON:
+Format as JSON:
 {
   "earnings_summary": "...",
   "guidance_score": X,
   "guidance_assessment": "...",
   "narrative_score": X,
   "narrative_assessment": "...",
-  "earnings_quality_score": X,
   "ep_verdict": "..."
 }`;
+  } else {
+    prompt = `You are a financial analyst. Provide a brief earnings analysis for ${report.companyName} (${ticker}).
+
+REPORT DATE: ${report.reportDate}
+PRICE CHANGE: ${report.priceChangePct ?? 'N/A'}%
+GAP: ${report.gapPct ?? 'N/A'}%
+VOLUME vs ADV: ${report.volumeIncreasePct ?? 'N/A'}%
+
+Note: No earnings call transcript is available yet. Provide a brief analysis based on the market reaction.
+
+Format as JSON:
+{
+  "earnings_summary": "Transcript not yet available. Market reaction: ${report.priceChangePct ?? 0}% move on ${report.volumeIncreasePct ? (report.volumeIncreasePct / 100).toFixed(1) + 'x' : 'N/A'} average volume. [Add 1-2 sentences about what the price/volume action suggests]",
+  "guidance_score": 5,
+  "guidance_assessment": "No transcript available to assess guidance",
+  "narrative_score": 5,
+  "narrative_assessment": "No transcript available to assess narrative",
+  "ep_verdict": "Cannot fully assess EP without transcript data"
+}`;
+  }
 
   try {
     const response = await openai.chat.completions.create({
