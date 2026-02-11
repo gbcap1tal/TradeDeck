@@ -69,6 +69,18 @@ export async function fetchEarningsCalendar(dateStr: string, forceRefresh: boole
     .where(eq(earningsReports.reportDate, dateStr));
 
   if (existingReports.length > 0) {
+    const today = new Date().toISOString().split('T')[0];
+    const hasMissingActuals = dateStr >= today && existingReports.some(r => r.epsReported === null);
+
+    if (hasMissingActuals) {
+      await refreshActualsFromFinnhub(dateStr, existingReports);
+      const refreshed = await db.select().from(earningsReports)
+        .where(eq(earningsReports.reportDate, dateStr));
+      const items = await enrichWithEpScores(refreshed);
+      setCache(cacheKey, items, 120);
+      return items;
+    }
+
     const items = await enrichWithEpScores(existingReports);
     setCache(cacheKey, items, 300);
     return items;
@@ -275,6 +287,92 @@ async function fetchFromFinnhubAndFMP(dateStr: string): Promise<EarningsCalendar
   }
 
   return items;
+}
+
+async function refreshActualsFromFinnhub(dateStr: string, existing: typeof earningsReports.$inferSelect[]): Promise<void> {
+  const refreshKey = `refresh_actuals_${dateStr}`;
+  const lastRefresh = getCached<number>(refreshKey);
+  if (lastRefresh) return;
+
+  const finnhubKey = getFinnhubKey();
+  if (!finnhubKey) return;
+
+  try {
+    const url = `${FINNHUB_BASE}/calendar/earnings?from=${dateStr}&to=${dateStr}&token=${finnhubKey}`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!resp.ok) return;
+
+    const data = await resp.json();
+    const cal = data?.earningsCalendar;
+    if (!Array.isArray(cal)) return;
+
+    const actualsMap = new Map<string, { epsActual: number | null; revenueActual: number | null }>();
+    for (const item of cal) {
+      if (item.epsActual !== null || item.revenueActual !== null) {
+        actualsMap.set(item.symbol, { epsActual: item.epsActual, revenueActual: item.revenueActual });
+      }
+    }
+
+    if (actualsMap.size === 0) {
+      setCache(refreshKey, Date.now(), 120);
+      return;
+    }
+
+    let updated = 0;
+    for (const report of existing) {
+      if (report.epsReported !== null) continue;
+      const actuals = actualsMap.get(report.ticker);
+      if (!actuals || actuals.epsActual === null) continue;
+
+      const epsSurprise = (report.epsEstimate && actuals.epsActual != null)
+        ? ((actuals.epsActual - report.epsEstimate) / Math.abs(report.epsEstimate || 1)) * 100
+        : null;
+      const revSurprise = (report.revenueEstimate && actuals.revenueActual)
+        ? ((actuals.revenueActual - report.revenueEstimate) / Math.abs(report.revenueEstimate || 1)) * 100
+        : null;
+
+      await db.update(earningsReports)
+        .set({
+          epsReported: actuals.epsActual,
+          revenueReported: actuals.revenueActual,
+          epsSurprisePct: epsSurprise ? Math.round(epsSurprise * 100) / 100 : null,
+          revenueSurprisePct: revSurprise ? Math.round(revSurprise * 100) / 100 : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(earningsReports.id, report.id));
+
+      const epResult = calculateEpScore({
+        volumeIncreasePct: report.volumeIncreasePct,
+        gapPct: report.gapPct,
+        epsSurprisePct: epsSurprise,
+        revenueSurprisePct: revSurprise,
+        high52w: report.high52w,
+        currentPrice: report.openPrice,
+        price2MonthsAgo: report.price2MonthsAgo,
+      });
+
+      await db.update(epScores)
+        .set({
+          totalScore: epResult.totalScore,
+          volumeScore: epResult.volumeScore,
+          earningsQualityScore: epResult.earningsQualityScore,
+          gapScore: epResult.gapScore,
+          baseQualityScore: epResult.baseQualityScore,
+          bonusPoints: epResult.bonusPoints,
+          isDisqualified: epResult.isDisqualified,
+          disqualificationReason: epResult.disqualificationReason,
+          classification: epResult.classification,
+        })
+        .where(eq(epScores.earningsReportId, report.id));
+
+      updated++;
+    }
+
+    console.log(`[earnings] Refreshed actuals for ${dateStr}: ${updated}/${actualsMap.size} updated`);
+    setCache(refreshKey, Date.now(), 120);
+  } catch (e: any) {
+    console.error(`[earnings] Refresh actuals error for ${dateStr}:`, e.message);
+  }
 }
 
 function detectTiming(timeStr: string | undefined | null): string {
