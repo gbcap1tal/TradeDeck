@@ -269,11 +269,9 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
   );
 }
 
-function isTodayET(timestamp: number): boolean {
-  const now = new Date();
-  const todayET = now.toLocaleDateString('en-US', { timeZone: 'America/New_York' });
-  const itemET = new Date(timestamp).toLocaleDateString('en-US', { timeZone: 'America/New_York' });
-  return todayET === itemET;
+function isRecentET(timestamp: number): boolean {
+  const diffMs = Date.now() - timestamp;
+  return diffMs < 48 * 3600000;
 }
 
 function NewsPanel({ symbol }: { symbol: string }) {
@@ -303,7 +301,7 @@ function NewsPanel({ symbol }: { symbol: string }) {
             else if (diffDays < 7) timeLabel = `${diffDays}d ago`;
             else timeLabel = format(itemDate, "MMM d");
 
-            const isBreaking = item.breaking && isTodayET(item.timestamp);
+            const isBreaking = item.breaking && isRecentET(item.timestamp);
 
             if (isBreaking) {
               const BreakingWrapper = item.url ? 'a' : 'div';

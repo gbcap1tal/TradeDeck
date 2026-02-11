@@ -508,6 +508,18 @@ export async function getFinvizNews(symbol: string): Promise<Array<{ id: string;
         }
       });
 
+      let breakingUrl = '';
+      whyMoving.find('a').each((_: number, el: any) => {
+        const href = $(el).attr('href');
+        if (href && href.startsWith('http')) {
+          breakingUrl = href;
+          return false;
+        }
+      });
+      if (!breakingUrl) {
+        breakingUrl = `https://finviz.com/quote.ashx?t=${encodeURIComponent(symbol)}`;
+      }
+
       if (breakingHeadline) {
         let breakingTs = Date.now();
         const timeMatch = breakingTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
@@ -539,7 +551,7 @@ export async function getFinvizNews(symbol: string): Promise<Array<{ id: string;
           headline: breakingHeadline,
           summary: '',
           source: 'Finviz',
-          url: '',
+          url: breakingUrl,
           timestamp: breakingTs,
           relatedSymbols: [symbol],
           breaking: true,
