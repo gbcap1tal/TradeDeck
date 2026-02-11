@@ -191,9 +191,6 @@ export function MarketBreadth() {
 
   const spyTrend = getSPYTrend(t);
 
-  const bulls4 = t.momentum?.components?.fourPercentRatio?.bulls ?? 0;
-  const bears4 = t.momentum?.components?.fourPercentRatio?.bears ?? 0;
-
   const advancingCount = breadth.advancingDeclining?.advancing ?? 0;
   const decliningCount = breadth.advancingDeclining?.declining ?? 0;
 
@@ -239,12 +236,6 @@ export function MarketBreadth() {
             rightLabel="Declining"
             aboveCount={advancingCount}
             belowCount={decliningCount}
-          />
-          <SMABar
-            label="Strength"
-            rightLabel="Weakness"
-            aboveCount={bulls4}
-            belowCount={bears4}
           />
           <SMABar
             label="SMA 50"
