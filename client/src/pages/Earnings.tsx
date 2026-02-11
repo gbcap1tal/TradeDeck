@@ -67,7 +67,7 @@ function priceChangeColor(v: number | null): string {
   return 'text-white/60';
 }
 
-type SortKey = 'ticker' | 'epsReported' | 'epsEstimate' | 'epsSurprisePct' | 'revSurprisePct' | 'priceChangePct' | 'gapPct' | 'volumeIncreasePct' | 'epScore';
+type SortKey = 'ticker' | 'epsReported' | 'epsEstimate' | 'epsSurprisePct' | 'revSurprisePct' | 'priceChangePct' | 'volumeIncreasePct' | 'epScore';
 type SortDir = 'asc' | 'desc';
 
 function getSortValue(item: EarningsItem, key: SortKey): number | string {
@@ -78,7 +78,6 @@ function getSortValue(item: EarningsItem, key: SortKey): number | string {
     case 'epsSurprisePct': return item.epsSurprisePct ?? -Infinity;
     case 'revSurprisePct': return item.revenueSurprisePct ?? -Infinity;
     case 'priceChangePct': return item.priceChangePct ?? -Infinity;
-    case 'gapPct': return item.gapPct ?? -Infinity;
     case 'volumeIncreasePct': return item.volumeIncreasePct ?? -Infinity;
     case 'epScore': return item.epScore?.totalScore ?? -Infinity;
   }
@@ -402,7 +401,6 @@ function MobileSortBar({ sortKey, sortDir, onSort }: { sortKey: SortKey; sortDir
     { key: 'priceChangePct', label: 'Price' },
     { key: 'epsSurprisePct', label: 'Surprise' },
     { key: 'volumeIncreasePct', label: 'Volume' },
-    { key: 'gapPct', label: 'Gap' },
     { key: 'ticker', label: 'Name' },
     { key: 'epScore', label: 'EP' },
   ];
@@ -583,7 +581,6 @@ function EarningsTable({ items, onTickerClick, onDetailsClick }: {
           <SortHeader label="Estimate" sortKey="epsEstimate" {...hp} />
           <SortHeader label="Surprise" sortKey="epsSurprisePct" {...hp} />
           <SortHeader label="Price Chg" sortKey="priceChangePct" {...hp} />
-          <SortHeader label="Gap" sortKey="gapPct" {...hp} />
           <SortHeader label="Vol %" sortKey="volumeIncreasePct" {...hp} />
           <SortHeader label="EP" sortKey="epScore" align="center" {...hp} />
           <th className="w-10 px-2 py-2" />
@@ -650,12 +647,6 @@ function EarningsTable({ items, onTickerClick, onDetailsClick }: {
               <td className="text-right px-3 py-2.5 font-mono-nums">
                 <span className={cn("text-[13px] font-semibold", priceChangeColor(item.priceChangePct))} data-testid={`text-price-change-${item.ticker}`}>
                   {item.priceChangePct != null ? `${item.priceChangePct > 0 ? '+' : ''}${item.priceChangePct.toFixed(1)}%` : '—'}
-                </span>
-              </td>
-
-              <td className="text-right px-3 py-2.5 font-mono-nums">
-                <span className={cn("text-[12px]", priceChangeColor(item.gapPct))}>
-                  {item.gapPct != null ? `${item.gapPct > 0 ? '+' : ''}${item.gapPct.toFixed(1)}%` : '—'}
                 </span>
               </td>
 
