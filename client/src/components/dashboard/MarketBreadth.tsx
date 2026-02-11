@@ -194,6 +194,9 @@ export function MarketBreadth() {
   const bulls4 = t.momentum?.components?.fourPercentRatio?.bulls ?? 0;
   const bears4 = t.momentum?.components?.fourPercentRatio?.bears ?? 0;
 
+  const advancingCount = breadth.advancingDeclining?.advancing ?? 0;
+  const decliningCount = breadth.advancingDeclining?.declining ?? 0;
+
   const above50 = t.breadth?.components?.above50ma?.above ?? 0;
   const below50 = t.breadth?.components?.above50ma?.below ?? 0;
 
@@ -231,6 +234,12 @@ export function MarketBreadth() {
 
       <div className="glass-card rounded-xl p-3 sm:p-5 mt-2">
         <div className="flex flex-col gap-3.5">
+          <SMABar
+            label="Advancing"
+            rightLabel="Declining"
+            aboveCount={advancingCount}
+            belowCount={decliningCount}
+          />
           <SMABar
             label="Strength"
             rightLabel="Weakness"

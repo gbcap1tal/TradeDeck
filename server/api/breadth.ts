@@ -229,6 +229,7 @@ export interface BreadthData {
       };
     };
   };
+  advancingDeclining?: { advancing: number; declining: number };
   universeSize: number;
 }
 
@@ -271,6 +272,7 @@ export async function computeQuoteBreadth(): Promise<{
   netHighs52w: { value: number; highs: number; lows: number; score: number; max: number };
   fourPercent: { value: number; bulls: number; bears: number; score: number; max: number };
   vixLevel: { value: number; score: number; max: number };
+  advancingDeclining: { advancing: number; declining: number };
   universeSize: number;
 }> {
   const broadData = await yahoo.getBroadMarketData();
@@ -279,6 +281,7 @@ export async function computeQuoteBreadth(): Promise<{
   let above50 = 0, above200 = 0, total50 = 0, total200 = 0;
   let newHighs = 0, newLows = 0;
   let bulls4 = 0, bears4 = 0;
+  let advancing = 0, declining = 0;
 
   for (const s of universe) {
     if (!s || !s.price) continue;
@@ -297,6 +300,9 @@ export async function computeQuoteBreadth(): Promise<{
 
     if (s.changePercent >= 4) bulls4++;
     if (s.changePercent <= -4) bears4++;
+
+    if (s.changePercent > 0) advancing++;
+    else if (s.changePercent < 0) declining++;
   }
 
   const pctAbove50 = total50 > 0 ? Math.round((above50 / total50) * 1000) / 10 : 50;
@@ -318,6 +324,7 @@ export async function computeQuoteBreadth(): Promise<{
     netHighs52w: { value: netHighs, highs: newHighs, lows: newLows, score: scoreNetHighs(netHighs), max: 9 },
     fourPercent: { value: ratio4, bulls: bulls4, bears: bears4, score: score4PercentRatio(ratio4), max: 16 },
     vixLevel: { value: vixLevel, score: scoreVIX(vixLevel), max: 7 },
+    advancingDeclining: { advancing, declining },
     universeSize: universe.length,
   };
 }
@@ -412,6 +419,7 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
   let above200maData = { value: 50, above: 0, below: 0, total: 0, score: 4, max: 11 };
   let netHighsData = { value: 0, highs: 0, lows: 0, score: 2, max: 9 };
   let vixData = { value: 20, score: 5, max: 7 };
+  let advDecl = { advancing: 0, declining: 0 };
 
   if (fullScan) {
     const [quoteBreadth, quarterlyBreadth] = await Promise.all([
@@ -425,6 +433,7 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
     above200maData = quoteBreadth.above200ma;
     netHighsData = quoteBreadth.netHighs52w;
     vixData = quoteBreadth.vixLevel;
+    advDecl = quoteBreadth.advancingDeclining;
     universeSize = quoteBreadth.universeSize;
     lastFullComputeTime = new Date().toISOString();
   } else {
@@ -490,6 +499,7 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
         },
       },
     },
+    advancingDeclining: advDecl,
     universeSize,
   };
 
