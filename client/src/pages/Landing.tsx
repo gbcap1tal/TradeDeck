@@ -406,16 +406,19 @@ export default function Landing() {
                   className="h-full [&_img]:h-full [&_img]:w-full [&_img]:object-cover [&_img]:object-top"
                 />
               </div>
-              <h3 className="text-[16px] sm:text-[18px] font-semibold mb-3 text-white/90" data-testid="text-earnings-heading">
+              <h3 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4" data-testid="text-earnings-heading">
                 Earnings Insights
               </h3>
-              <p className="text-[13px] sm:text-[14px] text-white/40 leading-relaxed mb-4">
+              <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed mb-2">
                 Monthly earnings calendar with our proprietary Episodic Pivots detection
-                algorithm that scans for explosive setups before market open. Combined
-                with an AI agent that reads the full earnings call transcript and generates
-                an actionable summary with key metrics, guidance changes, and management tone.
+                algorithm that scans for explosive setups before market open.
               </p>
-              <div className="space-y-2">
+              <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed mb-6">
+                Combined with an AI agent that reads the full earnings call transcript
+                and generates an actionable summary with key metrics, guidance changes,
+                and management tone.
+              </p>
+              <div className="space-y-2.5">
                 {[
                   "Episodic Pivots detection algorithm, pre-market scanning",
                   "AI-powered earnings call summaries",
@@ -424,7 +427,7 @@ export default function Landing() {
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-2.5">
                     <Check className="w-3.5 h-3.5 text-white/30 mt-0.5 shrink-0" />
-                    <span className="text-[12px] sm:text-[13px] text-white/50">{item}</span>
+                    <span className="text-[13px] text-white/50">{item}</span>
                   </div>
                 ))}
               </div>
@@ -439,16 +442,18 @@ export default function Landing() {
                   className="h-full [&_img]:h-full [&_img]:w-full [&_img]:object-cover [&_img]:object-top"
                 />
               </div>
-              <h3 className="text-[16px] sm:text-[18px] font-semibold mb-3 text-white/90" data-testid="text-megatrends-heading">
+              <h3 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4" data-testid="text-megatrends-heading">
                 Megatrend Baskets
               </h3>
-              <p className="text-[13px] sm:text-[14px] text-white/40 leading-relaxed mb-4">
+              <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed mb-2">
                 We continuously add new thematic baskets as emerging trends surface:
                 AI, cybersecurity, nuclear energy, quantum computing, and more.
+              </p>
+              <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed mb-6">
                 Inside your account you can fully customize them, add your own,
                 and track cap-weighted performance across any timeframe.
               </p>
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {[
                   "New thematic baskets added regularly by our team",
                   "Fully customizable in your account: add, edit, or remove",
@@ -457,7 +462,7 @@ export default function Landing() {
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-2.5">
                     <Check className="w-3.5 h-3.5 text-white/30 mt-0.5 shrink-0" />
-                    <span className="text-[12px] sm:text-[13px] text-white/50">{item}</span>
+                    <span className="text-[13px] text-white/50">{item}</span>
                   </div>
                 ))}
               </div>
