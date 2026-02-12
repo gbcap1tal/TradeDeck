@@ -64,8 +64,8 @@ const SENTIMENT_PATTERNS: Array<{ pattern: RegExp; type: SentimentType }> = [
 ];
 
 const SENTIMENT_COLORS: Record<SentimentType, string> = {
-  positive: 'text-[#30d158]',
-  negative: 'text-[#ff453a]',
+  positive: 'text-[#1a8a3a]',
+  negative: 'text-[#b5332e]',
   neutral: 'text-white',
 };
 
