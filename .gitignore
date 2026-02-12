@@ -1,8 +1,53 @@
-node_modules
-dist
+# Dependencies
+node_modules/
+.pythonlibs/
+
+# Build output
+dist/
+server/public/
+
+# Environment & secrets
+.env
+.env.*
+
+# OS files
 .DS_Store
-server/public
+Thumbs.db
+
+# Vite
 vite.config.ts.*
-*.tar.gz
+
+# Runtime caches (regenerated on startup)
 .breadth-cache.json
+.breadth-history.json
 .industry-perf-cache.json
+.industry-rs-cache.json
+.finviz-cache.json
+.digest-cache.json
+.premarket-cache.json
+.megatrend-perf-cache.json
+.transcript-cache/
+
+# Firecrawl usage tracking
+.firecrawl-usage.json
+
+# Archives
+*.tar.gz
+
+# Replit internals
+.cache/
+.config/
+.local/
+.upm/
+.replit
+
+# Logs
+*.log
+/tmp/logs/
+
+# Editor
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
