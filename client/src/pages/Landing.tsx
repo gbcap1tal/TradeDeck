@@ -21,7 +21,7 @@ import {
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import logoImg from "@/assets/logo.webp";
-import heroAbstract from "@/assets/images/hero-abstract.png";
+import { MarketPulse } from "@/components/landing/MarketPulse";
 import dashboardScreenshot from "@assets/Screenshot_2026-02-12_alle_17.20.15_1770913305164.png";
 import featureStock from "@/assets/images/feature-stock.png";
 import newsScreenshot from "@assets/Screenshot_2026-02-12_alle_17.53.29_1770915277387.png";
@@ -158,15 +158,9 @@ export default function Landing() {
 
       <section className="relative pt-14 overflow-hidden">
         <div className="relative w-full" style={{ minHeight: '70vh' }}>
-          <img
-            src={heroAbstract}
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover"
-            loading="eager"
-            data-testid="img-hero-bg"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-transparent to-background" />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
+          <MarketPulse />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-transparent to-background pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent pointer-events-none" />
 
           <div className="relative z-10 flex flex-col items-center justify-center text-center px-4 sm:px-6 py-20 sm:py-28 lg:py-36">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/15 bg-black/40 backdrop-blur-sm mb-6 sm:mb-8">
