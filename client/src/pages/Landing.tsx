@@ -24,7 +24,7 @@ import logoImg from "@/assets/logo.webp";
 import heroAbstract from "@/assets/images/hero-abstract.png";
 import dashboardScreenshot from "@assets/Screenshot_2026-02-12_alle_17.20.15_1770913305164.png";
 import featureStock from "@/assets/images/feature-stock.png";
-import featureNews from "@/assets/images/feature-news.png";
+import newsScreenshot from "@assets/Screenshot_2026-02-12_alle_17.53.29_1770915277387.png";
 
 const FEATURES = [
   {
@@ -309,7 +309,7 @@ export default function Landing() {
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             <div className="order-2 lg:order-1 rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
               <img
-                src={featureNews}
+                src={newsScreenshot}
                 alt="News Intelligence"
                 className="w-full h-auto"
                 loading="lazy"
