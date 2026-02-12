@@ -1,3 +1,4 @@
+import { useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -93,9 +94,41 @@ const INCLUDED = [
   "Lifetime access, no subscription",
 ];
 
+function useTransparentLogo(src: string) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const d = imageData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const brightness = Math.max(d[i], d[i + 1], d[i + 2]);
+        if (brightness < 30) {
+          d[i + 3] = 0;
+        } else if (brightness < 60) {
+          d[i + 3] = Math.round((brightness - 30) / 30 * 255);
+        }
+      }
+      ctx.putImageData(imageData, 0, 0);
+    };
+    img.src = src;
+  }, [src]);
+  return canvasRef;
+}
+
 export default function Landing() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const logoCanvasRef = useTransparentLogo(tradeDeckLogo);
+  const footerLogoRef = useTransparentLogo(tradeDeckLogo);
 
   function handleCTA() {
     if (user) {
@@ -110,17 +143,12 @@ export default function Landing() {
       <nav className="fixed top-0 left-0 right-0 z-50 glass" data-testid="landing-nav">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center" data-testid="link-landing-brand">
-            <div className="bg-black rounded-sm">
-              <img
-                src={tradeDeckLogo}
-                alt="TradeDeck"
-                className="h-8 object-contain"
-                loading="eager"
-                decoding="async"
-                data-testid="img-landing-logo"
-                style={{ mixBlendMode: "screen" }}
-              />
-            </div>
+            <canvas
+              ref={logoCanvasRef}
+              className="h-8"
+              style={{ objectFit: "contain" }}
+              data-testid="img-landing-logo"
+            />
           </div>
           <div className="flex items-center gap-3">
             {user ? (
@@ -518,17 +546,13 @@ export default function Landing() {
 
       <footer className="border-t border-white/[0.04] py-8 px-4 sm:px-6" data-testid="landing-footer">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center">
-            <div className="bg-black rounded-sm opacity-40">
-              <img
-                src={tradeDeckLogo}
-                alt="TradeDeck"
-                className="h-6 object-contain"
-                loading="lazy"
-                data-testid="text-footer-brand"
-                style={{ mixBlendMode: "screen" }}
-              />
-            </div>
+          <div className="flex items-center opacity-40">
+            <canvas
+              ref={footerLogoRef}
+              className="h-6"
+              style={{ objectFit: "contain" }}
+              data-testid="text-footer-brand"
+            />
           </div>
           <p className="text-[11px] text-white/15" data-testid="text-footer-disclaimer">
             Market data for informational purposes only. Not financial advice.
