@@ -14,7 +14,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useMarketStatus } from "@/hooks/use-market";
-import logoImg from "@assets/Screenshot_2026-02-06_alle_10.14.14_1770369914698.png";
+import logoImg from "@/assets/logo.webp";
 
 interface SearchResult {
   symbol: string;
@@ -152,7 +152,7 @@ export function Navbar() {
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden text-white/50"
+              className="md:hidden text-white/50 min-w-[44px] min-h-[44px]"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               data-testid="button-mobile-menu"
             >
@@ -160,7 +160,7 @@ export function Navbar() {
             </Button>
 
             <Link href="/" className="flex items-center gap-2.5 group" data-testid="link-home">
-              <img src={logoImg} alt="TradeDeck" className="h-7 w-7 rounded flex-shrink-0" />
+              <img src={logoImg} alt="TradeDeck" className="h-7 w-7 rounded flex-shrink-0" loading="eager" decoding="async" />
               <span className="font-semibold text-[15px] tracking-tight hidden md:block text-white/90">TradeDeck</span>
             </Link>
 
@@ -237,7 +237,7 @@ export function Navbar() {
               <div className="flex items-center gap-1">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="rounded-full w-8 h-8 bg-white/5 border border-white/10 text-white/60 hover:text-white">
+                    <Button variant="ghost" size="icon" className="rounded-full min-w-[44px] min-h-[44px] bg-white/5 border border-white/10 text-white/60 hover:text-white">
                       <User className="w-3.5 h-3.5" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -258,7 +258,7 @@ export function Navbar() {
               </div>
             ) : (
               <a href="/api/login" data-testid="button-login">
-                <Button size="sm" variant="outline" className="h-8 text-[13px] text-white/70 font-medium">
+                <Button size="sm" variant="outline" className="min-h-[44px] text-[13px] text-white/70 font-medium">
                   Log In
                 </Button>
               </a>
