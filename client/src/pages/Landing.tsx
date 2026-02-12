@@ -110,11 +110,16 @@ function useTransparentLogo(src: string) {
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const d = imageData.data;
       for (let i = 0; i < d.length; i += 4) {
-        const brightness = Math.max(d[i], d[i + 1], d[i + 2]);
-        if (brightness < 30) {
+        const r = d[i], g = d[i + 1], b = d[i + 2];
+        const brightness = Math.max(r, g, b);
+        const isColorful = (Math.max(r, g, b) - Math.min(r, g, b)) > 30;
+        if (isColorful) {
+          continue;
+        }
+        if (brightness < 18) {
           d[i + 3] = 0;
-        } else if (brightness < 60) {
-          d[i + 3] = Math.round((brightness - 30) / 30 * 255);
+        } else if (brightness < 45) {
+          d[i + 3] = Math.round(((brightness - 18) / 27) * d[i + 3]);
         }
       }
       ctx.putImageData(imageData, 0, 0);
