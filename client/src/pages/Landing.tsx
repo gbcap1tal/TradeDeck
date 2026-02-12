@@ -28,6 +28,8 @@ import detailMQ from "@assets/Screenshot_2026-02-12_alle_18.01.09_1770915705571.
 import detailHeatmap from "@assets/Screenshot_2026-02-12_alle_18.01.31_1770915705569.png";
 import detailHeadlines from "@assets/Screenshot_2026-02-12_alle_18.00.20_1770915705573.png";
 import detailCorporate from "@assets/Screenshot_2026-02-12_alle_18.00.37_1770915705574.png";
+import earningsScreenshot from "@assets/Screenshot_2026-02-12_alle_22.06.10_1770930498923.png";
+import megatrendsScreenshot from "@assets/Screenshot_2026-02-12_alle_22.07.20_1770930496029.png";
 
 const FEATURES = [
   {
@@ -396,8 +398,12 @@ export default function Landing() {
 
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
             <div>
-              <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40 mb-6 aspect-video bg-white/[0.02] flex items-center justify-center">
-                <span className="text-white/15 text-[13px]" data-testid="placeholder-earnings-img">Earnings screenshot coming soon</span>
+              <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40 mb-6">
+                <ImageLens
+                  src={earningsScreenshot}
+                  alt="Earnings Calendar with EP Detection"
+                  data-testid="img-feature-earnings"
+                />
               </div>
               <h3 className="text-[16px] sm:text-[18px] font-semibold mb-3 text-white/90" data-testid="text-earnings-heading">
                 Earnings Insights
@@ -424,23 +430,28 @@ export default function Landing() {
             </div>
 
             <div>
-              <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40 mb-6 aspect-video bg-white/[0.02] flex items-center justify-center">
-                <span className="text-white/15 text-[13px]" data-testid="placeholder-megatrends-img">Megatrends screenshot coming soon</span>
+              <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40 mb-6">
+                <ImageLens
+                  src={megatrendsScreenshot}
+                  alt="Megatrend Baskets Performance"
+                  data-testid="img-feature-megatrends"
+                />
               </div>
               <h3 className="text-[16px] sm:text-[18px] font-semibold mb-3 text-white/90" data-testid="text-megatrends-heading">
                 Megatrend Baskets
               </h3>
               <p className="text-[13px] sm:text-[14px] text-white/40 leading-relaxed mb-4">
-                Build custom industry baskets to track the macro themes that matter.
-                AI, cybersecurity, energy transition, quantum computing. Create your
-                own market-cap weighted indices and watch them move in real time.
+                We continuously add new thematic baskets as emerging trends surface:
+                AI, cybersecurity, nuclear energy, quantum computing, and more.
+                Inside your account you can fully customize them, add your own,
+                and track cap-weighted performance across any timeframe.
               </p>
               <div className="space-y-2">
                 {[
-                  "Custom baskets with market-cap weighted performance",
-                  "Top & worst performing industries ranked",
-                  "Real-time performance across multiple timeframes",
-                  "Full CRUD: create, edit, delete your baskets",
+                  "New thematic baskets added regularly by our team",
+                  "Fully customizable in your account: add, edit, or remove",
+                  "Top and worst performing industries ranked",
+                  "Real-time cap-weighted performance across all timeframes",
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-2.5">
                     <Check className="w-3.5 h-3.5 text-white/30 mt-0.5 shrink-0" />
