@@ -183,7 +183,7 @@ function WaitlistForm({ size = "default", className = "" }: { size?: "default" |
 
 export default function Landing() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const logoCanvasRef = useTransparentLogo(tradeDeckLogo);
   const footerLogoRef = useTransparentLogo(tradeDeckLogo);
 
@@ -205,7 +205,7 @@ export default function Landing() {
             />
           </div>
           <div className="flex items-center gap-3">
-            {user ? (
+            {authLoading ? null : user ? (
               <Button
                 size="sm"
                 onClick={() => setLocation("/")}
@@ -250,7 +250,9 @@ export default function Landing() {
               Follow sector rotation before it becomes consensus.
             </p>
 
-            {user ? (
+            {authLoading ? (
+              <div className="h-12 mb-4" />
+            ) : user ? (
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-4">
                 <Button
                   size="lg"
@@ -577,7 +579,9 @@ export default function Landing() {
                 ))}
               </div>
 
-              {user ? (
+              {authLoading ? (
+                <div className="h-10 w-full" />
+              ) : user ? (
                 <Button
                   size="lg"
                   className="w-full"
