@@ -50,7 +50,7 @@ const FEATURES = [
   },
   {
     icon: CalendarDays,
-    title: "Earnings Intelligence",
+    title: "Earnings Insights",
     description:
       "Monthly earnings calendar with EP scoring, AI-powered summaries from actual call transcripts, and EPS/revenue tracking.",
   },
@@ -337,7 +337,7 @@ export default function Landing() {
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             <div>
               <p className="text-[11px] sm:text-[12px] text-white/30 font-medium uppercase tracking-[0.15em] mb-3">
-                Stock Intelligence
+                Stock Analysis
               </p>
               <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4" data-testid="text-stock-heading">
                 Deep-dive into any stock
@@ -400,17 +400,17 @@ export default function Landing() {
                 <span className="text-white/15 text-[13px]" data-testid="placeholder-earnings-img">Earnings screenshot coming soon</span>
               </div>
               <h3 className="text-[16px] sm:text-[18px] font-semibold mb-3 text-white/90" data-testid="text-earnings-heading">
-                Earnings Intelligence
+                Earnings Insights
               </h3>
               <p className="text-[13px] sm:text-[14px] text-white/40 leading-relaxed mb-4">
-                Monthly earnings calendar with EP (Episodic Pivot) scoring that flags
-                stocks likely to make explosive post-earnings moves. Our AI agent reads
-                the full earnings call transcript and generates an actionable summary.
-                Key metrics, guidance changes, and management tone in seconds.
+                Monthly earnings calendar with our proprietary Episodic Pivots detection
+                algorithm that scans for explosive setups before market open. Combined
+                with an AI agent that reads the full earnings call transcript and generates
+                an actionable summary with key metrics, guidance changes, and management tone.
               </p>
               <div className="space-y-2">
                 {[
-                  "Episodic Pivot scoring with historical accuracy",
+                  "Episodic Pivots detection algorithm, pre-market scanning",
                   "AI-powered earnings call summaries",
                   "EPS & Revenue surprise tracking with color coding",
                   "Monthly calendar with AMC/BMO filters",
