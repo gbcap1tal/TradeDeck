@@ -34,31 +34,31 @@ const FEATURES = [
     icon: Activity,
     title: "Market Quality Score",
     description:
-      "Real-time breadth analysis across 5,000+ US stocks. Advance/decline ratios, SMA trends, and new highs/lows — all in one glance.",
+      "Real-time breadth analysis across 5,000+ US stocks. Advance/decline ratios, SMA trends, and new highs/lows in one glance.",
   },
   {
     icon: BarChart3,
     title: "144 Industries Tracked",
     description:
-      "Cap-weighted performance for every Finviz industry. Spot sector rotation and capital flows before the crowd.",
+      "Cap-weighted performance for every industry. Spot sector rotation and capital flows before the crowd.",
   },
   {
     icon: TrendingUp,
     title: "IBD-Style RS Ratings",
     description:
-      "Proprietary Relative Strength ratings (1-99) for 3,800+ stocks. Find market leaders with momentum on their side.",
+      "Proprietary Relative Strength ratings (1 to 99) covering all US stocks. Find market leaders with momentum on their side.",
+  },
+  {
+    icon: Crown,
+    title: "Stock Quality Score",
+    description:
+      "Multi-factor quality analysis combining earnings growth, profitability, and technical strength into one actionable score.",
   },
   {
     icon: Layers,
     title: "Megatrend Baskets",
     description:
-      "Custom thematic baskets tracking AI, quantum computing, psychedelics, nuclear energy, and more — with cap-weighted returns.",
-  },
-  {
-    icon: Crown,
-    title: "Stock Quality Scoring",
-    description:
-      "Multi-factor quality analysis combining earnings growth, profitability, and technical strength into one actionable score.",
+      "Custom thematic baskets tracking AI, quantum computing, nuclear energy, and more, with cap-weighted returns.",
   },
   {
     icon: CalendarDays,
@@ -90,7 +90,7 @@ const INCLUDED = [
   "Earnings calendar with AI summaries",
   "Sentiment-colored market news",
   "Mobile-optimized experience",
-  "Lifetime access — no subscription",
+  "Lifetime access, no subscription",
 ];
 
 export default function Landing() {
@@ -182,7 +182,7 @@ export default function Landing() {
                 onClick={handleCTA}
                 data-testid="button-hero-cta"
               >
-                {user ? "Access the Platform" : "Get Lifetime Access — €145"}
+                {user ? "Access the Platform" : "Get Lifetime Access for €145"}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
@@ -272,7 +272,7 @@ export default function Landing() {
               <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed mb-6">
                 Our Market Quality Score aggregates advance/decline data, SMA trends,
                 and new highs/lows across 5,000+ stocks. See whether the rally is
-                broad-based or narrow — and act accordingly.
+                broad-based or narrow, and act accordingly.
               </p>
               <div className="space-y-2.5">
                 {[
@@ -352,12 +352,12 @@ export default function Landing() {
               </h2>
               <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed mb-6">
                 Every stock page is a full command center. TradingView charts, quality
-                scoring, Weinstein stage analysis, and IBD-style Relative Strength ratings —
-                everything you need to evaluate a position in one view.
+                scoring, Weinstein stage analysis, and IBD-style Relative Strength ratings.
+                Everything you need to evaluate a position in one view.
               </p>
               <div className="space-y-2.5">
                 {[
-                  "IBD-style RS ratings for 3,800+ stocks",
+                  "IBD-style RS ratings for all US stocks",
                   "Stock Quality Score with multi-factor analysis",
                   "Weinstein stage + trend health indicators",
                   "Fundamentals, short interest, and smart money tracking",
@@ -395,7 +395,7 @@ export default function Landing() {
             </h2>
             <p className="text-[14px] sm:text-[15px] text-white/40 max-w-2xl mx-auto leading-relaxed">
               From explosive post-earnings moves to custom industry baskets that
-              track the trends shaping tomorrow — TradeDeck gives you the tools
+              track the trends shaping tomorrow. TradeDeck gives you the tools
               institutional desks keep to themselves.
             </p>
           </div>
@@ -411,8 +411,8 @@ export default function Landing() {
               <p className="text-[13px] sm:text-[14px] text-white/40 leading-relaxed mb-4">
                 Monthly earnings calendar with EP (Episodic Pivot) scoring that flags
                 stocks likely to make explosive post-earnings moves. Our AI agent reads
-                the full earnings call transcript and generates an actionable summary —
-                key metrics, guidance changes, and management tone in seconds.
+                the full earnings call transcript and generates an actionable summary.
+                Key metrics, guidance changes, and management tone in seconds.
               </p>
               <div className="space-y-2">
                 {[
@@ -438,7 +438,7 @@ export default function Landing() {
               </h3>
               <p className="text-[13px] sm:text-[14px] text-white/40 leading-relaxed mb-4">
                 Build custom industry baskets to track the macro themes that matter.
-                AI, cybersecurity, energy transition, quantum computing — create your
+                AI, cybersecurity, energy transition, quantum computing. Create your
                 own market-cap weighted indices and watch them move in real time.
               </p>
               <div className="space-y-2">
