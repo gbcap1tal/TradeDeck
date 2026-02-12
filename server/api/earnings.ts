@@ -71,8 +71,10 @@ export async function fetchEarningsCalendar(dateStr: string, forceRefresh: boole
   if (existingReports.length > 0) {
     const today = new Date().toISOString().split('T')[0];
     const isToday = dateStr === today;
+    const daysDiff = (new Date(today).getTime() - new Date(dateStr).getTime()) / 86400000;
+    const isRecent = daysDiff >= 0 && daysDiff <= 7;
 
-    const hasMissingActuals = dateStr >= today && existingReports.some(r => r.epsReported === null);
+    const hasMissingActuals = (isRecent || dateStr >= today) && existingReports.some(r => r.epsReported === null);
     if (hasMissingActuals) {
       await refreshActualsFromFinnhub(dateStr, existingReports);
     }
@@ -85,7 +87,7 @@ export async function fetchEarningsCalendar(dateStr: string, forceRefresh: boole
       const refreshed = await db.select().from(earningsReports)
         .where(eq(earningsReports.reportDate, dateStr));
       const items = await enrichWithEpScores(refreshed);
-      setCache(cacheKey, items, 90);
+      setCache(cacheKey, items, isToday ? 90 : 300);
       return items;
     }
 

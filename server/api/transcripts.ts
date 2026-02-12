@@ -83,6 +83,26 @@ function writeDiskCache(ticker: string, reportDate: string, result: TranscriptRe
   }
 }
 
+function loadTranscriptFromDisk(key: string): string | null {
+  try {
+    const filePath = path.join(TRANSCRIPT_CACHE_DIR, `${key}.txt`);
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf-8');
+      if (content.length > 200) return content;
+    }
+  } catch { /* ignored */ }
+  return null;
+}
+
+function saveTranscriptToDisk(key: string, content: string): void {
+  try {
+    ensureCacheDir();
+    fs.writeFileSync(path.join(TRANSCRIPT_CACHE_DIR, `${key}.txt`), content);
+  } catch (e: any) {
+    console.error(`[transcript] Failed to save transcript to disk:`, e.message);
+  }
+}
+
 export async function fetchEarningsTranscript(ticker: string, reportDate: string): Promise<TranscriptResult> {
   const cacheKey = `transcript_${ticker}_${reportDate}`;
   const memCached = getCached<TranscriptResult>(cacheKey);
@@ -261,8 +281,27 @@ async function _getAieraUrlForTicker(ticker: string, reportDate: string): Promis
   }
 }
 
-async function fetchFromZacksAiera(_ticker: string, _reportDate: string): Promise<TranscriptResult> {
-  return { transcript: null, source: 'zacks_aiera', url: null };
+async function fetchFromZacksAiera(ticker: string, reportDate: string): Promise<TranscriptResult> {
+  try {
+    const aieraUrl = await _getAieraUrlForTicker(ticker, reportDate);
+    if (!aieraUrl) return { transcript: null, source: 'zacks_aiera', url: null };
+
+    const firecrawlKey = process.env.FIRECRAWL_API_KEY;
+    if (firecrawlKey) {
+      const scraped = await _scrapeWithFirecrawl(aieraUrl, ticker, reportDate);
+      if (scraped) {
+        const cleaned = _cleanAieraTranscript(scraped);
+        if (cleaned && cleaned.length > 200) {
+          return { transcript: cleaned, source: 'zacks_aiera', url: aieraUrl };
+        }
+      }
+    }
+
+    return { transcript: null, source: 'zacks_aiera', url: aieraUrl };
+  } catch (e: any) {
+    console.error(`[zacks_aiera] Error for ${ticker}:`, e.message);
+    return { transcript: null, source: 'zacks_aiera', url: null };
+  }
 }
 
 async function _scrapeWithFirecrawl(url: string, ticker: string, reportDate: string): Promise<string | null> {
