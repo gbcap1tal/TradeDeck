@@ -22,6 +22,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import logoImg from "@/assets/logo.webp";
 import { MarketPulse } from "@/components/landing/MarketPulse";
+import { ImageLens } from "@/components/landing/ImageLens";
 import dashboardScreenshot from "@assets/Screenshot_2026-02-12_alle_17.20.15_1770913305164.png";
 import featureStock from "@/assets/images/feature-stock.png";
 import newsScreenshot from "@assets/Screenshot_2026-02-12_alle_17.53.29_1770915277387.png";
@@ -292,11 +293,9 @@ export default function Landing() {
               </div>
             </div>
             <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
-              <img
+              <ImageLens
                 src={dashboardScreenshot}
                 alt="TradeDeck Market Quality Dashboard"
-                className="w-full h-auto"
-                loading="lazy"
                 data-testid="img-feature-breadth"
               />
             </div>
@@ -308,11 +307,9 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             <div className="order-2 lg:order-1 rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
-              <img
+              <ImageLens
                 src={newsScreenshot}
                 alt="News Intelligence"
-                className="w-full h-auto"
-                loading="lazy"
                 data-testid="img-feature-news"
               />
             </div>
@@ -406,11 +403,9 @@ export default function Landing() {
               </div>
             </div>
             <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
-              <img
+              <ImageLens
                 src={featureStock}
                 alt="Stock Analysis"
-                className="w-full h-auto"
-                loading="lazy"
                 data-testid="img-feature-stock"
               />
             </div>
