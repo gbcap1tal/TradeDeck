@@ -18,8 +18,6 @@ import {
   Mail,
   Loader2,
 } from "lucide-react";
-import { useLocation } from "wouter";
-import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { useTransparentLogo } from "@/hooks/use-transparent-logo";
 import logoImg from "@/assets/logo.webp";
@@ -182,8 +180,6 @@ function WaitlistForm({ size = "default", className = "" }: { size?: "default" |
 }
 
 export default function Landing() {
-  const [, setLocation] = useLocation();
-  const { user, isLoading: authLoading } = useAuth();
   const logoCanvasRef = useTransparentLogo(tradeDeckLogo);
   const footerLogoRef = useTransparentLogo(tradeDeckLogo);
 
@@ -205,25 +201,6 @@ export default function Landing() {
             />
           </div>
           <div className="flex items-center gap-3">
-            {authLoading ? null : user ? (
-              <Button
-                size="sm"
-                onClick={() => setLocation("/")}
-                data-testid="button-go-dashboard"
-              >
-                Go to Dashboard
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-white/50"
-                onClick={() => { window.location.href = "/api/login"; }}
-                data-testid="button-landing-login"
-              >
-                Log In
-              </Button>
-            )}
           </div>
         </div>
       </nav>
@@ -250,21 +227,7 @@ export default function Landing() {
               Follow sector rotation before it becomes consensus.
             </p>
 
-            {authLoading ? (
-              <div className="h-12 mb-4" />
-            ) : user ? (
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-4">
-                <Button
-                  size="lg"
-                  className="w-full sm:w-auto"
-                  onClick={() => setLocation("/")}
-                  data-testid="button-hero-cta"
-                >
-                  Access the Platform
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
-            ) : (
+            {(
               <>
                 <WaitlistForm size="hero" className="w-full max-w-md mb-4" />
                 <p className="text-[12px] text-white/30">
@@ -579,21 +542,7 @@ export default function Landing() {
                 ))}
               </div>
 
-              {authLoading ? (
-                <div className="h-10 w-full" />
-              ) : user ? (
-                <Button
-                  size="lg"
-                  className="w-full"
-                  onClick={() => setLocation("/")}
-                  data-testid="button-pricing-cta"
-                >
-                  Access the Platform
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              ) : (
-                <WaitlistForm className="w-full" />
-              )}
+              <WaitlistForm className="w-full" />
 
               <div className="flex items-center justify-center gap-2 mt-4 text-[11px] text-white/25">
                 <Shield className="w-3 h-3" />
