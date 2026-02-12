@@ -20,7 +20,7 @@ class Particle {
     this.y = y;
     this.originalX = x;
     this.originalY = y;
-    this.size = 1.5;
+    this.size = 2;
     this.order = order;
     this.velocity = {
       x: (Math.random() - 0.5) * 2,
@@ -65,7 +65,9 @@ class Particle {
   }
 
   draw(ctx: CanvasRenderingContext2D) {
-    const alpha = this.order ? 0.35 - this.influence * 0.2 : 0.3;
+    const alpha = this.order
+      ? 0.6 - this.influence * 0.3
+      : 0.55;
     ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
@@ -97,7 +99,7 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
       ctx.scale(dpr, dpr);
 
       const particles: Particle[] = [];
-      const gridCols = 30;
+      const gridCols = 38;
       const gridRows = Math.round((h / w) * gridCols);
       const spacingX = w / gridCols;
       const spacingY = h / gridRows;
@@ -123,7 +125,7 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
         particle.neighbors = particles.filter((other) => {
           if (other === particle) return false;
           const distance = Math.hypot(particle.x - other.x, particle.y - other.y);
-          return distance < 80;
+          return distance < 90;
         });
       });
     }
@@ -142,10 +144,10 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
 
         particle.neighbors.forEach((neighbor) => {
           const distance = Math.hypot(particle.x - neighbor.x, particle.y - neighbor.y);
-          if (distance < 40) {
-            const alpha = 0.08 * (1 - distance / 40);
+          if (distance < 55) {
+            const alpha = 0.15 * (1 - distance / 55);
             ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-            ctx.lineWidth = 0.5;
+            ctx.lineWidth = 0.6;
             ctx.beginPath();
             ctx.moveTo(particle.x, particle.y);
             ctx.lineTo(neighbor.x, neighbor.y);
@@ -155,7 +157,7 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
       });
 
       const midX = w / 2;
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
       ctx.lineWidth = 0.5;
       ctx.beginPath();
       ctx.moveTo(midX, 0);
