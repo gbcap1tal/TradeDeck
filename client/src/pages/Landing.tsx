@@ -18,7 +18,7 @@ import {
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import logoImg from "@/assets/logo.webp";
-import heroDashboard from "@/assets/images/hero-dashboard.png";
+import heroDashboard from "@assets/Screenshot_2026-02-12_alle_17.20.15_1770913305164.png";
 import featureStock from "@/assets/images/feature-stock.png";
 import featureBreadth from "@/assets/images/feature-breadth.png";
 
@@ -193,8 +193,7 @@ export default function Landing() {
           </p>
         </div>
 
-        <div className="mt-12 sm:mt-16 max-w-5xl mx-auto relative">
-          <div className="absolute -inset-4 bg-gradient-to-t from-background via-transparent to-transparent z-10 pointer-events-none" />
+        <div className="mt-12 sm:mt-16 max-w-5xl mx-auto">
           <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-2xl shadow-black/50">
             <img
               src={heroDashboard}
