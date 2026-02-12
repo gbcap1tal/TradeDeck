@@ -117,7 +117,7 @@ export default function Landing() {
               loading="eager"
               decoding="async"
               data-testid="img-landing-logo"
-              style={{ mixBlendMode: "lighten" }}
+              style={{ mixBlendMode: "screen" }}
             />
           </div>
           <div className="flex items-center gap-3">
@@ -169,7 +169,7 @@ export default function Landing() {
               <span className="text-white/50">before it moves.</span>
             </h1>
 
-            <p className="text-[15px] sm:text-[17px] text-white/80 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
+            <p className="text-[15px] sm:text-[17px] text-white/[0.85] max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
               Track market health in real time.
               Detect explosive earnings setups before anyone else.
               Follow sector rotation before it becomes consensus.
@@ -523,7 +523,7 @@ export default function Landing() {
               className="h-6 object-contain opacity-40"
               loading="lazy"
               data-testid="text-footer-brand"
-              style={{ mixBlendMode: "lighten" }}
+              style={{ mixBlendMode: "screen" }}
             />
           </div>
           <p className="text-[11px] text-white/15" data-testid="text-footer-disclaimer">
