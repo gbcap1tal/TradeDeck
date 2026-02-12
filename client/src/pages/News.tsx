@@ -26,6 +26,57 @@ interface PreMarketData {
   fetchedAt: number;
 }
 
+type SentimentType = 'positive' | 'negative' | 'neutral';
+
+const SENTIMENT_PATTERNS: Array<{ pattern: RegExp; type: SentimentType }> = [
+  { pattern: /\bbeats?\b/gi, type: 'positive' },
+  { pattern: /\bbetter than\b/gi, type: 'positive' },
+  { pattern: /\bupside\b/gi, type: 'positive' },
+  { pattern: /\bupside guidance\b/gi, type: 'positive' },
+  { pattern: /\bmiss(?:es)?\b/gi, type: 'negative' },
+  { pattern: /\bworse than\b/gi, type: 'negative' },
+  { pattern: /\bdownside\b/gi, type: 'negative' },
+  { pattern: /\bdownside guidance\b/gi, type: 'negative' },
+  { pattern: /\bin-line\b/gi, type: 'neutral' },
+];
+
+const SENTIMENT_COLORS: Record<SentimentType, string> = {
+  positive: 'text-[#30d158]',
+  negative: 'text-[#ff453a]',
+  neutral: 'text-white',
+};
+
+function applySentimentHighlight(text: string): Array<{ text: string; sentiment?: SentimentType }> {
+  const combined = SENTIMENT_PATTERNS
+    .map(p => `(${p.pattern.source})`)
+    .join('|');
+  const regex = new RegExp(combined, 'gi');
+
+  const segments: Array<{ text: string; sentiment?: SentimentType }> = [];
+  let lastIndex = 0;
+  let m;
+
+  while ((m = regex.exec(text)) !== null) {
+    if (m.index > lastIndex) {
+      segments.push({ text: text.slice(lastIndex, m.index) });
+    }
+    const matched = m[0].toLowerCase();
+    let type: SentimentType = 'neutral';
+    for (const sp of SENTIMENT_PATTERNS) {
+      if (new RegExp(sp.pattern.source, 'i').test(matched)) {
+        type = sp.type;
+        break;
+      }
+    }
+    segments.push({ text: m[0], sentiment: type });
+    lastIndex = m.index + m[0].length;
+  }
+  if (lastIndex < text.length) {
+    segments.push({ text: text.slice(lastIndex) });
+  }
+  return segments;
+}
+
 function highlightTickers(text: string, onTickerClick: (ticker: string) => void) {
   const tickerRegex = /\b([A-Z]{1,5})\b/g;
   const knownTickers = new Set([
@@ -84,7 +135,23 @@ function highlightTickers(text: string, onTickerClick: (ticker: string) => void)
     parts.push({ text: text.slice(lastIndex), isTicker: false });
   }
 
-  if (parts.length === 0) return <span>{text}</span>;
+  if (parts.length === 0) {
+    const sentimentSegs = applySentimentHighlight(text);
+    if (sentimentSegs.some(s => s.sentiment)) {
+      return (
+        <span>
+          {sentimentSegs.map((s, i) =>
+            s.sentiment ? (
+              <span key={i} className={`${SENTIMENT_COLORS[s.sentiment]} font-semibold`}>{s.text}</span>
+            ) : (
+              <span key={i}>{s.text}</span>
+            )
+          )}
+        </span>
+      );
+    }
+    return <span>{text}</span>;
+  }
 
   return (
     <span>
@@ -102,7 +169,15 @@ function highlightTickers(text: string, onTickerClick: (ticker: string) => void)
             {part.text}
           </span>
         ) : (
-          <span key={i}>{part.text}</span>
+          <span key={i}>
+            {applySentimentHighlight(part.text).map((s, j) =>
+              s.sentiment ? (
+                <span key={j} className={`${SENTIMENT_COLORS[s.sentiment]} font-semibold`}>{s.text}</span>
+              ) : (
+                <span key={j}>{s.text}</span>
+              )
+            )}
+          </span>
         )
       )}
     </span>
