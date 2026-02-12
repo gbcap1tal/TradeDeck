@@ -172,11 +172,16 @@ export default function Landing() {
               <span className="text-white/50">before it moves.</span>
             </h1>
 
-            <p className="text-base sm:text-lg text-white/50 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
-              TradeDeck combines real-time breadth analysis, sector rotation tracking,
-              and AI-powered earnings intelligence into one dark, minimal dashboard
-              built for serious traders.
-            </p>
+            <div className="max-w-2xl mx-auto mb-8 sm:mb-10 space-y-2.5">
+              <p className="text-[15px] sm:text-[17px] text-white/45 leading-relaxed">
+                Track market health in real time.
+                Detect explosive earnings setups before anyone else.
+                Follow sector rotation before it becomes consensus.
+              </p>
+              <p className="text-[13px] sm:text-[14px] text-white/25 leading-relaxed">
+                One dashboard. No noise. Just signal.
+              </p>
+            </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-4">
               <Button
