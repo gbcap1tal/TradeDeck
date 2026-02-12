@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   BarChart3,
   TrendingUp,
@@ -13,9 +15,12 @@ import {
   ArrowRight,
   Check,
   ChevronDown,
+  Mail,
+  Loader2,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
 import { useTransparentLogo } from "@/hooks/use-transparent-logo";
 import logoImg from "@/assets/logo.webp";
 import tradeDeckLogo from "@assets/Screenshot_2026-02-12_alle_21.14.42_1770927291981.png";
@@ -92,8 +97,87 @@ const INCLUDED = [
   "Earnings calendar with AI summaries",
   "Sentiment-colored market news",
   "Mobile-optimized experience",
-  "Lifetime access, no subscription",
+  "Early access pricing at launch",
 ];
+
+function WaitlistForm({ size = "default", className = "" }: { size?: "default" | "hero"; className?: string }) {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "already" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setStatus("loading");
+    try {
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setStatus("error");
+        setErrorMsg(data.error || "Something went wrong");
+        return;
+      }
+      setStatus(data.alreadyJoined ? "already" : "success");
+    } catch {
+      setStatus("error");
+      setErrorMsg("Connection failed. Please try again.");
+    }
+  }
+
+  if (status === "success" || status === "already") {
+    return (
+      <div className={`flex items-center gap-2 ${className}`}>
+        <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+        <span className="text-[14px] text-emerald-400/90">
+          {status === "already" ? "You're already on the list. We'll be in touch." : "You're in. Check your inbox for confirmation."}
+        </span>
+      </div>
+    );
+  }
+
+  const isHero = size === "hero";
+
+  return (
+    <form onSubmit={handleSubmit} className={`${className}`}>
+      <div className={`flex ${isHero ? "flex-col sm:flex-row" : "flex-row"} gap-2`}>
+        <div className="relative flex-1">
+          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/25 pointer-events-none" />
+          <Input
+            type="email"
+            placeholder="Enter your email"
+            value={email}
+            onChange={(e) => { setEmail(e.target.value); setStatus("idle"); }}
+            className={`pl-9 bg-white/[0.06] border-white/[0.1] text-white placeholder:text-white/25 ${isHero ? "h-11" : ""}`}
+            required
+            data-testid="input-waitlist-email"
+          />
+        </div>
+        <Button
+          type="submit"
+          disabled={status === "loading"}
+          className={isHero ? "h-11 px-6" : ""}
+          data-testid="button-waitlist-submit"
+        >
+          {status === "loading" ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <>
+              Join Waitlist
+              <ArrowRight className="w-4 h-4 ml-1.5" />
+            </>
+          )}
+        </Button>
+      </div>
+      {status === "error" && (
+        <p className="text-[12px] text-red-400 mt-1.5">{errorMsg}</p>
+      )}
+    </form>
+  );
+}
 
 export default function Landing() {
   const [, setLocation] = useLocation();
@@ -101,13 +185,10 @@ export default function Landing() {
   const logoCanvasRef = useTransparentLogo(tradeDeckLogo);
   const footerLogoRef = useTransparentLogo(tradeDeckLogo);
 
-  function handleCTA() {
-    if (user) {
-      setLocation("/");
-    } else {
-      setLocation("/payment");
-    }
-  }
+  const { data: waitlistData } = useQuery<{ count: number }>({
+    queryKey: ["/api/waitlist/count"],
+    refetchInterval: 30000,
+  });
 
   return (
     <div className="min-h-screen bg-background text-white overflow-x-hidden">
@@ -131,24 +212,15 @@ export default function Landing() {
                 Go to Dashboard
               </Button>
             ) : (
-              <>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-white/50"
-                  onClick={() => { window.location.href = "/api/login"; }}
-                  data-testid="button-landing-login"
-                >
-                  Log In
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => setLocation("/payment")}
-                  data-testid="button-landing-get-access"
-                >
-                  Get Access
-                </Button>
-              </>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-white/50"
+                onClick={() => { window.location.href = "/api/login"; }}
+                data-testid="button-landing-login"
+              >
+                Log In
+              </Button>
             )}
           </div>
         </div>
@@ -176,21 +248,26 @@ export default function Landing() {
               Follow sector rotation before it becomes consensus.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-4">
-              <Button
-                size="lg"
-                className="w-full sm:w-auto"
-                onClick={handleCTA}
-                data-testid="button-hero-cta"
-              >
-                {user ? "Access the Platform" : "Get Lifetime Access for €145"}
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
-
-            <p className="text-[12px] text-white/30">
-              One-time payment. No subscription. No hidden fees.
-            </p>
+            {user ? (
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-4">
+                <Button
+                  size="lg"
+                  className="w-full sm:w-auto"
+                  onClick={() => setLocation("/")}
+                  data-testid="button-hero-cta"
+                >
+                  Access the Platform
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            ) : (
+              <>
+                <WaitlistForm size="hero" className="w-full max-w-md mb-4" />
+                <p className="text-[12px] text-white/30">
+                  {waitlistData?.count ? `${waitlistData.count.toLocaleString()} trader${waitlistData.count === 1 ? "" : "s"} on the waitlist` : "Be the first to get access"}
+                </p>
+              </>
+            )}
           </div>
         </div>
 
@@ -477,27 +554,18 @@ export default function Landing() {
       >
         <div className="max-w-lg mx-auto text-center">
           <p className="text-[11px] sm:text-[12px] text-white/30 font-medium uppercase tracking-[0.15em] mb-3">
-            Simple Pricing
+            Early Access
           </p>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3" data-testid="text-pricing-heading">
-            One price. Lifetime access.
+            Join the waitlist.
           </h2>
           <p className="text-[14px] text-white/35 mb-8 sm:mb-10">
-            No subscriptions, no recurring fees. Pay once and get full access forever.
+            We're opening access to a limited group of traders first.
+            Leave your email and we'll notify you when it's your turn.
           </p>
 
           <Card className="glass-card border-white/[0.08] bg-white/[0.03]">
             <CardContent className="p-6 sm:p-8">
-              <div className="mb-6">
-                <div
-                  className="text-5xl font-bold font-mono-nums mb-1"
-                  data-testid="text-landing-price"
-                >
-                  €145
-                </div>
-                <p className="text-[13px] text-white/30">One-time payment</p>
-              </div>
-
               <div className="space-y-2.5 text-left mb-8">
                 {INCLUDED.map((item) => (
                   <div key={item} className="flex items-start gap-2.5">
@@ -507,19 +575,23 @@ export default function Landing() {
                 ))}
               </div>
 
-              <Button
-                size="lg"
-                className="w-full"
-                onClick={handleCTA}
-                data-testid="button-pricing-cta"
-              >
-                {user ? "Access the Platform" : "Get Lifetime Access"}
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
+              {user ? (
+                <Button
+                  size="lg"
+                  className="w-full"
+                  onClick={() => setLocation("/")}
+                  data-testid="button-pricing-cta"
+                >
+                  Access the Platform
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              ) : (
+                <WaitlistForm className="w-full" />
+              )}
 
               <div className="flex items-center justify-center gap-2 mt-4 text-[11px] text-white/25">
                 <Shield className="w-3 h-3" />
-                <span>Secure payment via Stripe</span>
+                <span>{waitlistData?.count ? `${waitlistData.count.toLocaleString()} trader${waitlistData.count === 1 ? "" : "s"} already signed up` : "Be among the first"}</span>
               </div>
             </CardContent>
           </Card>

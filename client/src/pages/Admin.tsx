@@ -6,7 +6,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Trash2, UserPlus, ArrowLeft, Mail, User, Shield } from "lucide-react";
+import { Trash2, UserPlus, ArrowLeft, Mail, User, Shield, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -15,6 +15,12 @@ const ADMIN_ID = '54198443';
 interface FreeUserEntry {
   id: number;
   name: string;
+  email: string;
+  createdAt: string;
+}
+
+interface WaitlistEntry {
+  id: number;
   email: string;
   createdAt: string;
 }
@@ -31,6 +37,11 @@ export default function Admin() {
 
   const { data: freeUsers = [], isLoading } = useQuery<FreeUserEntry[]>({
     queryKey: ['/api/admin/free-users'],
+    enabled: isAdminUser,
+  });
+
+  const { data: waitlistEntries = [], isLoading: waitlistLoading } = useQuery<WaitlistEntry[]>({
+    queryKey: ['/api/admin/waitlist'],
     enabled: isAdminUser,
   });
 
@@ -85,10 +96,41 @@ export default function Admin() {
               Back
             </Button>
             <div>
-              <h1 className="text-xl font-bold text-white" data-testid="text-admin-title">Free Access Users</h1>
-              <p className="text-[13px] text-white/40">Manage users who can access TradeDeck without paying</p>
+              <h1 className="text-xl font-bold text-white" data-testid="text-admin-title">Admin Panel</h1>
+              <p className="text-[13px] text-white/40">Manage waitlist and free access users</p>
             </div>
           </div>
+
+          <Card className="mb-6">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                Waitlist ({waitlistEntries.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {waitlistLoading ? (
+                <p className="text-white/30 text-sm">Loading...</p>
+              ) : waitlistEntries.length === 0 ? (
+                <p className="text-white/30 text-sm" data-testid="text-no-waitlist">No waitlist signups yet</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {waitlistEntries.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-white/[0.03] border border-white/[0.06]"
+                      data-testid={`waitlist-row-${entry.id}`}
+                    >
+                      <span className="text-[13px] text-white/80 truncate" data-testid={`text-waitlist-email-${entry.id}`}>{entry.email}</span>
+                      <span className="text-[11px] text-white/25 shrink-0">
+                        {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Card className="mb-6">
             <CardHeader className="pb-3">
