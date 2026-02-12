@@ -445,12 +445,48 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
     universeSize = quoteBreadth.universeSize;
     lastFullComputeTime = new Date().toISOString();
 
-    if (finvizBreadth && finvizBreadth.advancingDeclining.advancing > 0) {
-      advDecl = {
-        advancing: finvizBreadth.advancingDeclining.advancing,
-        declining: finvizBreadth.advancingDeclining.declining,
-      };
-      console.log(`[breadth] Using Finviz exchange-level A/D: ${advDecl.advancing}/${advDecl.declining}`);
+    if (finvizBreadth) {
+      if (finvizBreadth.advancingDeclining.advancing > 0) {
+        advDecl = {
+          advancing: finvizBreadth.advancingDeclining.advancing,
+          declining: finvizBreadth.advancingDeclining.declining,
+        };
+      }
+      if (finvizBreadth.aboveSMA50.above > 0) {
+        const fvTotal50 = finvizBreadth.aboveSMA50.above + finvizBreadth.aboveSMA50.below;
+        const fvPct50 = finvizBreadth.aboveSMA50.abovePct;
+        above50maData = {
+          value: fvPct50,
+          above: finvizBreadth.aboveSMA50.above,
+          below: finvizBreadth.aboveSMA50.below,
+          total: fvTotal50,
+          score: scoreAbove50MA(fvPct50),
+          max: 11,
+        };
+      }
+      if (finvizBreadth.aboveSMA200.above > 0) {
+        const fvTotal200 = finvizBreadth.aboveSMA200.above + finvizBreadth.aboveSMA200.below;
+        const fvPct200 = finvizBreadth.aboveSMA200.abovePct;
+        above200maData = {
+          value: fvPct200,
+          above: finvizBreadth.aboveSMA200.above,
+          below: finvizBreadth.aboveSMA200.below,
+          total: fvTotal200,
+          score: scoreAbove200MA(fvPct200),
+          max: 11,
+        };
+      }
+      if (finvizBreadth.newHighLow.highs > 0 || finvizBreadth.newHighLow.lows > 0) {
+        const fvNetHighs = finvizBreadth.newHighLow.highs - finvizBreadth.newHighLow.lows;
+        netHighsData = {
+          value: fvNetHighs,
+          highs: finvizBreadth.newHighLow.highs,
+          lows: finvizBreadth.newHighLow.lows,
+          score: scoreNetHighs(fvNetHighs),
+          max: 9,
+        };
+      }
+      console.log(`[breadth] Using Finviz exchange-level data: A/D=${advDecl.advancing}/${advDecl.declining}, SMA50=${above50maData.value}%, SMA200=${above200maData.value}%, H/L=${netHighsData.highs}/${netHighsData.lows}`);
     }
   } else {
     try {
