@@ -185,7 +185,7 @@ export default function Landing() {
                 onClick={handleCTA}
                 data-testid="button-hero-cta"
               >
-                {user ? "Open Dashboard" : "Get Lifetime Access — €145"}
+                {user ? "Access the Platform" : "Get Lifetime Access — €145"}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
@@ -460,7 +460,7 @@ export default function Landing() {
                 onClick={handleCTA}
                 data-testid="button-pricing-cta"
               >
-                {user ? "Open Dashboard" : "Get Lifetime Access"}
+                {user ? "Access the Platform" : "Get Lifetime Access"}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
 
