@@ -7,6 +7,20 @@ import { z } from "zod";
 export * from "./models/auth";
 import { users } from "./models/auth";
 
+// === FREE ACCESS USERS ===
+
+export const freeUsers = pgTable("free_users", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFreeUserSchema = createInsertSchema(freeUsers).omit({ id: true, createdAt: true, passwordHash: true });
+export type FreeUser = typeof freeUsers.$inferSelect;
+export type InsertFreeUser = z.infer<typeof insertFreeUserSchema>;
+
 // === EARNINGS TABLE DEFINITIONS ===
 
 export const earningsReports = pgTable("earnings_reports", {

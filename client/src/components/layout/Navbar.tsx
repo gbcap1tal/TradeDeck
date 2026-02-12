@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Search, User, LogOut, Menu, X, BarChart3, Layers, Newspaper, Crown, CalendarDays } from "lucide-react";
+import { Search, User, LogOut, Menu, X, BarChart3, Layers, Newspaper, Crown, CalendarDays, KeyRound, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,12 +9,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useMarketStatus } from "@/hooks/use-market";
+import { useToast } from "@/hooks/use-toast";
 import logoImg from "@/assets/logo.webp";
+
+const ADMIN_ID = '54198443';
 
 interface SearchResult {
   symbol: string;
@@ -26,6 +30,7 @@ interface SearchResult {
 export function Navbar() {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
+  const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [mobileSearch, setMobileSearch] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -33,8 +38,44 @@ export function Navbar() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showPwDialog, setShowPwDialog] = useState(false);
+  const [currentPw, setCurrentPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
   const { data: status } = useMarketStatus();
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const isFreeUser = !!(user as any)?._freeUser;
+  const isAdmin = user?.id === ADMIN_ID;
+
+  async function handlePasswordChange(e: React.FormEvent) {
+    e.preventDefault();
+    if (!currentPw || !newPw || newPw.length < 6) {
+      toast({ title: "Password must be at least 6 characters", variant: "destructive" });
+      return;
+    }
+    setPwLoading(true);
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: currentPw, newPassword: newPw }),
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Error", description: data.message, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Password updated" });
+      setShowPwDialog(false);
+      setCurrentPw('');
+      setNewPw('');
+    } catch {
+      toast({ title: "Failed to change password", variant: "destructive" });
+    } finally {
+      setPwLoading(false);
+    }
+  }
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
   const mobileDebounceRef = useRef<ReturnType<typeof setTimeout>>();
@@ -249,12 +290,59 @@ export function Navbar() {
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator className="bg-white/10" />
+                    {isAdmin && (
+                      <DropdownMenuItem className="text-white/60 hover:text-white focus:text-white" onClick={() => setLocation('/admin')} data-testid="menu-admin">
+                        <Shield className="mr-2 h-3.5 w-3.5" />
+                        Manage Users
+                      </DropdownMenuItem>
+                    )}
+                    {isFreeUser && (
+                      <DropdownMenuItem className="text-white/60 hover:text-white focus:text-white" onClick={() => setShowPwDialog(true)} data-testid="menu-change-password">
+                        <KeyRound className="mr-2 h-3.5 w-3.5" />
+                        Change Password
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem className="text-white/60 hover:text-white focus:text-white" onClick={() => logout()}>
                       <LogOut className="mr-2 h-3.5 w-3.5" />
                       Log out
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+
+                <Dialog open={showPwDialog} onOpenChange={setShowPwDialog}>
+                  <DialogContent className="bg-[#1a1a1a] border-white/10 sm:max-w-sm">
+                    <DialogHeader>
+                      <DialogTitle className="text-white">Change Password</DialogTitle>
+                      <DialogDescription className="text-white/40">Enter your current and new password</DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handlePasswordChange} className="space-y-3">
+                      <Input
+                        type="password"
+                        placeholder="Current password"
+                        value={currentPw}
+                        onChange={(e) => setCurrentPw(e.target.value)}
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                        data-testid="input-current-password"
+                      />
+                      <Input
+                        type="password"
+                        placeholder="New password (min 6 characters)"
+                        value={newPw}
+                        onChange={(e) => setNewPw(e.target.value)}
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                        data-testid="input-new-password"
+                      />
+                      <Button
+                        type="submit"
+                        className="w-full min-h-[44px]"
+                        disabled={pwLoading || !currentPw || !newPw}
+                        data-testid="button-save-password"
+                      >
+                        {pwLoading ? "Saving..." : "Update Password"}
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
               </div>
             ) : (
               <a href="/api/login" data-testid="button-login">

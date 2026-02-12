@@ -1,14 +1,21 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Shield } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Shield, Mail, Lock } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Payment() {
   const { user, isLoading } = useAuth();
+  const { toast } = useToast();
   const [processing, setProcessing] = useState(false);
+  const [showEmailLogin, setShowEmailLogin] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
 
   async function handleCheckout() {
     if (!user) {
@@ -33,6 +40,32 @@ export default function Payment() {
       console.error("Checkout error:", err);
     } finally {
       setProcessing(false);
+    }
+  }
+
+  async function handleEmailLogin(e: React.FormEvent) {
+    e.preventDefault();
+    if (!loginEmail.trim() || !loginPassword) return;
+    setLoginLoading(true);
+    try {
+      const res = await fetch('/api/auth/email-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail.trim(), password: loginPassword }),
+        credentials: 'include',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "Login failed", description: data.message || "Invalid credentials", variant: "destructive" });
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payment/status'] });
+      window.location.href = "/";
+    } catch (err: any) {
+      toast({ title: "Error", description: "Login failed", variant: "destructive" });
+    } finally {
+      setLoginLoading(false);
     }
   }
 
@@ -89,6 +122,56 @@ export default function Payment() {
             </div>
           </CardContent>
         </Card>
+
+        {!user && (
+          <Card>
+            <CardContent className="p-6 space-y-4">
+              <button
+                onClick={() => setShowEmailLogin(!showEmailLogin)}
+                className="w-full text-center text-[13px] text-white/40 hover:text-white/60 transition-colors"
+                data-testid="button-toggle-email-login"
+              >
+                {showEmailLogin ? "Hide email login" : "Have an invite? Log in with email"}
+              </button>
+
+              {showEmailLogin && (
+                <form onSubmit={handleEmailLogin} className="space-y-3" data-testid="form-email-login">
+                  <div className="relative">
+                    <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 z-10" />
+                    <Input
+                      type="email"
+                      placeholder="Email"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      className="pl-8 bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                      data-testid="input-login-email"
+                    />
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 z-10" />
+                    <Input
+                      type="password"
+                      placeholder="Password"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className="pl-8 bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                      data-testid="input-login-password"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    className="w-full min-h-[44px]"
+                    disabled={loginLoading || !loginEmail.trim() || !loginPassword}
+                    data-testid="button-email-login"
+                  >
+                    {loginLoading ? "Logging in..." : "Log In"}
+                  </Button>
+                </form>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

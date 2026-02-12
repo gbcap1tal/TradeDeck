@@ -18,6 +18,7 @@ import Earnings from "@/pages/Earnings";
 import Payment from "@/pages/Payment";
 import PaymentSuccess from "@/pages/PaymentSuccess";
 import PaymentCancel from "@/pages/PaymentCancel";
+import Admin from "@/pages/Admin";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 
@@ -62,6 +63,7 @@ function Router() {
       <Route path="/payment" component={Payment} />
       <Route path="/payment/success" component={PaymentSuccess} />
       <Route path="/payment/cancel" component={PaymentCancel} />
+      <Route path="/admin" component={Admin} />
       <Route path="/" component={ProtectedDashboard} />
       <Route path="/stocks/:symbol" component={ProtectedStockDetail} />
       <Route path="/sectors/:sectorName/industries/:industryName" component={ProtectedIndustryDetail} />

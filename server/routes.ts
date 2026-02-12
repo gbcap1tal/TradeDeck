@@ -18,9 +18,11 @@ import { scrapeFinvizDigest, scrapeBriefingPreMarket, getPersistedDigest, scrape
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripe/stripeClient";
 import { db } from "./db";
 import { users } from "@shared/models/auth";
+import { freeUsers } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import * as fs from 'fs';
 import * as path from 'path';
+import bcrypt from 'bcryptjs';
 import { spawn } from 'child_process';
 
 const INDUSTRY_PERF_PERSIST_PATH = path.join(process.cwd(), '.industry-perf-cache.json');
@@ -2377,6 +2379,7 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       if (isAdmin(req)) return res.json({ hasPaid: true });
+      if (req.user.claims?._freeUser) return res.json({ hasPaid: true });
       const [user] = await db.select().from(users).where(eq(users.id, userId));
       if (!user) return res.json({ hasPaid: false });
       res.json({ hasPaid: user.hasPaid === 'true' });
@@ -2457,6 +2460,110 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error('[stripe] Verify error:', err.message);
       res.status(500).json({ error: 'Verification failed' });
+    }
+  });
+
+  // === FREE ACCESS USER MANAGEMENT (Admin) ===
+
+  app.get('/api/admin/free-users', isAuthenticated, async (req: any, res) => {
+    if (!isAdmin(req)) return res.status(403).json({ message: "Admin only" });
+    try {
+      const all = await db.select({ id: freeUsers.id, name: freeUsers.name, email: freeUsers.email, createdAt: freeUsers.createdAt }).from(freeUsers);
+      res.json(all);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/admin/free-users', isAuthenticated, async (req: any, res) => {
+    if (!isAdmin(req)) return res.status(403).json({ message: "Admin only" });
+    try {
+      const { name, email } = req.body;
+      if (!name || !email) return res.status(400).json({ message: "name and email required" });
+      const normalizedEmail = email.trim().toLowerCase();
+      const existing = await db.select().from(freeUsers).where(eq(freeUsers.email, normalizedEmail));
+      if (existing.length > 0) return res.status(409).json({ message: "Email already exists" });
+      const passwordHash = await bcrypt.hash('tradedeck', 10);
+      const [created] = await db.insert(freeUsers).values({ name: name.trim(), email: normalizedEmail, passwordHash }).returning({ id: freeUsers.id, name: freeUsers.name, email: freeUsers.email, createdAt: freeUsers.createdAt });
+      res.status(201).json(created);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete('/api/admin/free-users/:id', isAuthenticated, async (req: any, res) => {
+    if (!isAdmin(req)) return res.status(403).json({ message: "Admin only" });
+    try {
+      const id = Number(req.params.id);
+      await db.delete(freeUsers).where(eq(freeUsers.id, id));
+      res.status(204).send();
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // === EMAIL/PASSWORD AUTH FOR FREE USERS ===
+
+  app.post('/api/auth/email-login', async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) return res.status(400).json({ message: "Email and password required" });
+      const normalizedEmail = email.trim().toLowerCase();
+      const [freeUser] = await db.select().from(freeUsers).where(eq(freeUsers.email, normalizedEmail));
+      if (!freeUser) return res.status(401).json({ message: "Invalid email or password" });
+      const valid = await bcrypt.compare(password, freeUser.passwordHash);
+      if (!valid) return res.status(401).json({ message: "Invalid email or password" });
+
+      const freeUserId = `free_${freeUser.id}`;
+      await db.insert(users).values({
+        id: freeUserId,
+        email: freeUser.email,
+        firstName: freeUser.name.split(' ')[0] || freeUser.name,
+        lastName: freeUser.name.split(' ').slice(1).join(' ') || '',
+        hasPaid: 'true',
+      }).onConflictDoUpdate({
+        target: users.id,
+        set: { hasPaid: 'true', updatedAt: new Date() },
+      });
+
+      (req as any).login({
+        claims: {
+          sub: freeUserId,
+          email: freeUser.email,
+          first_name: freeUser.name.split(' ')[0] || freeUser.name,
+          last_name: freeUser.name.split(' ').slice(1).join(' ') || '',
+          _freeUser: true,
+        },
+        expires_at: Math.floor(Date.now() / 1000) + 86400 * 30,
+      }, (err: any) => {
+        if (err) return res.status(500).json({ message: "Login failed" });
+        res.json({
+          success: true,
+          user: { id: freeUserId, email: freeUser.email, firstName: freeUser.name.split(' ')[0], lastName: freeUser.name.split(' ').slice(1).join(' ') || '' },
+          needsPasswordChange: freeUser.passwordHash === undefined,
+        });
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/auth/change-password', isAuthenticated, async (req: any, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      if (!currentPassword || !newPassword) return res.status(400).json({ message: "Current and new password required" });
+      if (newPassword.length < 6) return res.status(400).json({ message: "Password must be at least 6 characters" });
+      const userEmail = req.user?.claims?.email;
+      if (!userEmail) return res.status(400).json({ message: "No email associated" });
+      const [freeUser] = await db.select().from(freeUsers).where(eq(freeUsers.email, userEmail.toLowerCase()));
+      if (!freeUser) return res.status(404).json({ message: "Free user not found" });
+      const valid = await bcrypt.compare(currentPassword, freeUser.passwordHash);
+      if (!valid) return res.status(401).json({ message: "Current password is incorrect" });
+      const newHash = await bcrypt.hash(newPassword, 10);
+      await db.update(freeUsers).set({ passwordHash: newHash }).where(eq(freeUsers.id, freeUser.id));
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
     }
   });
 
