@@ -7,6 +7,11 @@ import OpenAI from 'openai';
 const FINNHUB_BASE = 'https://finnhub.io/api/v1';
 const FMP_V3 = 'https://financialmodelingprep.com/api/v3';
 
+function getETTodayStr(): string {
+  const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  return `${et.getFullYear()}-${String(et.getMonth() + 1).padStart(2, '0')}-${String(et.getDate()).padStart(2, '0')}`;
+}
+
 function getFinnhubKey(): string | undefined {
   return process.env.FINNHUB_API_KEY;
 }
@@ -69,25 +74,26 @@ export async function fetchEarningsCalendar(dateStr: string, forceRefresh: boole
     .where(eq(earningsReports.reportDate, dateStr));
 
   if (existingReports.length > 0) {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getETTodayStr();
     const isToday = dateStr === today;
     const daysDiff = (new Date(today).getTime() - new Date(dateStr).getTime()) / 86400000;
     const isRecent = daysDiff >= 0 && daysDiff <= 7;
+    const isYesterday = daysDiff >= 0.5 && daysDiff <= 1.5;
 
     const hasMissingActuals = (isRecent || dateStr >= today) && existingReports.some(r => r.epsReported === null);
     if (hasMissingActuals) {
       await refreshActualsFromFinnhub(dateStr, existingReports);
     }
 
-    if (isToday) {
+    if (isToday || isYesterday) {
       await refreshLivePrices(dateStr);
     }
 
-    if (hasMissingActuals || isToday) {
+    if (hasMissingActuals || isToday || isYesterday) {
       const refreshed = await db.select().from(earningsReports)
         .where(eq(earningsReports.reportDate, dateStr));
       const items = await enrichWithEpScores(refreshed);
-      setCache(cacheKey, items, isToday ? 90 : 300);
+      setCache(cacheKey, items, isToday ? 90 : (isYesterday ? 180 : 300));
       return items;
     }
 

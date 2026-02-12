@@ -18,7 +18,7 @@ import { scrapeFinvizDigest, scrapeBriefingPreMarket, getPersistedDigest, scrape
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripe/stripeClient";
 import { db } from "./db";
 import { users } from "@shared/models/auth";
-import { freeUsers } from "@shared/schema";
+import { freeUsers, earningsReports } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import * as fs from 'fs';
 import * as path from 'path';
@@ -1072,6 +1072,88 @@ function initBackgroundTasks() {
       selfHealingInProgress = false;
     }
   }, 5 * 60 * 1000); // every 5 minutes
+
+  let lastEarningsWatchdogRun = 0;
+  const EARNINGS_WATCHDOG_COOLDOWN = 10 * 60 * 1000;
+
+  setInterval(async () => {
+    const now = new Date();
+    const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const day = et.getDay();
+    if (day === 0 || day === 6) return;
+
+    const timeMinutes = et.getHours() * 60 + et.getMinutes();
+    if (timeMinutes < 390 || timeMinutes > 1200) return;
+
+    if (Date.now() - lastEarningsWatchdogRun < EARNINGS_WATCHDOG_COOLDOWN) return;
+    lastEarningsWatchdogRun = Date.now();
+
+    const todayET = `${et.getFullYear()}-${String(et.getMonth() + 1).padStart(2, '0')}-${String(et.getDate()).padStart(2, '0')}`;
+    const yesterdayET = new Date(et);
+    yesterdayET.setDate(yesterdayET.getDate() - 1);
+    const yesterdayStr = `${yesterdayET.getFullYear()}-${String(yesterdayET.getMonth() + 1).padStart(2, '0')}-${String(yesterdayET.getDate()).padStart(2, '0')}`;
+
+    const datesToCheck = [todayET, yesterdayStr];
+    let totalFixed = 0;
+
+    for (const dateStr of datesToCheck) {
+      try {
+        const reports = await db.select().from(earningsReports)
+          .where(eq(earningsReports.reportDate, dateStr));
+
+        if (reports.length === 0) {
+          try {
+            const items = await fetchEarningsCalendar(dateStr, true);
+            if (items.length > 0) {
+              console.log(`[earnings-watchdog] Loaded ${items.length} earnings for ${dateStr} (was empty)`);
+              totalFixed += items.length;
+            }
+          } catch (fetchErr: any) {
+            console.error(`[earnings-watchdog] Failed to fetch earnings for ${dateStr}: ${fetchErr.message}`);
+          }
+          continue;
+        }
+
+        const missingActuals = reports.filter(r => r.epsReported === null);
+        const missingPct = Math.round((missingActuals.length / reports.length) * 100);
+
+        const isYesterday = dateStr === yesterdayStr;
+        const isAfterClose = timeMinutes > 960;
+        const needsRefresh = isYesterday
+          ? missingPct > 15
+          : (isAfterClose && missingPct > 30);
+
+        if (needsRefresh) {
+          console.log(`[earnings-watchdog] ${dateStr}: ${missingActuals.length}/${reports.length} missing actuals (${missingPct}%) — triggering refresh`);
+          try {
+            const items = await fetchEarningsCalendar(dateStr, true);
+            const afterRefresh = items.filter(i => i.epsReported !== null).length;
+            const before = reports.length - missingActuals.length;
+            const fixed = afterRefresh - before;
+            if (fixed > 0) {
+              totalFixed += fixed;
+              console.log(`[earnings-watchdog] ${dateStr}: Fixed ${fixed} entries (${before} → ${afterRefresh} with actuals)`);
+            } else {
+              console.log(`[earnings-watchdog] ${dateStr}: No new actuals available yet`);
+            }
+          } catch (refreshErr: any) {
+            console.error(`[earnings-watchdog] Refresh failed for ${dateStr}: ${refreshErr.message}`);
+            sendAlert(
+              `Earnings Watchdog: Refresh Failed for ${dateStr}`,
+              `Earnings actuals refresh for ${dateStr} failed.\n\nMissing: ${missingActuals.length}/${reports.length} (${missingPct}%)\nError: ${refreshErr.message}`,
+              'earnings_watchdog'
+            );
+          }
+        }
+      } catch (err: any) {
+        console.error(`[earnings-watchdog] Error checking ${dateStr}: ${err.message}`);
+      }
+    }
+
+    if (totalFixed > 0) {
+      console.log(`[earnings-watchdog] Total fixed: ${totalFixed} entries across today/yesterday`);
+    }
+  }, 10 * 60 * 1000);
 }
 
 function _seededRandom(seed: string) {

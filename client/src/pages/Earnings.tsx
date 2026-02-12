@@ -141,20 +141,41 @@ function renderBulletSummary(summary: string) {
   );
 }
 
+function getETDate(d: Date = new Date()): { year: number; month: number; day: number; dateStr: string } {
+  const parts = d.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }).split('-');
+  const year = parseInt(parts[0]);
+  const month = parseInt(parts[1]);
+  const day = parseInt(parts[2]);
+  const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  return { year, month, day, dateStr };
+}
+
 export default function Earnings() {
-  const today = new Date();
-  const [selectedDate, setSelectedDate] = useState(today.toISOString().split('T')[0]);
-  const [currentYear, setCurrentYear] = useState(today.getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(today.getMonth() + 1);
+  const etNow = getETDate();
+  const todayStr = etNow.dateStr;
+
+  const yesterdayRaw = new Date();
+  yesterdayRaw.setDate(yesterdayRaw.getDate() - 1);
+  const etYesterday = getETDate(yesterdayRaw);
+  const yesterdayStr = etYesterday.dateStr;
+
+  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [currentYear, setCurrentYear] = useState(etNow.year);
+  const [currentMonth, setCurrentMonth] = useState(etNow.month);
   const [modalItem, setModalItem] = useState<EarningsItem | null>(null);
   const [showBMO, setShowBMO] = useState(true);
   const [showAMC, setShowAMC] = useState(true);
   const [, setLocation] = useLocation();
-  const todayStr = today.toISOString().split('T')[0];
+
+  function isDateClickable(dateStr: string): boolean {
+    if (dateStr >= todayStr) return true;
+    if (dateStr >= yesterdayStr) return true;
+    return false;
+  }
 
   const { data: earnings = [], isLoading } = useQuery<EarningsItem[]>({
     queryKey: [`/api/earnings/calendar?date=${selectedDate}`],
-    refetchInterval: selectedDate === todayStr ? 120000 : false,
+    refetchInterval: (selectedDate === todayStr || selectedDate === yesterdayStr) ? 120000 : false,
   });
 
   const { data: earningsDates = [] } = useQuery<string[]>({
@@ -188,28 +209,52 @@ export default function Earnings() {
 
     const amcItems = all.filter(e => e.timing === 'AMC');
     const bmoItems = all.filter(e => e.timing !== 'AMC');
-    const isPast = selectedDate < todayStr;
+    const isYesterday = selectedDate === yesterdayStr;
+    const isToday = selectedDate === todayStr;
+    const isFuture = selectedDate > todayStr;
 
     const result: { items: EarningsItem[]; label: string; badge: 'BMO' | 'AMC' }[] = [];
 
-    if (isPast) {
-      if (showAMC) result.push({ items: amcItems, label: 'Fresh Results — After Close', badge: 'AMC' });
-      if (showBMO) result.push({ items: bmoItems, label: 'Already Traded — Before Open', badge: 'BMO' });
-    } else {
+    if (isToday) {
       if (showBMO) result.push({
         items: bmoItems,
-        label: selectedDate === todayStr ? 'Pre-Market Movers — Before Open' : 'Before Market Open',
+        label: 'Pre-Market Movers — Before Open',
         badge: 'BMO',
       });
       if (showAMC) result.push({
         items: amcItems,
-        label: selectedDate === todayStr ? 'After Close — Upcoming' : 'After Market Close',
+        label: 'After Close — Upcoming',
         badge: 'AMC',
       });
+    } else if (isYesterday) {
+      if (showAMC) result.push({
+        items: amcItems,
+        label: 'Fresh Results — After Close',
+        badge: 'AMC',
+      });
+      if (showBMO) result.push({
+        items: bmoItems,
+        label: 'Already Traded — Before Open',
+        badge: 'BMO',
+      });
+    } else if (isFuture) {
+      if (showBMO) result.push({
+        items: bmoItems,
+        label: 'Before Market Open',
+        badge: 'BMO',
+      });
+      if (showAMC) result.push({
+        items: amcItems,
+        label: 'After Market Close',
+        badge: 'AMC',
+      });
+    } else {
+      if (showAMC) result.push({ items: amcItems, label: 'After Close', badge: 'AMC' });
+      if (showBMO) result.push({ items: bmoItems, label: 'Before Open', badge: 'BMO' });
     }
 
     return { sections: result, totalCount: total };
-  }, [earnings, selectedDate, todayStr, showBMO, showAMC]);
+  }, [earnings, selectedDate, todayStr, yesterdayStr, showBMO, showAMC]);
 
   const prevMonth = () => {
     if (currentMonth === 1) {
@@ -284,27 +329,32 @@ export default function Earnings() {
               const isToday = dateStr === todayStr;
               const hasEarnings = earningsDatesSet.has(dateStr);
               const weekend = isWeekend(currentYear, currentMonth, day);
+              const clickable = isDateClickable(dateStr);
+              const tooOld = !clickable;
 
               return (
                 <button
                   key={day}
-                  onClick={() => setSelectedDate(dateStr)}
+                  onClick={() => clickable && setSelectedDate(dateStr)}
+                  disabled={tooOld}
                   className={cn(
                     "relative py-1.5 rounded text-[11px] font-medium transition-colors",
-                    isSelected
-                      ? "bg-[#FBBB04] text-black"
-                      : isToday
-                        ? "bg-white/10 text-white/80"
-                        : weekend
-                          ? "text-white/15"
-                          : hasEarnings
-                            ? "text-white/60 hover:bg-white/5"
-                            : "text-white/25 hover:bg-white/5"
+                    tooOld
+                      ? "text-white/10 cursor-not-allowed line-through decoration-white/10"
+                      : isSelected
+                        ? "bg-[#FBBB04] text-black"
+                        : isToday
+                          ? "bg-white/10 text-white/80"
+                          : weekend
+                            ? "text-white/15"
+                            : hasEarnings
+                              ? "text-white/60 hover:bg-white/5"
+                              : "text-white/25 hover:bg-white/5"
                   )}
                   data-testid={`button-date-${dateStr}`}
                 >
                   {day}
-                  {hasEarnings && !isSelected && (
+                  {hasEarnings && !isSelected && !tooOld && (
                     <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-[#FBBB04]/60" />
                   )}
                 </button>
