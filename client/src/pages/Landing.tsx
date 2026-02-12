@@ -9,7 +9,6 @@ import {
   CalendarDays,
   Newspaper,
   Shield,
-  Zap,
   Target,
   ArrowRight,
   Check,
@@ -35,7 +34,7 @@ const FEATURES = [
     icon: Activity,
     title: "Market Quality Score",
     description:
-      "Real-time breadth analysis across 5,000+ US stocks. Advance/decline ratios, SMA trends, and new highs/lows in one glance.",
+      "Proprietary algorithm synthesizing breadth, momentum, and participation data across 5,000+ US stocks into one composite signal. Powered by multi-layer analysis with adaptive weighting.",
   },
   {
     icon: BarChart3,
@@ -50,22 +49,22 @@ const FEATURES = [
       "Proprietary Relative Strength ratings (1 to 99) covering all US stocks. Find market leaders with momentum on their side.",
   },
   {
+    icon: CalendarDays,
+    title: "Earnings Intelligence",
+    description:
+      "Monthly earnings calendar with EP scoring, AI-powered summaries from actual call transcripts, and EPS/revenue tracking.",
+  },
+  {
     icon: Crown,
     title: "Stock Quality Score",
     description:
-      "Multi-factor quality analysis combining earnings growth, profitability, and technical strength into one actionable score.",
+      "Proprietary composite score blending technicals, fundamentals, profitability, and institutional momentum into a single actionable rating.",
   },
   {
     icon: Layers,
     title: "Megatrend Baskets",
     description:
       "Custom thematic baskets tracking AI, quantum computing, nuclear energy, and more, with cap-weighted returns.",
-  },
-  {
-    icon: CalendarDays,
-    title: "Earnings Intelligence",
-    description:
-      "Monthly earnings calendar with EP scoring, AI-powered summaries from actual call transcripts, and EPS/revenue tracking.",
   },
   {
     icon: Newspaper,
@@ -248,14 +247,6 @@ export default function Landing() {
             ))}
           </div>
 
-          <div className="flex justify-center mt-8 sm:mt-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.03]">
-              <Zap className="w-3 h-3 text-white/40" />
-              <span className="text-[11px] sm:text-[12px] text-white/40 font-medium uppercase tracking-[0.15em]">
-                Professional-Grade Market Intelligence
-              </span>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -270,16 +261,17 @@ export default function Landing() {
                 Know the market's true health
               </h2>
               <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed mb-6">
-                Our Market Quality Score aggregates advance/decline data, SMA trends,
-                and new highs/lows across 5,000+ stocks. See whether the rally is
-                broad-based or narrow, and act accordingly.
+                Our proprietary Market Quality Score runs a multi-factor algorithm
+                across 5,000+ US stocks in real time. It fuses breadth, trend
+                participation, and momentum divergence signals into one composite
+                reading so you can see whether the rally is broad-based or fragile.
               </p>
               <div className="space-y-2.5">
                 {[
                   "Advance/Decline breadth from NYSE, Nasdaq, and AMEX",
                   "SMA 50 & SMA 200 participation tracking",
                   "New highs vs new lows monitoring",
-                  "Self-healing data pipeline with email alerts",
+                  "Daily, weekly, and monthly historical snapshots",
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-2.5">
                     <Check className="w-3.5 h-3.5 text-white/30 mt-0.5 shrink-0" />
@@ -351,17 +343,19 @@ export default function Landing() {
                 Deep-dive into any stock
               </h2>
               <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed mb-6">
-                Every stock page is a full command center. TradingView charts, quality
-                scoring, Weinstein stage analysis, and IBD-style Relative Strength ratings.
-                Everything you need to evaluate a position in one view.
+                Every stock page is a full command center. Charts, fundamentals,
+                institutional flow, and our proprietary Quality Score that blends
+                technicals, profitability, growth, and momentum into one number.
+                See the full picture at a glance.
               </p>
               <div className="space-y-2.5">
                 {[
                   "IBD-style RS ratings for all US stocks",
-                  "Stock Quality Score with multi-factor analysis",
-                  "Weinstein stage + trend health indicators",
-                  "Fundamentals, short interest, and smart money tracking",
-                  "Latest news feed directly on the stock page",
+                  "Quality Score combining technicals, fundamentals, and profitability",
+                  "EPS and sales columns with surprise tracking",
+                  "Insider purchases and institutional fund flow",
+                  "Weinstein stage analysis and trend health",
+                  "Latest news and sentiment directly on the stock page",
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-2.5">
                     <Check className="w-3.5 h-3.5 text-white/30 mt-0.5 shrink-0" />
