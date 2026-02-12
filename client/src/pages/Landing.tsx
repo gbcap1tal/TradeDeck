@@ -397,12 +397,13 @@ export default function Landing() {
           </div>
 
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
-            <div>
-              <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40 mb-6">
+            <div className="flex flex-col">
+              <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40 mb-6 aspect-[16/10]">
                 <ImageLens
                   src={earningsScreenshot}
                   alt="Earnings Calendar with EP Detection"
                   data-testid="img-feature-earnings"
+                  className="h-full [&_img]:h-full [&_img]:w-full [&_img]:object-cover [&_img]:object-top"
                 />
               </div>
               <h3 className="text-[16px] sm:text-[18px] font-semibold mb-3 text-white/90" data-testid="text-earnings-heading">
@@ -429,12 +430,13 @@ export default function Landing() {
               </div>
             </div>
 
-            <div>
-              <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40 mb-6">
+            <div className="flex flex-col">
+              <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40 mb-6 aspect-[16/10]">
                 <ImageLens
                   src={megatrendsScreenshot}
                   alt="Megatrend Baskets Performance"
                   data-testid="img-feature-megatrends"
+                  className="h-full [&_img]:h-full [&_img]:w-full [&_img]:object-cover [&_img]:object-top"
                 />
               </div>
               <h3 className="text-[16px] sm:text-[18px] font-semibold mb-3 text-white/90" data-testid="text-megatrends-heading">
