@@ -23,6 +23,8 @@ import Landing from "@/pages/Landing";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 
+const isProduction = import.meta.env.PROD;
+
 function PaymentGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading: authLoading } = useAuth();
 
@@ -37,6 +39,9 @@ function PaymentGate({ children }: { children: React.ReactNode }) {
   }
 
   if (!user) {
+    if (isProduction) {
+      return <Landing />;
+    }
     return <Redirect to="/landing" />;
   }
 
