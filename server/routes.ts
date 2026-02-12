@@ -2797,52 +2797,6 @@ export async function registerRoutes(
 
       await db.insert(waitlist).values({ email: cleaned });
 
-      try {
-        const { Resend } = await import('resend');
-        const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
-        const xReplitToken = process.env.REPL_IDENTITY
-          ? 'repl ' + process.env.REPL_IDENTITY
-          : process.env.WEB_REPL_RENEWAL
-          ? 'depl ' + process.env.WEB_REPL_RENEWAL
-          : null;
-
-        if (hostname && xReplitToken) {
-          const connData = await fetch(
-            'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=resend',
-            { headers: { 'Accept': 'application/json', 'X_REPLIT_TOKEN': xReplitToken } }
-          ).then(r => r.json()).then(d => d.items?.[0]);
-
-          if (connData?.settings?.api_key) {
-            const resend = new Resend(connData.settings.api_key);
-            const fromEmail = connData.settings.from_email;
-
-            await resend.emails.send({
-              from: fromEmail,
-              to: cleaned,
-              subject: 'Welcome to the TradeDeck Waitlist',
-              html: `
-                <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px; background: #0a0a0a; color: #e0e0e0; border-radius: 12px;">
-                  <h2 style="margin: 0 0 16px; color: #ffffff; font-size: 22px; font-weight: 700;">You're on the list.</h2>
-                  <p style="margin: 0 0 16px; color: #999; font-size: 14px; line-height: 1.6;">
-                    Thanks for joining the TradeDeck waitlist. We're building the most advanced
-                    market analysis platform for serious traders and investors.
-                  </p>
-                  <p style="margin: 0 0 16px; color: #999; font-size: 14px; line-height: 1.6;">
-                    We'll notify you as soon as access opens up. In the meantime, you can reply
-                    to this email with any questions.
-                  </p>
-                  <div style="border-top: 1px solid #222; padding-top: 16px; margin-top: 24px;">
-                    <p style="margin: 0; color: #555; font-size: 11px;">TradeDeck by GB Capital</p>
-                  </div>
-                </div>
-              `,
-            });
-          }
-        }
-      } catch (emailErr: any) {
-        console.error('[waitlist] Confirmation email failed:', emailErr.message);
-      }
-
       res.json({ success: true });
     } catch (err: any) {
       if (err.code === '23505') {

@@ -133,7 +133,9 @@ function WaitlistForm({ size = "default", className = "" }: { size?: "default" |
       <div className={`flex items-center gap-2 ${className}`}>
         <Check className="w-4 h-4 text-emerald-400 shrink-0" />
         <span className="text-[14px] text-emerald-400/90">
-          {status === "already" ? "You're already on the list. We'll be in touch." : "You're in. Check your inbox for confirmation."}
+          {status === "already"
+            ? "You're already on the list. We'll be in touch."
+            : "Your email has been registered. You'll receive updates as soon as the first version is ready, with early access at a special price."}
         </span>
       </div>
     );

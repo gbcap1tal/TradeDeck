@@ -6,7 +6,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Trash2, UserPlus, ArrowLeft, Mail, User, Shield, Users } from "lucide-react";
+import { Trash2, UserPlus, ArrowLeft, Mail, User, Shield, Users, Copy, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -102,11 +102,50 @@ export default function Admin() {
           </div>
 
           <Card className="mb-6">
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 Waitlist ({waitlistEntries.length})
               </CardTitle>
+              {waitlistEntries.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const emails = waitlistEntries.map(e => e.email).join('\n');
+                      navigator.clipboard.writeText(emails);
+                      toast({ title: "Copied", description: `${waitlistEntries.length} emails copied to clipboard` });
+                    }}
+                    data-testid="button-copy-waitlist"
+                  >
+                    <Copy className="w-3.5 h-3.5 mr-1" />
+                    Copy All
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const header = 'Email,Date Joined';
+                      const rows = waitlistEntries.map(e =>
+                        `${e.email},${e.createdAt ? new Date(e.createdAt).toISOString().split('T')[0] : ''}`
+                      );
+                      const csv = [header, ...rows].join('\n');
+                      const blob = new Blob([csv], { type: 'text/csv' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `tradedeck-waitlist-${new Date().toISOString().split('T')[0]}.csv`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    data-testid="button-export-waitlist"
+                  >
+                    <Download className="w-3.5 h-3.5 mr-1" />
+                    Export CSV
+                  </Button>
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               {waitlistLoading ? (
@@ -115,15 +154,18 @@ export default function Admin() {
                 <p className="text-white/30 text-sm" data-testid="text-no-waitlist">No waitlist signups yet</p>
               ) : (
                 <div className="space-y-1.5">
-                  {waitlistEntries.map((entry) => (
+                  {waitlistEntries.map((entry, i) => (
                     <div
                       key={entry.id}
                       className="flex items-center justify-between gap-3 px-3 py-2 rounded-md bg-white/[0.03] border border-white/[0.06]"
                       data-testid={`waitlist-row-${entry.id}`}
                     >
-                      <span className="text-[13px] text-white/80 truncate" data-testid={`text-waitlist-email-${entry.id}`}>{entry.email}</span>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-[11px] text-white/20 font-mono w-5 text-right shrink-0">{i + 1}</span>
+                        <span className="text-[13px] text-white/80 truncate" data-testid={`text-waitlist-email-${entry.id}`}>{entry.email}</span>
+                      </div>
                       <span className="text-[11px] text-white/25 shrink-0">
-                        {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+                        {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
                       </span>
                     </div>
                   ))}
