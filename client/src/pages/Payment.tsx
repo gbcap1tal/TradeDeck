@@ -74,7 +74,7 @@ export default function Payment() {
             </div>
 
             <Button
-              className="w-full"
+              className="w-full min-h-[44px]"
               size="lg"
               onClick={handleCheckout}
               disabled={processing || isLoading}
