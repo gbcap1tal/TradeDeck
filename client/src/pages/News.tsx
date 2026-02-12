@@ -100,7 +100,7 @@ function applySentimentHighlight(text: string): Array<{ text: string; sentiment?
   return segments;
 }
 
-function highlightTickers(text: string, onTickerClick: (ticker: string) => void) {
+function highlightTickers(text: string, onTickerClick: (ticker: string) => void, skipSentiment = false) {
   const tickerRegex = /\b([A-Z]{1,5})\b/g;
   const knownTickers = new Set([
     'SPY', 'QQQ', 'IWM', 'DIA', 'AAPL', 'MSFT', 'GOOG', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA',
@@ -159,19 +159,21 @@ function highlightTickers(text: string, onTickerClick: (ticker: string) => void)
   }
 
   if (parts.length === 0) {
-    const sentimentSegs = applySentimentHighlight(text);
-    if (sentimentSegs.some(s => s.sentiment)) {
-      return (
-        <span>
-          {sentimentSegs.map((s, i) =>
-            s.sentiment ? (
-              <span key={i} className={`${SENTIMENT_COLORS[s.sentiment]} font-semibold`}>{s.text}</span>
-            ) : (
-              <span key={i}>{s.text}</span>
-            )
-          )}
-        </span>
-      );
+    if (!skipSentiment) {
+      const sentimentSegs = applySentimentHighlight(text);
+      if (sentimentSegs.some(s => s.sentiment)) {
+        return (
+          <span>
+            {sentimentSegs.map((s, i) =>
+              s.sentiment ? (
+                <span key={i} className={`${SENTIMENT_COLORS[s.sentiment]} font-semibold`}>{s.text}</span>
+              ) : (
+                <span key={i}>{s.text}</span>
+              )
+            )}
+          </span>
+        );
+      }
     }
     return <span>{text}</span>;
   }
@@ -191,6 +193,8 @@ function highlightTickers(text: string, onTickerClick: (ticker: string) => void)
           >
             {part.text}
           </span>
+        ) : skipSentiment ? (
+          <span key={i}>{part.text}</span>
         ) : (
           <span key={i}>
             {applySentimentHighlight(part.text).map((s, j) =>
@@ -331,7 +335,7 @@ export default function News() {
                     className="text-[17px] leading-snug font-semibold text-white/90 mb-5"
                     data-testid="text-digest-headline"
                   >
-                    {highlightTickers(digest.headline, goToStock)}
+                    {highlightTickers(digest.headline, goToStock, true)}
                   </h2>
                   {digest.bullets.length > 0 && (
                     <ul className="space-y-3">
@@ -339,7 +343,7 @@ export default function News() {
                         <li key={i} className="flex gap-3" data-testid={`text-digest-bullet-${i}`}>
                           <span className="w-1.5 h-1.5 rounded-full bg-[#0a84ff]/40 mt-2 flex-shrink-0" />
                           <span className="text-[13px] text-white/55 leading-relaxed">
-                            {highlightTickers(bullet, goToStock)}
+                            {highlightTickers(bullet, goToStock, true)}
                           </span>
                         </li>
                       ))}
@@ -347,7 +351,7 @@ export default function News() {
                   )}
                   {digest.bullets.length === 0 && (
                     <p className="text-[13px] text-white/50 leading-relaxed">
-                      {highlightTickers(digest.headline, goToStock)}
+                      {highlightTickers(digest.headline, goToStock, true)}
                     </p>
                   )}
                 </div>
