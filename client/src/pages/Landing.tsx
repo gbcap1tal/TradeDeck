@@ -295,42 +295,14 @@ export default function Landing() {
                 ))}
               </div>
             </div>
-            <div className="space-y-3">
-              <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
-                <img
-                  src={dashboardScreenshot}
-                  alt="TradeDeck Market Quality Dashboard"
-                  className="w-full h-auto"
-                  loading="lazy"
-                  data-testid="img-feature-breadth"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg overflow-hidden border border-white/[0.08] shadow-lg shadow-black/30 relative">
-                  <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded bg-black/60 backdrop-blur-sm">
-                    <span className="text-[10px] text-white/60 font-medium">Market Quality Score</span>
-                  </div>
-                  <img
-                    src={detailMQ}
-                    alt="Market Quality Score detail"
-                    className="w-full h-auto"
-                    loading="lazy"
-                    data-testid="img-detail-mq"
-                  />
-                </div>
-                <div className="rounded-lg overflow-hidden border border-white/[0.08] shadow-lg shadow-black/30 relative">
-                  <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded bg-black/60 backdrop-blur-sm">
-                    <span className="text-[10px] text-white/60 font-medium">Heatmap & Sector Rotation</span>
-                  </div>
-                  <img
-                    src={detailHeatmap}
-                    alt="Market Heatmap and Sector Rotation"
-                    className="w-full h-auto"
-                    loading="lazy"
-                    data-testid="img-detail-heatmap"
-                  />
-                </div>
-              </div>
+            <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
+              <img
+                src={dashboardScreenshot}
+                alt="TradeDeck Market Quality Dashboard"
+                className="w-full h-auto"
+                loading="lazy"
+                data-testid="img-feature-breadth"
+              />
             </div>
           </div>
         </div>
@@ -339,42 +311,14 @@ export default function Landing() {
       <section className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/[0.04]">
         <div className="max-w-6xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-            <div className="order-2 lg:order-1 space-y-3">
-              <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
-                <img
-                  src={newsScreenshot}
-                  alt="News Intelligence"
-                  className="w-full h-auto"
-                  loading="lazy"
-                  data-testid="img-feature-news"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg overflow-hidden border border-white/[0.08] shadow-lg shadow-black/30 relative">
-                  <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded bg-black/60 backdrop-blur-sm">
-                    <span className="text-[10px] text-white/60 font-medium">Headlines That Matter</span>
-                  </div>
-                  <img
-                    src={detailHeadlines}
-                    alt="Headlines That Matter detail"
-                    className="w-full h-auto"
-                    loading="lazy"
-                    data-testid="img-detail-headlines"
-                  />
-                </div>
-                <div className="rounded-lg overflow-hidden border border-white/[0.08] shadow-lg shadow-black/30 relative">
-                  <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded bg-black/60 backdrop-blur-sm">
-                    <span className="text-[10px] text-white/60 font-medium">Corporate Developments</span>
-                  </div>
-                  <img
-                    src={detailCorporate}
-                    alt="Corporate Developments detail"
-                    className="w-full h-auto"
-                    loading="lazy"
-                    data-testid="img-detail-corporate"
-                  />
-                </div>
-              </div>
+            <div className="order-2 lg:order-1 rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
+              <img
+                src={newsScreenshot}
+                alt="News Intelligence"
+                className="w-full h-auto"
+                loading="lazy"
+                data-testid="img-feature-news"
+              />
             </div>
             <div className="order-1 lg:order-2">
               <p className="text-[11px] sm:text-[12px] text-white/30 font-medium uppercase tracking-[0.15em] mb-3">
