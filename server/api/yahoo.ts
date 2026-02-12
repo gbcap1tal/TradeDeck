@@ -447,6 +447,10 @@ export async function getStockSummary(symbol: string) {
 
 let cachedYahooAuth: { crumb: string; cookie: string } | null = null;
 
+export function clearYahooAuthCache() {
+  cachedYahooAuth = null;
+}
+
 async function getYahooAuth(): Promise<{ crumb: string; cookie: string } | null> {
   if (cachedYahooAuth) return cachedYahooAuth;
 

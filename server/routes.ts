@@ -945,6 +945,133 @@ function initBackgroundTasks() {
       sendAlert('RS Ratings Script Spawn Failed', `Could not start RS computation script.\n\nError: ${err.message}`, 'general');
     });
   }, 60000);
+
+  // === SELF-HEALING WATCHDOG ===
+  // Checks every 5 minutes if market data is broken (0 stocks, missing breadth/indices)
+  // and automatically retries with fresh Yahoo auth
+  let selfHealingInProgress = false;
+  let lastSelfHealTime = 0;
+  const SELF_HEAL_COOLDOWN = 10 * 60 * 1000; // 10 min cooldown between heal attempts
+
+  setInterval(async () => {
+    if (selfHealingInProgress || isFullRefreshRunning) return;
+
+    const now = new Date();
+    const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const day = et.getDay();
+    if (day === 0 || day === 6) return; // skip weekends
+
+    const timeMinutes = et.getHours() * 60 + et.getMinutes();
+    if (timeMinutes < 540 || timeMinutes > 965) return; // only during market hours (9AM-4:05PM ET)
+
+    const breadthData = getCached<any>('market_breadth');
+    const sectorsData = getCached<any[]>('sectors_data');
+
+    let needsHeal = false;
+    const reasons: string[] = [];
+
+    // Check 1: Breadth has 0 universe stocks
+    if (breadthData) {
+      const universe = breadthData.universeSize ?? 0;
+      if (universe === 0) {
+        needsHeal = true;
+        reasons.push(`Breadth universe is 0 stocks`);
+      }
+      // Check 1b: Breadth data is stale (computed > 6 hours ago during market hours)
+      if (breadthData.lastComputedAt) {
+        const computedAge = Date.now() - new Date(breadthData.lastComputedAt).getTime();
+        if (computedAge > 6 * 3600 * 1000) {
+          needsHeal = true;
+          reasons.push(`Breadth data stale (${Math.round(computedAge / 3600000)}h old)`);
+        }
+      }
+    }
+
+    // Check 2: No breadth data at all (and server has been up > 5 min)
+    if (!breadthData) {
+      const uptime = process.uptime();
+      if (uptime > 300) {
+        needsHeal = true;
+        reasons.push('No breadth data cached after 5+ min uptime');
+      }
+    }
+
+    // Check 3: No sectors data
+    if (!sectorsData || sectorsData.length === 0) {
+      const uptime = process.uptime();
+      if (uptime > 300) {
+        needsHeal = true;
+        reasons.push('No sectors data cached');
+      }
+    }
+
+    // Check 4: Indices health — test if Yahoo quotes work (indices rely on yf.quote)
+    // Clearing Yahoo auth cache fixes all Yahoo-dependent endpoints (indices, quotes, breadth)
+    if (!needsHeal && process.uptime() > 300) {
+      try {
+        const testQuote = await yahoo.getQuote('SPY');
+        if (!testQuote || testQuote.price === 0) {
+          needsHeal = true;
+          reasons.push('Yahoo SPY quote returned empty — indices likely broken');
+        }
+      } catch {
+        needsHeal = true;
+        reasons.push('Yahoo SPY quote failed — indices likely broken');
+      }
+    }
+
+    if (!needsHeal) return;
+
+    // Cooldown check — don't spam retries
+    if (Date.now() - lastSelfHealTime < SELF_HEAL_COOLDOWN) return;
+
+    selfHealingInProgress = true;
+    lastSelfHealTime = Date.now();
+    console.log(`[watchdog] Self-healing triggered: ${reasons.join(', ')}`);
+
+    try {
+      // Step 1: Clear stale Yahoo auth to force fresh cookies/crumb
+      yahoo.clearYahooAuthCache();
+      console.log('[watchdog] Cleared Yahoo auth cache');
+
+      // Step 2: Wait a moment for Yahoo rate limits to cool down
+      await new Promise(r => setTimeout(r, 3000));
+
+      // Step 3: Retry breadth computation with fresh auth
+      try {
+        const breadth = await computeMarketBreadth(true);
+        const universe = breadth.universeSize ?? 0;
+        if (universe > 0) {
+          setCache('market_breadth', breadth, CACHE_TTL.BREADTH);
+          console.log(`[watchdog] Breadth healed: score=${breadth.overallScore}, universe=${universe} stocks`);
+          clearFailures('breadth_scan');
+        } else {
+          console.log(`[watchdog] Breadth retry still returned 0 stocks — Yahoo may be blocking`);
+          sendAlert('Self-Healing: Breadth Still Broken', `Watchdog attempted to heal breadth data but Yahoo screener still returned 0 stocks.\n\nReasons: ${reasons.join(', ')}`, 'watchdog_breadth');
+        }
+      } catch (err: any) {
+        console.error(`[watchdog] Breadth retry error: ${err.message}`);
+        sendAlert('Self-Healing: Breadth Retry Failed', `Watchdog breadth retry threw an error.\n\nError: ${err.message}`, 'watchdog_breadth');
+      }
+
+      // Step 4: Retry sectors if missing
+      if (!sectorsData || sectorsData.length === 0) {
+        try {
+          const sectors = await computeSectorsData();
+          if (sectors.length > 0) {
+            setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
+            console.log(`[watchdog] Sectors healed: ${sectors.length} sectors`);
+          }
+        } catch (err: any) {
+          console.error(`[watchdog] Sectors retry error: ${err.message}`);
+        }
+      }
+    } catch (outerErr: any) {
+      console.error(`[watchdog] Self-healing error: ${outerErr.message}`);
+    } finally {
+      selfHealingInProgress = false;
+    }
+  }, 5 * 60 * 1000); // every 5 minutes
 }
 
 function _seededRandom(seed: string) {
