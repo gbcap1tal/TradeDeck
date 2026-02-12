@@ -285,7 +285,8 @@ async function computeIndustryPerformance(_etfOnly: boolean = false): Promise<an
       }
     }
 
-    const industries = rsData.map(ind => {
+    const EXCLUDED_FROM_RANKING = new Set(['Shell Companies', 'Exchange Traded Fund']);
+    const industries = rsData.filter(ind => !EXCLUDED_FROM_RANKING.has(ind.name)).map(ind => {
       const capWeightedDaily = getIndustryAvgChange(ind.name);
 
       return {

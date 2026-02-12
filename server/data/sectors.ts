@@ -54,7 +54,6 @@ export const INDUSTRY_ETF_MAP: Record<string, string | null> = {
   'Credit Services': null,
   'Mortgage Finance': null,
   'Financial Conglomerates': null,
-  'Shell Companies': null,
   'Biotechnology': 'IBB',
   'Medical Devices': 'IHI',
   'Medical Instruments & Supplies': null,

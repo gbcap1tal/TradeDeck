@@ -241,6 +241,7 @@ export default function Market() {
     quarterChange: mt.quarterChange || 0,
     halfChange: mt.halfChange || 0,
     yearlyChange: mt.yearlyChange || 0,
+    ytdChange: mt.ytdChange || 0,
     sector: 'Megatrend',
     isMegatrend: true,
   }));
