@@ -16,7 +16,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useMarketStatus } from "@/hooks/use-market";
 import { useToast } from "@/hooks/use-toast";
-import logoImg from "@/assets/logo.webp";
+import { useTransparentLogo } from "@/hooks/use-transparent-logo";
+import tradeDeckLogo from "@assets/Screenshot_2026-02-12_alle_21.14.42_1770927291981.png";
 
 const ADMIN_ID = '54198443';
 
@@ -30,6 +31,7 @@ interface SearchResult {
 export function Navbar() {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
+  const navLogoRef = useTransparentLogo(tradeDeckLogo);
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [mobileSearch, setMobileSearch] = useState("");
@@ -200,9 +202,12 @@ export function Navbar() {
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </Button>
 
-            <Link href="/" className="flex items-center gap-2.5 group" data-testid="link-home">
-              <img src={logoImg} alt="TradeDeck" className="h-7 w-7 rounded flex-shrink-0" loading="eager" decoding="async" />
-              <span className="font-semibold text-[15px] tracking-tight hidden md:block text-white/90">TradeDeck</span>
+            <Link href="/" className="flex items-center group" data-testid="link-home">
+              <canvas
+                ref={navLogoRef}
+                className="h-7"
+                style={{ objectFit: "contain" }}
+              />
             </Link>
 
             <div className="hidden md:flex items-center gap-1">
