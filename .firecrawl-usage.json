@@ -1,5 +1,5 @@
 {
-  "totalCreditsUsed": 3,
+  "totalCreditsUsed": 4,
   "calls": [
     {
       "ticker": "HOOD",
@@ -17,6 +17,12 @@
       "ticker": "dgx",
       "date": "2026-02-10_search",
       "timestamp": "2026-02-11T17:02:34.195Z",
+      "credits": 1
+    },
+    {
+      "ticker": "sphr",
+      "date": "2026-02-12_search",
+      "timestamp": "2026-02-12T14:34:58.204Z",
       "credits": 1
     }
   ]
