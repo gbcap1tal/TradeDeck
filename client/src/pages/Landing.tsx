@@ -14,9 +14,6 @@ import {
   ArrowRight,
   Check,
   ChevronDown,
-  Brain,
-  Palette,
-  MousePointerClick,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
@@ -25,7 +22,7 @@ import tradeDeckLogo from "@assets/Screenshot_2026-02-12_alle_21.14.42_177092729
 import { MarketPulse } from "@/components/landing/MarketPulse";
 import { ImageLens } from "@/components/landing/ImageLens";
 import dashboardScreenshot from "@assets/Screenshot_2026-02-12_alle_17.20.15_1770913305164.png";
-import featureStock from "@/assets/images/feature-stock.png";
+import featureStock from "@assets/Screenshot_2026-02-12_alle_21.09.44_1770927489467.png";
 import newsScreenshot from "@assets/Screenshot_2026-02-12_alle_17.53.29_1770915277387.png";
 import detailMQ from "@assets/Screenshot_2026-02-12_alle_18.01.09_1770915705571.png";
 import detailHeatmap from "@assets/Screenshot_2026-02-12_alle_18.01.31_1770915705569.png";
@@ -325,47 +322,18 @@ export default function Landing() {
                 neutral for everything else. One look tells you what matters.
               </p>
 
-              <div className="space-y-4 mb-6">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0 mt-0.5">
-                    <Palette className="w-3.5 h-3.5 text-white/50" />
+              <div className="space-y-2.5">
+                {[
+                  "Color-coded sentiment: green, red, neutral at a glance",
+                  "Daily market digest curated before the bell",
+                  "Corporate developments with direct ticker links",
+                  "Real-time feed across all major financial sources",
+                ].map((item) => (
+                  <div key={item} className="flex items-start gap-2.5">
+                    <Check className="w-3.5 h-3.5 text-white/30 mt-0.5 shrink-0" />
+                    <span className="text-[13px] text-white/50">{item}</span>
                   </div>
-                  <div>
-                    <h4 className="text-[13px] font-semibold text-white/80 mb-1">Color-Coded Sentiment</h4>
-                    <p className="text-[12px] sm:text-[13px] text-white/35 leading-relaxed">
-                      Every news item is tagged with a sentiment score and highlighted accordingly.
-                      Scan dozens of headlines in seconds — the color does the reading for you.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0 mt-0.5">
-                    <Brain className="w-3.5 h-3.5 text-white/50" />
-                  </div>
-                  <div>
-                    <h4 className="text-[13px] font-semibold text-white/80 mb-1">AI Earnings Agent</h4>
-                    <p className="text-[12px] sm:text-[13px] text-white/35 leading-relaxed">
-                      After each earnings report, our AI agent reads the full call transcript and
-                      generates a concise, actionable summary. Key metrics, management outlook,
-                      guidance changes — all distilled in one click.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0 mt-0.5">
-                    <MousePointerClick className="w-3.5 h-3.5 text-white/50" />
-                  </div>
-                  <div>
-                    <h4 className="text-[13px] font-semibold text-white/80 mb-1">Always One Click Away</h4>
-                    <p className="text-[12px] sm:text-[13px] text-white/35 leading-relaxed">
-                      From any stock page, access the latest news, earnings data, and AI summaries
-                      instantly. No tab-switching, no digging through filings — everything you need
-                      is right there.
-                    </p>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           </div>
@@ -383,16 +351,17 @@ export default function Landing() {
                 Deep-dive into any stock
               </h2>
               <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed mb-6">
-                Every stock page combines price charts, earnings history, quality
-                metrics, and IBD-style Relative Strength ratings. AI-generated
-                summaries from actual earnings call transcripts give you the edge.
+                Every stock page is a full command center. TradingView charts, quality
+                scoring, Weinstein stage analysis, and IBD-style Relative Strength ratings —
+                everything you need to evaluate a position in one view.
               </p>
               <div className="space-y-2.5">
                 {[
                   "IBD-style RS ratings for 3,800+ stocks",
-                  "Multi-factor quality scoring",
-                  "AI-powered earnings call summaries",
-                  "Earnings history with EP scoring",
+                  "Stock Quality Score with multi-factor analysis",
+                  "Weinstein stage + trend health indicators",
+                  "Fundamentals, short interest, and smart money tracking",
+                  "Latest news feed directly on the stock page",
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-2.5">
                     <Check className="w-3.5 h-3.5 text-white/30 mt-0.5 shrink-0" />
@@ -407,6 +376,84 @@ export default function Landing() {
                 alt="Stock Analysis"
                 data-testid="img-feature-stock"
               />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/[0.04]">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12 sm:mb-16">
+            <p className="text-[11px] sm:text-[12px] text-white/30 font-medium uppercase tracking-[0.15em] mb-3">
+              Earnings & Megatrends
+            </p>
+            <h2
+              className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-4"
+              data-testid="text-earnings-mega-title"
+            >
+              Spot the winners before the crowd
+            </h2>
+            <p className="text-[14px] sm:text-[15px] text-white/40 max-w-2xl mx-auto leading-relaxed">
+              From explosive post-earnings moves to custom industry baskets that
+              track the trends shaping tomorrow — TradeDeck gives you the tools
+              institutional desks keep to themselves.
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
+            <div>
+              <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40 mb-6 aspect-video bg-white/[0.02] flex items-center justify-center">
+                <span className="text-white/15 text-[13px]" data-testid="placeholder-earnings-img">Earnings screenshot coming soon</span>
+              </div>
+              <h3 className="text-[16px] sm:text-[18px] font-semibold mb-3 text-white/90" data-testid="text-earnings-heading">
+                Earnings Intelligence
+              </h3>
+              <p className="text-[13px] sm:text-[14px] text-white/40 leading-relaxed mb-4">
+                Monthly earnings calendar with EP (Episodic Pivot) scoring that flags
+                stocks likely to make explosive post-earnings moves. Our AI agent reads
+                the full earnings call transcript and generates an actionable summary —
+                key metrics, guidance changes, and management tone in seconds.
+              </p>
+              <div className="space-y-2">
+                {[
+                  "Episodic Pivot scoring with historical accuracy",
+                  "AI-powered earnings call summaries",
+                  "EPS & Revenue surprise tracking with color coding",
+                  "Monthly calendar with AMC/BMO filters",
+                ].map((item) => (
+                  <div key={item} className="flex items-start gap-2.5">
+                    <Check className="w-3.5 h-3.5 text-white/30 mt-0.5 shrink-0" />
+                    <span className="text-[12px] sm:text-[13px] text-white/50">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40 mb-6 aspect-video bg-white/[0.02] flex items-center justify-center">
+                <span className="text-white/15 text-[13px]" data-testid="placeholder-megatrends-img">Megatrends screenshot coming soon</span>
+              </div>
+              <h3 className="text-[16px] sm:text-[18px] font-semibold mb-3 text-white/90" data-testid="text-megatrends-heading">
+                Megatrend Baskets
+              </h3>
+              <p className="text-[13px] sm:text-[14px] text-white/40 leading-relaxed mb-4">
+                Build custom industry baskets to track the macro themes that matter.
+                AI, cybersecurity, energy transition, quantum computing — create your
+                own market-cap weighted indices and watch them move in real time.
+              </p>
+              <div className="space-y-2">
+                {[
+                  "Custom baskets with market-cap weighted performance",
+                  "Top & worst performing industries ranked",
+                  "Real-time performance across multiple timeframes",
+                  "Full CRUD: create, edit, delete your baskets",
+                ].map((item) => (
+                  <div key={item} className="flex items-start gap-2.5">
+                    <Check className="w-3.5 h-3.5 text-white/30 mt-0.5 shrink-0" />
+                    <span className="text-[12px] sm:text-[13px] text-white/50">{item}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
