@@ -5,7 +5,7 @@ const MQ = {
   excellent: '#2eb850',
   good: '#3d8a4e',
   fair: '#2a4a32',
-  neutral: '#aaaaaa',
+  neutral: '#6b6b6b',
   weak: '#6a2a35',
   poor: '#b85555',
   critical: '#d04545',
