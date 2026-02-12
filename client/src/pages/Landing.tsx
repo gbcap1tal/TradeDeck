@@ -14,13 +14,17 @@ import {
   ArrowRight,
   Check,
   ChevronDown,
+  Brain,
+  Palette,
+  MousePointerClick,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import logoImg from "@/assets/logo.webp";
-import heroDashboard from "@assets/Screenshot_2026-02-12_alle_17.20.15_1770913305164.png";
+import heroAbstract from "@/assets/images/hero-abstract.png";
+import dashboardScreenshot from "@assets/Screenshot_2026-02-12_alle_17.20.15_1770913305164.png";
 import featureStock from "@/assets/images/feature-stock.png";
-import featureBreadth from "@/assets/images/feature-breadth.png";
+import featureNews from "@/assets/images/feature-news.png";
 
 const FEATURES = [
   {
@@ -148,64 +152,60 @@ export default function Landing() {
         </div>
       </nav>
 
-      <section className="relative pt-28 pb-16 sm:pt-36 sm:pb-24 px-4 sm:px-6">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-white/[0.02] rounded-full blur-[120px]" />
-        </div>
+      <section className="relative pt-14 overflow-hidden">
+        <div className="relative w-full" style={{ minHeight: '70vh' }}>
+          <img
+            src={heroAbstract}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+            loading="eager"
+            data-testid="img-hero-bg"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-transparent to-background" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
 
-        <div className="max-w-4xl mx-auto text-center relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 mb-6 sm:mb-8">
-            <Zap className="w-3 h-3 text-white/50" />
-            <span className="text-[11px] sm:text-[12px] text-white/50 font-medium uppercase tracking-wider">
-              Professional-Grade Market Intelligence
-            </span>
-          </div>
+          <div className="relative z-10 flex flex-col items-center justify-center text-center px-4 sm:px-6 py-20 sm:py-28 lg:py-36">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/15 bg-black/40 backdrop-blur-sm mb-6 sm:mb-8">
+              <Zap className="w-3 h-3 text-white/60" />
+              <span className="text-[11px] sm:text-[12px] text-white/60 font-medium uppercase tracking-wider">
+                Professional-Grade Market Intelligence
+              </span>
+            </div>
 
-          <h1
-            className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1] mb-4 sm:mb-6"
-            data-testid="text-hero-title"
-          >
-            See the market
-            <br />
-            <span className="text-white/40">before it moves.</span>
-          </h1>
-
-          <p className="text-base sm:text-lg text-white/40 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
-            TradeDeck combines real-time breadth analysis, sector rotation tracking,
-            and AI-powered earnings intelligence into one dark, minimal dashboard
-            built for serious traders.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-6">
-            <Button
-              size="lg"
-              className="w-full sm:w-auto"
-              onClick={handleCTA}
-              data-testid="button-hero-cta"
+            <h1
+              className="text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight leading-[1.05] mb-4 sm:mb-6"
+              data-testid="text-hero-title"
             >
-              {user ? "Open Dashboard" : "Get Lifetime Access — €145"}
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </div>
+              See the market
+              <br />
+              <span className="text-white/50">before it moves.</span>
+            </h1>
 
-          <p className="text-[12px] text-white/25">
-            One-time payment. No subscription. No hidden fees.
-          </p>
+            <p className="text-base sm:text-lg text-white/50 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
+              TradeDeck combines real-time breadth analysis, sector rotation tracking,
+              and AI-powered earnings intelligence into one dark, minimal dashboard
+              built for serious traders.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-4">
+              <Button
+                size="lg"
+                className="w-full sm:w-auto"
+                onClick={handleCTA}
+                data-testid="button-hero-cta"
+              >
+                {user ? "Open Dashboard" : "Get Lifetime Access — €145"}
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+
+            <p className="text-[12px] text-white/30">
+              One-time payment. No subscription. No hidden fees.
+            </p>
+          </div>
         </div>
 
-        <div className="mt-12 sm:mt-16 max-w-5xl mx-auto">
-          <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-2xl shadow-black/50">
-            <img
-              src={heroDashboard}
-              alt="TradeDeck Dashboard"
-              className="w-full h-auto"
-              loading="eager"
-              data-testid="img-hero-dashboard"
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-center mt-8 sm:mt-12">
+        <div className="flex justify-center -mt-4 relative z-10">
           <div
             onClick={() =>
               document
@@ -269,7 +269,7 @@ export default function Landing() {
               <p className="text-[11px] sm:text-[12px] text-white/30 font-medium uppercase tracking-[0.15em] mb-3">
                 Market Breadth
               </p>
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4" data-testid="text-breadth-heading">
                 Know the market's true health
               </h2>
               <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed mb-6">
@@ -293,8 +293,8 @@ export default function Landing() {
             </div>
             <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
               <img
-                src={featureBreadth}
-                alt="Market Breadth Analysis"
+                src={dashboardScreenshot}
+                alt="TradeDeck Market Quality Dashboard"
                 className="w-full h-auto"
                 loading="lazy"
                 data-testid="img-feature-breadth"
@@ -309,18 +309,81 @@ export default function Landing() {
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             <div className="order-2 lg:order-1 rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
               <img
-                src={featureStock}
-                alt="Stock Analysis"
+                src={featureNews}
+                alt="News Intelligence"
                 className="w-full h-auto"
                 loading="lazy"
-                data-testid="img-feature-stock"
+                data-testid="img-feature-news"
               />
             </div>
             <div className="order-1 lg:order-2">
               <p className="text-[11px] sm:text-[12px] text-white/30 font-medium uppercase tracking-[0.15em] mb-3">
+                News & AI Intelligence
+              </p>
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4" data-testid="text-news-heading">
+                Every headline, instantly decoded
+              </h2>
+              <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed mb-6">
+                Stop reading between the lines. TradeDeck's news feed delivers corporate
+                developments with instant visual sentiment: green for bullish, red for bearish,
+                neutral for everything else. One look tells you what matters.
+              </p>
+
+              <div className="space-y-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0 mt-0.5">
+                    <Palette className="w-3.5 h-3.5 text-white/50" />
+                  </div>
+                  <div>
+                    <h4 className="text-[13px] font-semibold text-white/80 mb-1">Color-Coded Sentiment</h4>
+                    <p className="text-[12px] sm:text-[13px] text-white/35 leading-relaxed">
+                      Every news item is tagged with a sentiment score and highlighted accordingly.
+                      Scan dozens of headlines in seconds — the color does the reading for you.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0 mt-0.5">
+                    <Brain className="w-3.5 h-3.5 text-white/50" />
+                  </div>
+                  <div>
+                    <h4 className="text-[13px] font-semibold text-white/80 mb-1">AI Earnings Agent</h4>
+                    <p className="text-[12px] sm:text-[13px] text-white/35 leading-relaxed">
+                      After each earnings report, our AI agent reads the full call transcript and
+                      generates a concise, actionable summary. Key metrics, management outlook,
+                      guidance changes — all distilled in one click.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center shrink-0 mt-0.5">
+                    <MousePointerClick className="w-3.5 h-3.5 text-white/50" />
+                  </div>
+                  <div>
+                    <h4 className="text-[13px] font-semibold text-white/80 mb-1">Always One Click Away</h4>
+                    <p className="text-[12px] sm:text-[13px] text-white/35 leading-relaxed">
+                      From any stock page, access the latest news, earnings data, and AI summaries
+                      instantly. No tab-switching, no digging through filings — everything you need
+                      is right there.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/[0.04]">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+            <div>
+              <p className="text-[11px] sm:text-[12px] text-white/30 font-medium uppercase tracking-[0.15em] mb-3">
                 Stock Intelligence
               </p>
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4">
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4" data-testid="text-stock-heading">
                 Deep-dive into any stock
               </h2>
               <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed mb-6">
@@ -342,6 +405,15 @@ export default function Landing() {
                 ))}
               </div>
             </div>
+            <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
+              <img
+                src={featureStock}
+                alt="Stock Analysis"
+                className="w-full h-auto"
+                loading="lazy"
+                data-testid="img-feature-stock"
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -354,7 +426,7 @@ export default function Landing() {
           <p className="text-[11px] sm:text-[12px] text-white/30 font-medium uppercase tracking-[0.15em] mb-3">
             Simple Pricing
           </p>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3" data-testid="text-pricing-heading">
             One price. Lifetime access.
           </h2>
           <p className="text-[14px] text-white/35 mb-8 sm:mb-10">
