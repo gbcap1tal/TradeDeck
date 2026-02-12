@@ -53,7 +53,7 @@ export default function Payment() {
         <Card>
           <CardContent className="p-6 space-y-6">
             <div className="text-center space-y-1">
-              <div className="text-4xl font-bold text-white font-mono" data-testid="text-price">€129</div>
+              <div className="text-4xl font-bold text-white font-mono" data-testid="text-price">€145</div>
               <p className="text-[13px] text-white/40">One-time payment — lifetime access</p>
             </div>
 

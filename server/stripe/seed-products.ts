@@ -23,12 +23,12 @@ async function createProducts() {
 
   const price = await stripe.prices.create({
     product: product.id,
-    unit_amount: 12900,
+    unit_amount: 14500,
     currency: 'eur',
   });
 
   console.log('Product created:', product.id);
-  console.log('Price created:', price.id, '€129.00');
+  console.log('Price created:', price.id, '€145.00');
 }
 
 createProducts().catch(console.error);
