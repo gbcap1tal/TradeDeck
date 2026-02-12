@@ -163,13 +163,6 @@ export default function Landing() {
           <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent pointer-events-none" />
 
           <div className="relative z-10 flex flex-col items-center justify-center text-center px-4 sm:px-6 py-20 sm:py-28 lg:py-36">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/15 bg-black/40 backdrop-blur-sm mb-6 sm:mb-8">
-              <Zap className="w-3 h-3 text-white/60" />
-              <span className="text-[11px] sm:text-[12px] text-white/60 font-medium uppercase tracking-wider">
-                Professional-Grade Market Intelligence
-              </span>
-            </div>
-
             <h1
               className="text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight leading-[1.05] mb-4 sm:mb-6"
               data-testid="text-hero-title"
@@ -256,6 +249,15 @@ export default function Landing() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+
+          <div className="flex justify-center mt-8 sm:mt-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/[0.03]">
+              <Zap className="w-3 h-3 text-white/40" />
+              <span className="text-[11px] sm:text-[12px] text-white/40 font-medium uppercase tracking-[0.15em]">
+                Professional-Grade Market Intelligence
+              </span>
+            </div>
           </div>
         </div>
       </section>

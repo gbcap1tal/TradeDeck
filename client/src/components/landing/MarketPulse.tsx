@@ -1,201 +1,189 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef } from "react";
 
 interface MarketPulseProps {
   className?: string;
 }
 
+class Particle {
+  x: number;
+  y: number;
+  size: number;
+  order: boolean;
+  velocity: { x: number; y: number };
+  originalX: number;
+  originalY: number;
+  influence: number;
+  neighbors: Particle[];
+
+  constructor(x: number, y: number, order: boolean) {
+    this.x = x;
+    this.y = y;
+    this.originalX = x;
+    this.originalY = y;
+    this.size = 1.5;
+    this.order = order;
+    this.velocity = {
+      x: (Math.random() - 0.5) * 2,
+      y: (Math.random() - 0.5) * 2,
+    };
+    this.influence = 0;
+    this.neighbors = [];
+  }
+
+  update(w: number, h: number) {
+    if (this.order) {
+      const dx = this.originalX - this.x;
+      const dy = this.originalY - this.y;
+
+      const chaosInfluence = { x: 0, y: 0 };
+      this.neighbors.forEach((neighbor) => {
+        if (!neighbor.order) {
+          const distance = Math.hypot(this.x - neighbor.x, this.y - neighbor.y);
+          const strength = Math.max(0, 1 - distance / 100);
+          chaosInfluence.x += neighbor.velocity.x * strength;
+          chaosInfluence.y += neighbor.velocity.y * strength;
+          this.influence = Math.max(this.influence, strength);
+        }
+      });
+
+      this.x += dx * 0.05 * (1 - this.influence) + chaosInfluence.x * this.influence;
+      this.y += dy * 0.05 * (1 - this.influence) + chaosInfluence.y * this.influence;
+      this.influence *= 0.99;
+    } else {
+      this.velocity.x += (Math.random() - 0.5) * 0.5;
+      this.velocity.y += (Math.random() - 0.5) * 0.5;
+      this.velocity.x *= 0.95;
+      this.velocity.y *= 0.95;
+      this.x += this.velocity.x;
+      this.y += this.velocity.y;
+
+      if (this.x < w / 2 || this.x > w) this.velocity.x *= -1;
+      if (this.y < 0 || this.y > h) this.velocity.y *= -1;
+      this.x = Math.max(w / 2, Math.min(w, this.x));
+      this.y = Math.max(0, Math.min(h, this.y));
+    }
+  }
+
+  draw(ctx: CanvasRenderingContext2D) {
+    const alpha = this.order ? 0.35 - this.influence * 0.2 : 0.3;
+    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 export function MarketPulse({ className = "" }: MarketPulseProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animRef = useRef<number>(0);
 
-  const draw = useCallback(() => {
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const c = canvas.getContext("2d");
-    if (!c) return;
 
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    c.scale(dpr, dpr);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-    const W = rect.width;
-    const H = rect.height;
-    const ctx = c;
+    function setup() {
+      if (!canvas || !ctx) return { w: 0, h: 0, particles: [] as Particle[] };
 
-    const GOLD = "rgba(255, 214, 10,";
-    const baseY = H * 0.52;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      if (w === 0 || h === 0) return { w: 0, h: 0, particles: [] as Particle[] };
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.scale(dpr, dpr);
 
-    const traceLength = W * 1.2;
-    let headX = -50;
-    const speed = W * 0.0025;
+      const particles: Particle[] = [];
+      const gridCols = 30;
+      const gridRows = Math.round((h / w) * gridCols);
+      const spacingX = w / gridCols;
+      const spacingY = h / gridRows;
 
-    function ecgShape(x: number): number {
-      const cycle = 280;
-      const pos = ((x % cycle) + cycle) % cycle;
-
-      if (pos < 60) return Math.sin((pos / 60) * Math.PI * 2) * 2;
-      if (pos < 80) return 0;
-
-      if (pos < 90) return ((pos - 80) / 10) * -12;
-      if (pos < 95) return -12 + ((pos - 90) / 5) * 60;
-      if (pos < 100) return 48 - ((pos - 95) / 5) * 58;
-      if (pos < 105) return -10 + ((pos - 100) / 5) * 10;
-
-      if (pos < 130) return 0;
-      if (pos < 155) {
-        const t = (pos - 130) / 25;
-        return Math.sin(t * Math.PI) * 8;
+      for (let i = 0; i < gridCols; i++) {
+        for (let j = 0; j < gridRows; j++) {
+          const x = spacingX * i + spacingX / 2;
+          const y = spacingY * j + spacingY / 2;
+          const order = x < w / 2;
+          particles.push(new Particle(x, y, order));
+        }
       }
-      if (pos < 200) return Math.sin((pos - 155) / 45 * Math.PI) * 1.5;
-      return 0;
+
+      return { w, h, particles };
     }
 
-    const spikeStart = W * 0.38;
-    const spikeEnd = W * 0.62;
-    const spikePeak = W * 0.50;
+    let { w, h, particles } = setup();
+    let time = 0;
+    let animationId: number;
 
-    function bigSpike(x: number): number {
-      if (x < spikeStart || x > spikeEnd) return 0;
-      if (x <= spikePeak) {
-        const t = (x - spikeStart) / (spikePeak - spikeStart);
-        return Math.pow(t, 2.5) * 180;
-      } else {
-        const t = (x - spikePeak) / (spikeEnd - spikePeak);
-        return (1 - Math.pow(t, 1.5)) * 180;
-      }
+    function updateNeighbors() {
+      particles.forEach((particle) => {
+        particle.neighbors = particles.filter((other) => {
+          if (other === particle) return false;
+          const distance = Math.hypot(particle.x - other.x, particle.y - other.y);
+          return distance < 80;
+        });
+      });
     }
 
     function animate() {
-      ctx.clearRect(0, 0, W, H);
+      if (!ctx) return;
+      ctx.clearRect(0, 0, w, h);
 
-      ctx.strokeStyle = `${GOLD} 0.04)`;
+      if (time % 30 === 0) {
+        updateNeighbors();
+      }
+
+      particles.forEach((particle) => {
+        particle.update(w, h);
+        particle.draw(ctx);
+
+        particle.neighbors.forEach((neighbor) => {
+          const distance = Math.hypot(particle.x - neighbor.x, particle.y - neighbor.y);
+          if (distance < 40) {
+            const alpha = 0.08 * (1 - distance / 40);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(particle.x, particle.y);
+            ctx.lineTo(neighbor.x, neighbor.y);
+            ctx.stroke();
+          }
+        });
+      });
+
+      const midX = w / 2;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
       ctx.lineWidth = 0.5;
-      const gridSpacing = 50;
-      for (let x = 0; x < W; x += gridSpacing) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, H);
-        ctx.stroke();
-      }
-      for (let y = 0; y < H; y += gridSpacing) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(W, y);
-        ctx.stroke();
-      }
-
-      headX += speed;
-      if (headX > W + traceLength * 0.3) {
-        headX = -50;
-      }
-
-      const tailX = headX - traceLength;
-
       ctx.beginPath();
-      ctx.strokeStyle = `${GOLD} 0.7)`;
-      ctx.lineWidth = 2;
-      ctx.shadowColor = "rgba(255, 214, 10, 0.5)";
-      ctx.shadowBlur = 8;
-
-      let started = false;
-      const step = 2;
-      for (let px = Math.max(0, tailX); px <= Math.min(W, headX); px += step) {
-        const distFromHead = headX - px;
-        const fadeIn = distFromHead < 30 ? distFromHead / 30 : 1;
-        const fadeOut = (px - tailX) / (traceLength * 0.3);
-        const alpha = Math.min(fadeIn, Math.min(fadeOut, 1));
-
-        if (alpha <= 0) continue;
-
-        const ecg = ecgShape(px) * 1.2;
-        const spike = bigSpike(px);
-        const y = baseY - ecg - spike;
-
-        if (!started) {
-          ctx.moveTo(px, y);
-          started = true;
-        } else {
-          ctx.lineTo(px, y);
-        }
-      }
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-
-      ctx.beginPath();
-      ctx.strokeStyle = `${GOLD} 0.15)`;
-      ctx.lineWidth = 1;
-      for (let px = Math.max(0, tailX); px <= Math.min(W, headX); px += step) {
-        const distFromHead = headX - px;
-        const fadeIn = distFromHead < 30 ? distFromHead / 30 : 1;
-        const fadeOut = (px - tailX) / (traceLength * 0.3);
-        const alpha = Math.min(fadeIn, Math.min(fadeOut, 1));
-        if (alpha <= 0) continue;
-
-        const ecg = ecgShape(px + 40) * 0.8;
-        const spike = bigSpike(px) * 0.6;
-        const y = baseY + 30 - ecg * 0.5 - spike * 0.4;
-
-        if (px === Math.max(0, Math.floor(tailX / step) * step)) {
-          ctx.moveTo(px, y);
-        } else {
-          ctx.lineTo(px, y);
-        }
-      }
+      ctx.moveTo(midX, 0);
+      ctx.lineTo(midX, h);
       ctx.stroke();
 
-      if (headX > 0 && headX < W) {
-        const ecgHead = ecgShape(headX) * 1.2;
-        const spikeHead = bigSpike(headX);
-        const dotY = baseY - ecgHead - spikeHead;
-        const dotGlow = ctx.createRadialGradient(headX, dotY, 0, headX, dotY, 20);
-        dotGlow.addColorStop(0, `${GOLD} 0.8)`);
-        dotGlow.addColorStop(0.5, `${GOLD} 0.2)`);
-        dotGlow.addColorStop(1, `${GOLD} 0)`);
-        ctx.fillStyle = dotGlow;
-        ctx.fillRect(headX - 20, dotY - 20, 40, 40);
-
-        ctx.beginPath();
-        ctx.arc(headX, dotY, 3, 0, Math.PI * 2);
-        ctx.fillStyle = `${GOLD} 1)`;
-        ctx.fill();
-      }
-
-      if (headX >= spikeStart && headX <= spikeEnd + 100) {
-        const glowIntensity = headX <= spikePeak
-          ? (headX - spikeStart) / (spikePeak - spikeStart)
-          : Math.max(0, 1 - (headX - spikePeak) / (spikeEnd + 100 - spikePeak));
-        const gx = spikePeak;
-        const gy = baseY - 120;
-        const gr = 150 + glowIntensity * 80;
-        const glow = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
-        glow.addColorStop(0, `${GOLD} ${0.08 * glowIntensity})`);
-        glow.addColorStop(1, `${GOLD} 0)`);
-        ctx.fillStyle = glow;
-        ctx.fillRect(gx - gr, gy - gr, gr * 2, gr * 2);
-      }
-
-      animRef.current = requestAnimationFrame(animate);
+      time++;
+      animationId = requestAnimationFrame(animate);
     }
 
     animate();
-  }, []);
-
-  useEffect(() => {
-    draw();
 
     const handleResize = () => {
-      cancelAnimationFrame(animRef.current);
-      draw();
+      cancelAnimationFrame(animationId);
+      const result = setup();
+      w = result.w;
+      h = result.h;
+      particles = result.particles;
+      time = 0;
+      animate();
     };
 
     window.addEventListener("resize", handleResize);
     return () => {
-      cancelAnimationFrame(animRef.current);
+      cancelAnimationFrame(animationId);
       window.removeEventListener("resize", handleResize);
     };
-  }, [draw]);
+  }, []);
 
   return (
     <canvas
