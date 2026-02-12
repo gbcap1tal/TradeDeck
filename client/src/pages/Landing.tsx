@@ -110,15 +110,17 @@ export default function Landing() {
       <nav className="fixed top-0 left-0 right-0 z-50 glass" data-testid="landing-nav">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
           <div className="flex items-center" data-testid="link-landing-brand">
-            <img
-              src={tradeDeckLogo}
-              alt="TradeDeck"
-              className="h-8 object-contain"
-              loading="eager"
-              decoding="async"
-              data-testid="img-landing-logo"
-              style={{ mixBlendMode: "screen" }}
-            />
+            <div className="bg-black rounded-sm">
+              <img
+                src={tradeDeckLogo}
+                alt="TradeDeck"
+                className="h-8 object-contain"
+                loading="eager"
+                decoding="async"
+                data-testid="img-landing-logo"
+                style={{ mixBlendMode: "screen" }}
+              />
+            </div>
           </div>
           <div className="flex items-center gap-3">
             {user ? (
@@ -517,14 +519,16 @@ export default function Landing() {
       <footer className="border-t border-white/[0.04] py-8 px-4 sm:px-6" data-testid="landing-footer">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center">
-            <img
-              src={tradeDeckLogo}
-              alt="TradeDeck"
-              className="h-6 object-contain opacity-40"
-              loading="lazy"
-              data-testid="text-footer-brand"
-              style={{ mixBlendMode: "screen" }}
-            />
+            <div className="bg-black rounded-sm opacity-40">
+              <img
+                src={tradeDeckLogo}
+                alt="TradeDeck"
+                className="h-6 object-contain"
+                loading="lazy"
+                data-testid="text-footer-brand"
+                style={{ mixBlendMode: "screen" }}
+              />
+            </div>
           </div>
           <p className="text-[11px] text-white/15" data-testid="text-footer-disclaimer">
             Market data for informational purposes only. Not financial advice.
