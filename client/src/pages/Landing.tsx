@@ -25,6 +25,10 @@ import heroAbstract from "@/assets/images/hero-abstract.png";
 import dashboardScreenshot from "@assets/Screenshot_2026-02-12_alle_17.20.15_1770913305164.png";
 import featureStock from "@/assets/images/feature-stock.png";
 import newsScreenshot from "@assets/Screenshot_2026-02-12_alle_17.53.29_1770915277387.png";
+import detailMQ from "@assets/Screenshot_2026-02-12_alle_18.01.09_1770915705571.png";
+import detailHeatmap from "@assets/Screenshot_2026-02-12_alle_18.01.31_1770915705569.png";
+import detailHeadlines from "@assets/Screenshot_2026-02-12_alle_18.00.20_1770915705573.png";
+import detailCorporate from "@assets/Screenshot_2026-02-12_alle_18.00.37_1770915705574.png";
 
 const FEATURES = [
   {
@@ -307,24 +311,23 @@ export default function Landing() {
                     <span className="text-[10px] text-white/60 font-medium">Market Quality Score</span>
                   </div>
                   <img
-                    src={dashboardScreenshot}
+                    src={detailMQ}
                     alt="Market Quality Score detail"
-                    className="w-full h-32 sm:h-40 object-cover object-left-top"
+                    className="w-full h-auto"
                     loading="lazy"
                     data-testid="img-detail-mq"
                   />
                 </div>
                 <div className="rounded-lg overflow-hidden border border-white/[0.08] shadow-lg shadow-black/30 relative">
                   <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded bg-black/60 backdrop-blur-sm">
-                    <span className="text-[10px] text-white/60 font-medium">Breadth Charts</span>
+                    <span className="text-[10px] text-white/60 font-medium">Heatmap & Sector Rotation</span>
                   </div>
                   <img
-                    src={dashboardScreenshot}
-                    alt="Breadth Charts detail"
-                    className="w-full h-32 sm:h-40 object-cover"
-                    style={{ objectPosition: '50% 70%' }}
+                    src={detailHeatmap}
+                    alt="Market Heatmap and Sector Rotation"
+                    className="w-full h-auto"
                     loading="lazy"
-                    data-testid="img-detail-breadth"
+                    data-testid="img-detail-heatmap"
                   />
                 </div>
               </div>
@@ -352,24 +355,23 @@ export default function Landing() {
                     <span className="text-[10px] text-white/60 font-medium">Headlines That Matter</span>
                   </div>
                   <img
-                    src={newsScreenshot}
-                    alt="Headlines detail"
-                    className="w-full h-32 sm:h-40 object-cover object-left-top"
+                    src={detailHeadlines}
+                    alt="Headlines That Matter detail"
+                    className="w-full h-auto"
                     loading="lazy"
                     data-testid="img-detail-headlines"
                   />
                 </div>
                 <div className="rounded-lg overflow-hidden border border-white/[0.08] shadow-lg shadow-black/30 relative">
                   <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded bg-black/60 backdrop-blur-sm">
-                    <span className="text-[10px] text-white/60 font-medium">Sentiment Analysis</span>
+                    <span className="text-[10px] text-white/60 font-medium">Corporate Developments</span>
                   </div>
                   <img
-                    src={newsScreenshot}
-                    alt="Sentiment analysis detail"
-                    className="w-full h-32 sm:h-40 object-cover"
-                    style={{ objectPosition: '0% 85%' }}
+                    src={detailCorporate}
+                    alt="Corporate Developments detail"
+                    className="w-full h-auto"
                     loading="lazy"
-                    data-testid="img-detail-sentiment"
+                    data-testid="img-detail-corporate"
                   />
                 </div>
               </div>
