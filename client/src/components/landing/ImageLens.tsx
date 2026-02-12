@@ -13,14 +13,13 @@ export function ImageLens({
   src,
   alt,
   className = "",
-  lensSize = 180,
-  zoom = 2.5,
+  lensSize = 220,
+  zoom = 1.8,
   ...props
 }: ImageLensProps) {
   const [hovering, setHovering] = useState(false);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
-  const imgRef = useRef<HTMLImageElement>(null);
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
@@ -36,6 +35,21 @@ export function ImageLens({
   );
 
   const half = lensSize / 2;
+  const cw = containerRef.current?.offsetWidth ?? 1;
+  const ch = containerRef.current?.offsetHeight ?? 1;
+
+  const bgW = cw * zoom;
+  const bgH = ch * zoom;
+
+  let bgX = -(pos.x * zoom - half);
+  let bgY = -(pos.y * zoom - half);
+
+  const minBgX = lensSize - bgW;
+  const minBgY = lensSize - bgH;
+  if (bgX > 0) bgX = 0;
+  if (bgY > 0) bgY = 0;
+  if (bgX < minBgX) bgX = minBgX;
+  if (bgY < minBgY) bgY = minBgY;
 
   return (
     <div
@@ -46,7 +60,6 @@ export function ImageLens({
       onMouseMove={handleMouseMove}
     >
       <img
-        ref={imgRef}
         src={src}
         alt={alt}
         className="w-full h-auto"
@@ -61,11 +74,10 @@ export function ImageLens({
             width: lensSize,
             height: lensSize,
             borderRadius: "50%",
-            left: pos.x - half,
-            top: pos.y - half,
+            left: Math.max(0, Math.min(pos.x - half, cw - lensSize)),
+            top: Math.max(0, Math.min(pos.y - half, ch - lensSize)),
             overflow: "hidden",
             zIndex: 20,
-            backdropFilter: "blur(0px)",
           }}
         >
           <div
@@ -74,8 +86,8 @@ export function ImageLens({
               height: lensSize,
               backgroundImage: `url(${src})`,
               backgroundRepeat: "no-repeat",
-              backgroundSize: `${(containerRef.current?.offsetWidth ?? 400) * zoom}px auto`,
-              backgroundPosition: `-${pos.x * zoom - half}px -${pos.y * zoom - half}px`,
+              backgroundSize: `${bgW}px ${bgH}px`,
+              backgroundPosition: `${bgX}px ${bgY}px`,
             }}
           />
         </div>
