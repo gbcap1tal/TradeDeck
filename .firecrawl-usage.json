@@ -1,5 +1,5 @@
 {
-  "totalCreditsUsed": 5,
+  "totalCreditsUsed": 6,
   "calls": [
     {
       "ticker": "HOOD",
@@ -29,6 +29,12 @@
       "ticker": "issc",
       "date": "2026-02-12_search",
       "timestamp": "2026-02-12T14:42:35.625Z",
+      "credits": 1
+    },
+    {
+      "ticker": "APP",
+      "date": "2026-02-11",
+      "timestamp": "2026-02-12T14:47:31.467Z",
       "credits": 1
     }
   ]

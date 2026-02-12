@@ -253,7 +253,7 @@ async function _getAieraUrlForTicker(ticker: string, reportDate: string): Promis
     if (allEntries.length === 0) {
       const aieraUrls = html.match(/https:\/\/dashboard\.aiera\.com\/p\/evtmin\/[a-f0-9]+/g);
       if (aieraUrls) {
-        for (const url of [...new Set(aieraUrls)]) {
+        for (const url of Array.from(new Set(aieraUrls))) {
           allEntries.push({ date: 'unknown', url, dateDiff: 999 });
         }
       }
