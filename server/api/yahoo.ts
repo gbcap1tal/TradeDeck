@@ -1,7 +1,22 @@
-import YahooFinance from 'yahoo-finance2';
 import { getCached, setCache, CACHE_TTL } from './cache';
 
-const yf: any = new (YahooFinance as any)();
+let _yf: any = null;
+async function getYf() {
+  if (!_yf) {
+    const mod = await import('yahoo-finance2');
+    const YahooFinance = mod.default;
+    _yf = new (YahooFinance as any)();
+  }
+  return _yf;
+}
+const yf = new Proxy({} as any, {
+  get(_target, prop) {
+    return async (...args: any[]) => {
+      const instance = await getYf();
+      return instance[prop](...args);
+    };
+  }
+});
 
 const MAX_CONCURRENT = 8;
 const MIN_DELAY_MS = 100;
