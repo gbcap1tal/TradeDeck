@@ -138,7 +138,7 @@ export async function getMultipleHistories(symbols: string[], range: string = '1
       if (hist && hist.length > 0) {
         results.set(sym, hist);
       }
-    } catch {}
+    } catch { /* ignored */ }
     return null;
   }, 10);
   return results;
@@ -184,7 +184,7 @@ export async function getYearStartPrices(symbols: string[]): Promise<Map<string,
           ytdPriceStore.set(sym, lastClose);
         }
       }
-    } catch {}
+    } catch { /* ignored */ }
     return null;
   }, 10);
 

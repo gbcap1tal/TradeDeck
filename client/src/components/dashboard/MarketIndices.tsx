@@ -1,5 +1,4 @@
 import { useMarketIndices } from "@/hooks/use-market";
-import { cn } from "@/lib/utils";
 import { ArrowUp, ArrowDown } from "lucide-react";
 
 function Sparkline({ data, color, width = 80, height = 28 }: { data: number[]; color: string; width?: number; height?: number }) {

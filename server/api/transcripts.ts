@@ -23,7 +23,7 @@ function loadFirecrawlUsage(): FirecrawlUsage {
     if (fs.existsSync(FIRECRAWL_USAGE_FILE)) {
       return JSON.parse(fs.readFileSync(FIRECRAWL_USAGE_FILE, 'utf-8'));
     }
-  } catch {}
+  } catch { /* ignored */ }
   return { totalCreditsUsed: 0, calls: [] };
 }
 
@@ -70,7 +70,7 @@ function readDiskCache(ticker: string, reportDate: string): TranscriptResult | n
         return data;
       }
     }
-  } catch {}
+  } catch { /* ignored */ }
   return null;
 }
 
@@ -140,7 +140,7 @@ async function getZacksCookies(): Promise<string | null> {
       redirect: 'manual',
     });
 
-    let cookies: string[] = [];
+    const cookies: string[] = [];
     const homeCookies = homeResp.headers.getSetCookie?.() || [];
     for (const c of homeCookies) {
       const nameVal = c.split(';')[0];
@@ -181,7 +181,7 @@ async function getZacksCookies(): Promise<string | null> {
   }
 }
 
-async function getAieraUrlForTicker(ticker: string, reportDate: string): Promise<string | null> {
+async function _getAieraUrlForTicker(ticker: string, reportDate: string): Promise<string | null> {
   const cacheKey = `aiera_url_${ticker}_${reportDate}`;
   const cached = getCached<string>(cacheKey);
   if (cached) return cached;
@@ -261,11 +261,11 @@ async function getAieraUrlForTicker(ticker: string, reportDate: string): Promise
   }
 }
 
-async function fetchFromZacksAiera(ticker: string, reportDate: string): Promise<TranscriptResult> {
+async function fetchFromZacksAiera(_ticker: string, _reportDate: string): Promise<TranscriptResult> {
   return { transcript: null, source: 'zacks_aiera', url: null };
 }
 
-async function scrapeWithFirecrawl(url: string, ticker: string, reportDate: string): Promise<string | null> {
+async function _scrapeWithFirecrawl(url: string, ticker: string, reportDate: string): Promise<string | null> {
   const firecrawlKey = process.env.FIRECRAWL_API_KEY;
   if (!firecrawlKey) return null;
 
@@ -324,7 +324,7 @@ async function scrapeWithFirecrawl(url: string, ticker: string, reportDate: stri
   }
 }
 
-function cleanAieraTranscript(markdown: string): string {
+function _cleanAieraTranscript(markdown: string): string {
   const lines = markdown.split('\n');
   const cleaned: string[] = [];
   let startFound = false;
@@ -509,7 +509,7 @@ function extractMotleyFoolTranscript(html: string): string {
   const pRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
   let pMatch;
   while ((pMatch = pRegex.exec(transcriptHtml)) !== null) {
-    let text = stripHtml(pMatch[1]).trim();
+    const text = stripHtml(pMatch[1]).trim();
     if (text.length > 15 && !isBoilerplate(text)) {
       elements.push({ index: pMatch.index, text });
     }

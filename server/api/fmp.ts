@@ -1,7 +1,7 @@
 import { getCached, setCache, CACHE_TTL } from './cache';
 
 const FMP_STABLE = 'https://financialmodelingprep.com/stable';
-const FMP_V3 = 'https://financialmodelingprep.com/api/v3';
+const _FMP_V3 = 'https://financialmodelingprep.com/api/v3';
 
 async function fmpStableRequest(endpoint: string, params: Record<string, string> = {}): Promise<any> {
   const apiKey = process.env.FMP_KEY;

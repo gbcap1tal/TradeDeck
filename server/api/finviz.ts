@@ -66,7 +66,7 @@ function loadPersistedFinviz(): FinvizSectorData | null {
         console.log(`[finviz] Persisted cache is ${ageHours.toFixed(1)}h old (>48h). Discarding.`);
       }
     }
-  } catch {}
+  } catch { /* ignored */ }
   return null;
 }
 
@@ -84,7 +84,7 @@ async function fetchPage(url: string): Promise<{ html: string | null; status: nu
       return { html: null, status: response.status };
     }
     return { html: await response.text(), status: response.status };
-  } catch (err: any) {
+  } catch {
     return { html: null, status: 0 };
   }
 }
@@ -183,7 +183,7 @@ async function scrapeAllStocks(): Promise<FinvizStock[]> {
         try {
           const { sendAlert } = await import('./alerts');
           sendAlert('Finviz Scrape Aborted', `Scrape stopped early at offset ${offset} after ${MAX_CONSECUTIVE_FAILURES} consecutive page failures.\n\nStocks scraped so far: ${allStocks.length}`, 'finviz_scrape');
-        } catch {}
+        } catch { /* ignored */ }
         break;
       }
       offset += 20;
@@ -298,7 +298,7 @@ export async function getFinvizData(forceRefresh: boolean = false): Promise<Finv
         try {
           const { sendAlert } = await import('./alerts');
           sendAlert('Finviz Scrape Incomplete', `Only ${stocks.length} stocks scraped (expected 5000+). Finviz may be blocking requests.`, 'finviz_scrape');
-        } catch {}
+        } catch { /* ignored */ }
         return null;
       }
 
@@ -325,7 +325,7 @@ export async function getFinvizData(forceRefresh: boolean = false): Promise<Finv
         try {
           const { sendAlert } = await import('./alerts');
           sendAlert('Finviz Scrape Incomplete Sectors', `Only ${sectorCount} sectors found (expected 11). Scrape may be incomplete.\n\nStocks: ${stockCount}, Industries: ${industryCount}`, 'finviz_scrape');
-        } catch {}
+        } catch { /* ignored */ }
         return null;
       }
 
@@ -337,7 +337,7 @@ export async function getFinvizData(forceRefresh: boolean = false): Promise<Finv
       try {
         const { sendAlert } = await import('./alerts');
         sendAlert('Finviz Scrape Exception', `Finviz scrape threw an error.\n\nError: ${err.message}`, 'finviz_scrape');
-      } catch {}
+      } catch { /* ignored */ }
       return null;
     } finally {
       scrapeInProgress = false;
@@ -403,10 +403,10 @@ export function searchStocks(query: string, limit: number = 10): Array<{ symbol:
   if (!data || !query) return [];
 
   const q = query.toUpperCase();
-  const results: Array<{ symbol: string; name: string; sector: string; industry: string }> = [];
-  const symbolExact: typeof results = [];
-  const symbolPrefix: typeof results = [];
-  const nameMatch: typeof results = [];
+  const _results: Array<{ symbol: string; name: string; sector: string; industry: string }> = [];
+  const symbolExact: typeof _results = [];
+  const symbolPrefix: typeof _results = [];
+  const nameMatch: typeof _results = [];
 
   for (const [sector, sectorData] of Object.entries(data)) {
     for (const [industry, stocks] of Object.entries(sectorData.stocks)) {
@@ -629,7 +629,7 @@ const INDUSTRY_RS_TTL = 43200;
 function persistIndustryRS(data: IndustryRS[]): void {
   try {
     fs.writeFileSync(INDUSTRY_RS_PERSIST_PATH, JSON.stringify({ data, savedAt: Date.now() }), 'utf-8');
-  } catch {}
+  } catch { /* ignored */ }
 }
 
 function loadPersistedIndustryRS(): IndustryRS[] | null {

@@ -430,7 +430,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
   };
   const formatEps = (v: number) => `$${v.toFixed(2)}`;
 
-  const BAR_MAX_H = 70;
+  const _BAR_MAX_H = 70;
 
   const formatRevShort = (v: number) => {
     if (v === 0) return '-';
@@ -444,7 +444,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
   };
 
   const isQuarterly = view === 'quarterly';
-  const barCount = data.length;
+  const _barCount = data.length;
   const barGap = isQuarterly ? 1 : 6;
 
   const renderHoverTooltip = (type: 'sales' | 'eps') => {
@@ -726,7 +726,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
 export default function StockDetail() {
   const [, params] = useRoute("/stocks/:symbol");
   const symbol = params?.symbol?.toUpperCase() || "";
-  const { data: quote, isLoading: isQuoteLoading, isFetching: isQuoteFetching, isError: isQuoteError } = useStockQuote(symbol);
+  const { data: quote, isLoading: isQuoteLoading, isFetching: isQuoteFetching, isError: _isQuoteError } = useStockQuote(symbol);
   const { mutate: addToWatchlist } = useAddToWatchlist();
   const { data: watchlists } = useWatchlists();
   const { user } = useAuth();

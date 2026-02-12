@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { useQuery } from "@tanstack/react-query";
-import { Newspaper, Clock, ArrowUp, AlertCircle, Search, X } from "lucide-react";
+import { Newspaper, ArrowUp, AlertCircle, Search, X } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";

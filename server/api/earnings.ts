@@ -1,6 +1,6 @@
-import { getCached, setCache, CACHE_TTL } from './cache';
+import { getCached, setCache } from './cache';
 import { db } from '../db';
-import { earningsReports, epScores, earningsCalendar } from '@shared/schema';
+import { earningsReports, epScores } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import OpenAI from 'openai';
 
@@ -263,7 +263,7 @@ async function fetchFromFinnhubAndFMP(dateStr: string): Promise<EarningsCalendar
         price2MonthsAgo: priceData.price2MonthsAgo,
       });
 
-      const [epInserted] = await db.insert(epScores).values({
+      const [_epInserted] = await db.insert(epScores).values({
         earningsReportId: inserted.id,
         ticker: item.ticker,
         reportDate: dateStr,
@@ -335,12 +335,12 @@ async function refreshLivePrices(dateStr: string): Promise<void> {
             if (q?.symbol) quoteMap.set(q.symbol, q);
           }
         }
-      } catch (e: any) {
+      } catch {
         for (const t of batch) {
           try {
             const q = await yf.quote(t);
             if (q?.symbol) quoteMap.set(q.symbol, q);
-          } catch {}
+          } catch { /* ignored */ }
         }
       }
     }
@@ -877,7 +877,7 @@ export async function generateAiSummary(ticker: string, reportDate: string): Pro
 
   const isPlaceholderSummary = report.aiSummary && report.aiSummary.includes('Transcript not yet available');
   const hasMediaCoverage = report.aiSummary && report.aiSummary.includes('sourced from media coverage');
-  const isOldStylePlaceholder = isPlaceholderSummary && !hasMediaCoverage;
+  const _isOldStylePlaceholder = isPlaceholderSummary && !hasMediaCoverage;
 
   if (report.aiSummary && !isPlaceholderSummary) return report.aiSummary;
 
@@ -1064,7 +1064,7 @@ Format as JSON:
   }
 }
 
-function formatLargeNumber(n: number): string {
+function _formatLargeNumber(n: number): string {
   if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
   if (n >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
   return `$${n.toFixed(2)}`;

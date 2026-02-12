@@ -1,15 +1,15 @@
 import type { Express } from "express";
-import { createServer, type Server } from "http";
+import { type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import * as yahoo from "./api/yahoo";
 import * as fmp from "./api/fmp";
-import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL, clearCache } from "./api/cache";
+import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
-import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, scrapeIndustryRS, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying } from "./api/finviz";
+import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe } from "./api/breadth";
-import { getRSScore, getCachedRS, getAllRSRatings } from "./api/rs";
+import { getRSScore, getAllRSRatings } from "./api/rs";
 import { computeLeadersQualityBatch, getCachedLeadersQuality } from "./api/quality";
 import { sendAlert, clearFailures } from "./api/alerts";
 import { fetchEarningsCalendar, generateAiSummary, getEarningsDatesWithData } from "./api/earnings";
@@ -28,7 +28,7 @@ const INDUSTRY_PERF_PERSIST_PATH = path.join(process.cwd(), '.industry-perf-cach
 function persistIndustryPerfToFile(data: any): void {
   try {
     fs.writeFileSync(INDUSTRY_PERF_PERSIST_PATH, JSON.stringify({ data, savedAt: Date.now() }), 'utf-8');
-  } catch {}
+  } catch { /* ignored */ }
 }
 
 function loadPersistedIndustryPerf(): any | null {
@@ -42,7 +42,7 @@ function loadPersistedIndustryPerf(): any | null {
         return d;
       }
     }
-  } catch {}
+  } catch { /* ignored */ }
   return null;
 }
 
@@ -51,7 +51,7 @@ const MEGATREND_PERF_PERSIST_PATH = path.join(process.cwd(), '.megatrend-perf-ca
 function persistMegatrendPerfToFile(data: any): void {
   try {
     fs.writeFileSync(MEGATREND_PERF_PERSIST_PATH, JSON.stringify({ data, savedAt: Date.now() }), 'utf-8');
-  } catch {}
+  } catch { /* ignored */ }
 }
 
 function loadPersistedMegatrendPerf(): any | null {
@@ -59,7 +59,7 @@ function loadPersistedMegatrendPerf(): any | null {
     if (!fs.existsSync(MEGATREND_PERF_PERSIST_PATH)) return null;
     const raw = JSON.parse(fs.readFileSync(MEGATREND_PERF_PERSIST_PATH, 'utf-8'));
     if (raw?.data && Date.now() - raw.savedAt < 24 * 3600000) return raw.data;
-  } catch {}
+  } catch { /* ignored */ }
   return null;
 }
 
@@ -144,7 +144,7 @@ async function computeMegatrendPerformance(): Promise<Map<number, any>> {
     let halfWeightedSum = 0, halfTotalCap = 0;
     let yearWeightedSum = 0, yearTotalCap = 0;
     let ytdWeightedSum = 0, ytdTotalCap = 0;
-    let dailyCount = 0, multiCount = 0;
+    let _dailyCount = 0, _multiCount = 0;
 
     const uniqueTickers = Array.from(new Set(mt.tickers.map(t => t.toUpperCase())));
     for (const upper of uniqueTickers) {
@@ -165,7 +165,7 @@ async function computeMegatrendPerformance(): Promise<Map<number, any>> {
                 dailyEqSum += stock.changePercent;
                 dailyEqCount++;
               }
-              dailyCount++;
+              _dailyCount++;
               found = true;
               break;
             }
@@ -182,7 +182,7 @@ async function computeMegatrendPerformance(): Promise<Map<number, any>> {
         if (prices.h > 0) { halfWeightedSum += ((prices.current - prices.h) / prices.h) * 100 * cap; halfTotalCap += cap; }
         if (prices.y > 0) { yearWeightedSum += ((prices.current - prices.y) / prices.y) * 100 * cap; yearTotalCap += cap; }
         if (prices.ytd > 0) { ytdWeightedSum += ((prices.current - prices.ytd) / prices.ytd) * 100 * cap; ytdTotalCap += cap; }
-        multiCount++;
+        _multiCount++;
       }
     }
 
@@ -272,7 +272,7 @@ async function computeSectorsData(): Promise<any[]> {
   return withIndustries;
 }
 
-async function computeIndustryPerformance(etfOnly: boolean = false): Promise<any> {
+async function computeIndustryPerformance(_etfOnly: boolean = false): Promise<any> {
   const rsData = getAllIndustryRS();
 
   if (rsData.length > 0) {
@@ -424,7 +424,7 @@ async function computeIndustryMASignals(industryNames: string[]): Promise<Record
         results[industryName] = signals;
         setCache(cacheKey, signals, CACHE_TTL.HISTORY);
       }
-    } catch (e) {
+    } catch {
       // silently skip
     }
   });
@@ -945,7 +945,7 @@ function initBackgroundTasks() {
   }, 60000);
 }
 
-function seededRandom(seed: string) {
+function _seededRandom(seed: string) {
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
     const char = seed.charCodeAt(i);
@@ -1212,8 +1212,8 @@ export async function registerRoutes(
 
       if (finvizData) {
         const stockLookup: Record<string, number> = {};
-        for (const [sector, sectorData] of Object.entries(finvizData)) {
-          for (const [industry, stocks] of Object.entries(sectorData.stocks)) {
+        for (const [_sector, sectorData] of Object.entries(finvizData)) {
+          for (const [_industry, stocks] of Object.entries(sectorData.stocks)) {
             for (const stock of stocks) {
               stockLookup[stock.symbol] = stock.marketCap;
             }
@@ -1289,7 +1289,7 @@ export async function registerRoutes(
     let sectorQuote: any = null;
     try {
       sectorQuote = await yahoo.getQuote(sectorConfig.ticker);
-    } catch {}
+    } catch { /* ignored */ }
 
     const sector = {
       name: sectorConfig.name,
@@ -1344,7 +1344,7 @@ export async function registerRoutes(
     let quotes: any[] = [];
     try {
       quotes = await yahoo.getMultipleQuotes(symbolsToQuote);
-    } catch {}
+    } catch { /* ignored */ }
 
     const quoteMap = new Map<string, any>();
     for (const q of quotes) {
@@ -1354,7 +1354,7 @@ export async function registerRoutes(
     let ytdPrices = new Map<string, number>();
     try {
       ytdPrices = await yahoo.getYearStartPrices(symbolsToQuote);
-    } catch {}
+    } catch { /* ignored */ }
 
     const industryRSData = getIndustryRSData(industryName);
 
@@ -1485,7 +1485,7 @@ export async function registerRoutes(
       const sma20Pct = parsePercent(s['SMA20']);
       const sma50Pct = parsePercent(s['SMA50']);
       const sma200Pct = parsePercent(s['SMA200']);
-      const aboveSma20 = sma20Pct > 0;
+      const _aboveSma20 = sma20Pct > 0;
       const aboveSma50 = sma50Pct > 0;
       const aboveSma200 = sma200Pct > 0;
       const emaIndicators = await yahoo.getEMAIndicators(sym);
@@ -1528,7 +1528,7 @@ export async function registerRoutes(
             }
           }
         }
-      } catch (e) {
+      } catch {
         // Finnhub failed, fall back to Finviz
       }
       if (!nextEarningsDate) {
@@ -1649,20 +1649,20 @@ export async function registerRoutes(
       try {
         const insiderTx = await scrapeFinvizInsiderBuying(sym);
         smartMoney = insiderTx.length > 0;
-      } catch {}
+      } catch { /* ignored */ }
 
       let avgVolume10d = 0;
       try {
         const yahooQuote = await yahoo.getQuote(sym);
         avgVolume10d = yahooQuote.avgVolume10Day || 0;
-      } catch {}
+      } catch { /* ignored */ }
 
       let salesAccelQuarters = 0;
-      let latestQEpsYoY = epsYoY;
-      let latestQSalesYoY = salesYoY;
+      const latestQEpsYoY = epsYoY;
+      const latestQSalesYoY = salesYoY;
 
-      let epsQoQValues: number[] = [];
-      let salesQoQValues: number[] = [];
+      const epsQoQValues: number[] = [];
+      const salesQoQValues: number[] = [];
 
       if (snap && snap.earnings && snap.earnings.length > 0) {
         const allEntries = [...snap.earnings].sort((a, b) => a.fiscalEndDate.localeCompare(b.fiscalEndDate));
@@ -1899,7 +1899,7 @@ export async function registerRoutes(
           return res.json(result);
         }
 
-        const now = new Date();
+        const _now = new Date();
         const actuals = entries.filter(e => e.epsActual != null || e.salesActual != null);
         const estimates = entries.filter(e => e.epsActual == null && e.salesActual == null && new Date(e.fiscalEndDate) > new Date(actuals.length > 0 ? actuals[actuals.length - 1].fiscalEndDate : '2000-01-01'));
 
@@ -2210,7 +2210,7 @@ export async function registerRoutes(
       computeMegatrendPerformance().catch(err =>
         console.error(`[api] Background megatrend perf recompute after create failed: ${err.message}`)
       );
-    } catch (err) {
+    } catch {
       res.status(500).json({ message: "Failed to create megatrend" });
     }
   });
@@ -2228,7 +2228,7 @@ export async function registerRoutes(
       computeMegatrendPerformance().catch(err =>
         console.error(`[api] Background megatrend perf recompute after update failed: ${err.message}`)
       );
-    } catch (err) {
+    } catch {
       res.status(500).json({ message: "Failed to update megatrend" });
     }
   });
@@ -2242,7 +2242,7 @@ export async function registerRoutes(
       computeMegatrendPerformance().catch(err =>
         console.error(`[api] Background megatrend perf recompute after delete failed: ${err.message}`)
       );
-    } catch (err) {
+    } catch {
       res.status(500).json({ message: "Failed to delete megatrend" });
     }
   });
@@ -2258,7 +2258,7 @@ export async function registerRoutes(
       let quotes: any[] = [];
       try {
         quotes = await yahoo.getMultipleQuotes(uniqueTickers);
-      } catch {}
+      } catch { /* ignored */ }
 
       const quoteMap = new Map<string, any>();
       for (const q of quotes) {
@@ -2268,7 +2268,7 @@ export async function registerRoutes(
       let ytdPrices = new Map<string, number>();
       try {
         ytdPrices = await yahoo.getYearStartPrices(uniqueTickers);
-      } catch {}
+      } catch { /* ignored */ }
 
       let perfCached = getMegatrendPerfCached();
       if (!perfCached) {
@@ -2368,7 +2368,7 @@ export async function registerRoutes(
     try {
       const key = await getStripePublishableKey();
       res.json({ publishableKey: key });
-    } catch (err: any) {
+    } catch {
       res.status(500).json({ error: 'Stripe not configured' });
     }
   });

@@ -1,5 +1,5 @@
 import * as yahoo from './yahoo';
-import { getCached, setCache, CACHE_TTL } from './cache';
+import { getCached, setCache } from './cache';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -8,7 +8,7 @@ const BREADTH_PERSIST_PATH = path.join(process.cwd(), '.breadth-cache.json');
 function persistBreadthToFile(data: BreadthData): void {
   try {
     fs.writeFileSync(BREADTH_PERSIST_PATH, JSON.stringify({ data, savedAt: Date.now() }), 'utf-8');
-  } catch {}
+  } catch { /* ignored */ }
 }
 
 export function loadPersistedBreadthData(): BreadthData | null {
@@ -26,7 +26,7 @@ function loadPersistedBreadth(): BreadthData | null {
         return d;
       }
     }
-  } catch {}
+  } catch { /* ignored */ }
   return null;
 }
 
@@ -163,7 +163,7 @@ function getScoreColor(score: number): string {
   return '#d04545';
 }
 
-function isUSMarketHours(): boolean {
+function _isUSMarketHours(): boolean {
   const now = new Date();
   const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
   const day = et.getDay();
@@ -174,7 +174,7 @@ function isUSMarketHours(): boolean {
   return timeMinutes >= 540 && timeMinutes <= 1020;
 }
 
-function isNearMarketOpenOrClose(): boolean {
+function _isNearMarketOpenOrClose(): boolean {
   const now = new Date();
   const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
   const day = et.getDay();
@@ -320,7 +320,7 @@ export async function computeQuoteBreadth(): Promise<{
   try {
     const vixQuote = await yahoo.getQuote('^VIX');
     if (vixQuote) vixLevel = Math.round(vixQuote.price * 100) / 100;
-  } catch {}
+  } catch { /* ignored */ }
 
   console.log(`[breadth] Universe: ${universe.length} stocks, >50MA: ${above50}/${total50}, >200MA: ${above200}/${total200}, H/L: ${newHighs}/${newLows}, 4%: ${bulls4}/${bears4}`);
 
@@ -448,7 +448,7 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
       if (vixQuote) {
         vixData = { value: Math.round(vixQuote.price * 100) / 100, score: scoreVIX(vixQuote.price), max: 7 };
       }
-    } catch {}
+    } catch { /* ignored */ }
   }
 
   momentumScore = fourPercentData.score + twentyFivePercentData.score;
@@ -580,7 +580,7 @@ function saveDailySnapshot(data: BreadthData): void {
 
     const trimmed = history.slice(-60);
     fs.writeFileSync(BREADTH_HISTORY_PATH, JSON.stringify(trimmed), 'utf-8');
-  } catch {}
+  } catch { /* ignored */ }
 }
 
 function loadBreadthHistory(): DailySnapshot[] {
@@ -619,7 +619,7 @@ export function getBreadthWithTimeframe(timeframe: 'daily' | 'weekly' | 'monthly
   const totalHighs = recentDays.reduce((s, d) => s + d.highs, 0);
   const totalLows = recentDays.reduce((s, d) => s + d.lows, 0);
 
-  const lastDay = recentDays[recentDays.length - 1];
+  const _lastDay = recentDays[recentDays.length - 1];
 
   return {
     ...data,

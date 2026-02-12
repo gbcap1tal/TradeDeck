@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { insertWatchlistSchema, insertWatchlistItemSchema, watchlists, watchlistItems } from './schema';
+import { insertWatchlistSchema, watchlists, watchlistItems } from './schema';
 
 export const errorSchemas = {
   validation: z.object({

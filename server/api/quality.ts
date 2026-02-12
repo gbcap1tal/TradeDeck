@@ -5,8 +5,8 @@ import * as yahoo from './yahoo';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const LEADERS_QUALITY_CACHE_PREFIX = 'leaders_quality_scores';
-const LEADERS_QUALITY_TTL = 86400;
+const _LEADERS_QUALITY_CACHE_PREFIX = 'leaders_quality_scores';
+const _LEADERS_QUALITY_TTL = 86400;
 
 const QUALITY_PERSIST_PATH = path.join(process.cwd(), '.cache', 'quality_scores.json');
 
@@ -15,7 +15,7 @@ function persistQualityScores(scores: Record<string, number>): void {
     const dir = path.dirname(QUALITY_PERSIST_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(QUALITY_PERSIST_PATH, JSON.stringify({ scores, savedAt: Date.now() }), 'utf-8');
-  } catch {}
+  } catch { /* ignored */ }
 }
 
 function loadPersistedQualityScores(): Record<string, number> | null {
@@ -72,7 +72,7 @@ export async function computeQualityScore(sym: string): Promise<number> {
 
     const s = snap.snapshot;
 
-    const sma20Pct = parsePercent(s['SMA20']);
+    const _sma20Pct = parsePercent(s['SMA20']);
     const sma50Pct = parsePercent(s['SMA50']);
     const sma200Pct = parsePercent(s['SMA200']);
     const aboveSma50 = sma50Pct > 0;
@@ -85,10 +85,10 @@ export async function computeQualityScore(sym: string): Promise<number> {
       const emaIndicators = await yahoo.getEMAIndicators(sym);
       aboveEma10 = emaIndicators.aboveEma10;
       aboveEma20 = emaIndicators.aboveEma20;
-    } catch {}
+    } catch { /* ignored */ }
     try {
       weinsteinStage = await yahoo.getWeinsteinStage(sym);
-    } catch {}
+    } catch { /* ignored */ }
 
     const distFromSma50 = Math.round(sma50Pct * 100) / 100;
     const atr = parseNumVal(s['ATR (14)']);
@@ -162,16 +162,16 @@ export async function computeQualityScore(sym: string): Promise<number> {
     try {
       const insiderTx = await scrapeFinvizInsiderBuying(sym);
       smartMoney = insiderTx.length > 0;
-    } catch {}
+    } catch { /* ignored */ }
 
     let avgVolume10d = 0;
     try {
       const yahooQuote = await yahoo.getQuote(sym);
       avgVolume10d = yahooQuote.avgVolume10Day || 0;
-    } catch {}
+    } catch { /* ignored */ }
 
-    let epsQoQValues: number[] = [];
-    let salesQoQValues: number[] = [];
+    const epsQoQValues: number[] = [];
+    const salesQoQValues: number[] = [];
 
     if (snap.earnings && snap.earnings.length > 0) {
       const allEntries = [...snap.earnings].sort((a, b) => a.fiscalEndDate.localeCompare(b.fiscalEndDate));

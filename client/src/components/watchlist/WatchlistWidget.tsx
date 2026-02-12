@@ -1,4 +1,4 @@
-import { useWatchlists, useWatchlist, useCreateWatchlist, useAddToWatchlist, useRemoveFromWatchlist } from "@/hooks/use-watchlists";
+import { useWatchlists, useWatchlist, useCreateWatchlist, useRemoveFromWatchlist } from "@/hooks/use-watchlists";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, ChevronRight, ArrowUp, ArrowDown, Star } from "lucide-react";

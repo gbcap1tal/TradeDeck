@@ -50,7 +50,7 @@ function loadPersisted<T>(filePath: string, maxAgeHours: number): T | null {
       const ageHours = (Date.now() - raw.savedAt) / (1000 * 60 * 60);
       if (ageHours < maxAgeHours) return raw.data as T;
     }
-  } catch {}
+  } catch { /* ignored */ }
   return null;
 }
 
@@ -159,7 +159,7 @@ async function scrapeDigestWithPuppeteer(): Promise<{ headline: string; bullets:
   } catch (err: any) {
     console.error(`[news] Puppeteer digest error: ${err.message}`);
     if (browser) {
-      try { await browser.close(); } catch {}
+      try { await browser.close(); } catch { /* ignored */ }
     }
     return null;
   }

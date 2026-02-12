@@ -1,6 +1,5 @@
 import { useIndustryPerformance, useIndustryMASignals } from "@/hooks/use-market";
 import { useLocation } from "wouter";
-import { cn } from "@/lib/utils";
 import { ChevronRight } from "lucide-react";
 import { useState, useMemo } from "react";
 

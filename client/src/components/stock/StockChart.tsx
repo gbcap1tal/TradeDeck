@@ -184,6 +184,7 @@ const CANDLE_RANGES: { value: CandleRange; label: string }[] = [
   { value: 'MO', label: 'Monthly' },
 ];
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function StockChart({ symbol, currentPrice, compact }: StockChartProps) {
   const [lineRange, setLineRange] = useState<LineRange>('3M');
   const [candleRange, setCandleRange] = useState<CandleRange>('D');
