@@ -21,6 +21,18 @@ export const insertFreeUserSchema = createInsertSchema(freeUsers).omit({ id: tru
 export type FreeUser = typeof freeUsers.$inferSelect;
 export type InsertFreeUser = z.infer<typeof insertFreeUserSchema>;
 
+// === WAITLIST ===
+
+export const waitlist = pgTable("waitlist", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWaitlistSchema = createInsertSchema(waitlist).omit({ id: true, createdAt: true });
+export type WaitlistEntry = typeof waitlist.$inferSelect;
+export type InsertWaitlist = z.infer<typeof insertWaitlistSchema>;
+
 // === EARNINGS TABLE DEFINITIONS ===
 
 export const earningsReports = pgTable("earnings_reports", {
