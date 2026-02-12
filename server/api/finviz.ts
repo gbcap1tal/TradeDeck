@@ -967,6 +967,90 @@ export async function scrapeFinvizInsiderBuying(symbol: string): Promise<Insider
   }
 }
 
+export interface FinvizBreadthStats {
+  advancingDeclining: { advancing: number; declining: number; advancingPct: number; decliningPct: number; unchangedPct: number };
+  newHighLow: { highs: number; lows: number; highsPct: number; lowsPct: number };
+  aboveSMA50: { above: number; below: number; abovePct: number; belowPct: number };
+  aboveSMA200: { above: number; below: number; abovePct: number; belowPct: number };
+  fetchedAt: number;
+}
+
+export async function scrapeFinvizBreadth(): Promise<FinvizBreadthStats | null> {
+  const cacheKey = 'finviz_breadth_stats';
+  const cached = getCached<FinvizBreadthStats>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const resp = await fetch('https://finviz.com/', {
+      headers: { 'User-Agent': USER_AGENT },
+    });
+    if (!resp.ok) {
+      console.error(`[finviz] Homepage fetch failed: ${resp.status}`);
+      return null;
+    }
+    const html = await resp.text();
+    const $ = cheerio.load(html);
+
+    const stats: FinvizBreadthStats = {
+      advancingDeclining: { advancing: 0, declining: 0, advancingPct: 0, decliningPct: 0, unchangedPct: 0 },
+      newHighLow: { highs: 0, lows: 0, highsPct: 0, lowsPct: 0 },
+      aboveSMA50: { above: 0, below: 0, abovePct: 0, belowPct: 0 },
+      aboveSMA200: { above: 0, below: 0, abovePct: 0, belowPct: 0 },
+      fetchedAt: Date.now(),
+    };
+
+    const sections = $('div.market-stats');
+    sections.each((i, el) => {
+      const tooltip = $(el).attr('data-boxover') || '';
+      const leftLabel = $(el).find('.market-stats_labels_left p').first().text().trim();
+      const leftValue = $(el).find('.market-stats_labels_left p').last().text().trim();
+      const rightValue = $(el).find('.market-stats_labels_right p').last().text().trim();
+
+      const parseCount = (s: string): number => {
+        const m = s.match(/\((\d+)\)/);
+        return m ? parseInt(m[1]) : 0;
+      };
+      const parsePct = (s: string): number => {
+        const m = s.match(/([\d.]+)%/);
+        return m ? parseFloat(m[1]) : 0;
+      };
+
+      const leftCount = parseCount(leftValue);
+      const leftPct = parsePct(leftValue);
+      const rightCount = parseCount(rightValue);
+      const rightPct = parsePct(rightValue);
+
+      if (tooltip.includes('Advancing / Declining')) {
+        stats.advancingDeclining = {
+          advancing: leftCount,
+          declining: rightCount,
+          advancingPct: leftPct,
+          decliningPct: rightPct,
+          unchangedPct: Math.max(0, 100 - leftPct - rightPct),
+        };
+      } else if (tooltip.includes('New High / New Low')) {
+        stats.newHighLow = { highs: leftCount, lows: rightCount, highsPct: leftPct, lowsPct: rightPct };
+      } else if (tooltip.includes('Above SMA50')) {
+        stats.aboveSMA50 = { above: leftCount, below: rightCount, abovePct: leftPct, belowPct: rightPct };
+      } else if (tooltip.includes('Above SMA200')) {
+        stats.aboveSMA200 = { above: leftCount, below: rightCount, abovePct: leftPct, belowPct: rightPct };
+      }
+    });
+
+    if (stats.advancingDeclining.advancing > 0) {
+      console.log(`[finviz] Breadth scraped: A=${stats.advancingDeclining.advancing} D=${stats.advancingDeclining.declining} (${stats.advancingDeclining.advancingPct}%/${stats.advancingDeclining.decliningPct}%)`);
+      setCache(cacheKey, stats, 300);
+      return stats;
+    }
+
+    console.warn('[finviz] Breadth scrape returned zero advancing — HTML structure may have changed');
+    return null;
+  } catch (e: any) {
+    console.error(`[finviz] Breadth scrape error: ${e.message}`);
+    return null;
+  }
+}
+
 export function getAllIndustriesWithStockCount(): Array<{ name: string; sector: string; stockCount: number }> {
   const data = getFinvizDataSync();
   if (!data) return [];

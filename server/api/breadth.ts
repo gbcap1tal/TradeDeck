@@ -1,4 +1,5 @@
 import * as yahoo from './yahoo';
+import { scrapeFinvizBreadth } from './finviz';
 import { getCached, setCache } from './cache';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -428,9 +429,10 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
   let advDecl = { advancing: 0, declining: 0 };
 
   if (fullScan) {
-    const [quoteBreadth, quarterlyBreadth] = await Promise.all([
+    const [quoteBreadth, quarterlyBreadth, finvizBreadth] = await Promise.all([
       computeQuoteBreadth(),
       computeQuarterlyBreadth(),
+      scrapeFinvizBreadth(),
     ]);
 
     fourPercentData = quoteBreadth.fourPercent;
@@ -442,13 +444,37 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
     advDecl = quoteBreadth.advancingDeclining;
     universeSize = quoteBreadth.universeSize;
     lastFullComputeTime = new Date().toISOString();
+
+    if (finvizBreadth && finvizBreadth.advancingDeclining.advancing > 0) {
+      advDecl = {
+        advancing: finvizBreadth.advancingDeclining.advancing,
+        declining: finvizBreadth.advancingDeclining.declining,
+      };
+      console.log(`[breadth] Using Finviz exchange-level A/D: ${advDecl.advancing}/${advDecl.declining}`);
+    }
   } else {
     try {
-      const vixQuote = await yahoo.getQuote('^VIX');
+      const [vixQuote, finvizBreadth] = await Promise.all([
+        yahoo.getQuote('^VIX'),
+        scrapeFinvizBreadth(),
+      ]);
       if (vixQuote) {
         vixData = { value: Math.round(vixQuote.price * 100) / 100, score: scoreVIX(vixQuote.price), max: 7 };
       }
+      if (finvizBreadth && finvizBreadth.advancingDeclining.advancing > 0) {
+        advDecl = {
+          advancing: finvizBreadth.advancingDeclining.advancing,
+          declining: finvizBreadth.advancingDeclining.declining,
+        };
+      }
     } catch { /* ignored */ }
+
+    if (advDecl.advancing === 0 && advDecl.declining === 0) {
+      const previousFull = getCached<BreadthData>('breadth_full_result') || loadPersistedBreadth();
+      if (previousFull && previousFull.advancingDeclining) {
+        advDecl = previousFull.advancingDeclining;
+      }
+    }
   }
 
   momentumScore = fourPercentData.score + twentyFivePercentData.score;
