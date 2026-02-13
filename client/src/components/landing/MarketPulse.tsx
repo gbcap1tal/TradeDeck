@@ -14,24 +14,22 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
     const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
 
-    let animationId: number;
+    let animationId = 0;
     let w = 0;
     let h = 0;
+    let count = 0;
+    let px: Float32Array;
+    let py: Float32Array;
+    let vx: Float32Array;
+    let vy: Float32Array;
+    let ox: Float32Array;
+    let oy: Float32Array;
+    let ordered: Uint8Array;
 
-    const gridX: Float32Array[] = [];
-    const gridY: Float32Array[] = [];
-    let cols = 0;
-    let rows = 0;
-
-    const freeX: Float32Array = new Float32Array(60);
-    const freeY: Float32Array = new Float32Array(60);
-    const freeVX: Float32Array = new Float32Array(60);
-    const freeVY: Float32Array = new Float32Array(60);
-    const FREE_COUNT = 60;
-    const LINE_DIST = 50;
+    const LINE_DIST = 55;
     const LINE_DIST_SQ = LINE_DIST * LINE_DIST;
 
-    function resize() {
+    function setup() {
       const dpr = window.devicePixelRatio || 1;
       const rect = canvas!.getBoundingClientRect();
       w = rect.width;
@@ -41,32 +39,65 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
       canvas!.height = h * dpr;
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const spacing = 30;
-      cols = Math.ceil(w / spacing);
-      rows = Math.ceil(h / spacing);
+      const spacing = 28;
+      const cols = Math.max(10, Math.round(w / spacing));
+      const rows = Math.max(6, Math.round(h / spacing));
+      count = cols * rows;
 
-      gridX.length = 0;
-      gridY.length = 0;
+      px = new Float32Array(count);
+      py = new Float32Array(count);
+      vx = new Float32Array(count);
+      vy = new Float32Array(count);
+      ox = new Float32Array(count);
+      oy = new Float32Array(count);
+      ordered = new Uint8Array(count);
+
+      const sx = w / cols;
+      const sy = h / rows;
+      let idx = 0;
       for (let i = 0; i < cols; i++) {
-        const colX = new Float32Array(rows);
-        const colY = new Float32Array(rows);
         for (let j = 0; j < rows; j++) {
-          colX[j] = (i + 0.5) * spacing;
-          colY[j] = (j + 0.5) * spacing;
+          const x = sx * i + sx / 2;
+          const y = sy * j + sy / 2;
+          px[idx] = x;
+          py[idx] = y;
+          ox[idx] = x;
+          oy[idx] = y;
+          vx[idx] = (Math.random() - 0.5) * 2;
+          vy[idx] = (Math.random() - 0.5) * 2;
+          ordered[idx] = x < w / 2 ? 1 : 0;
+          idx++;
         }
-        gridX.push(colX);
-        gridY.push(colY);
-      }
-
-      for (let i = 0; i < FREE_COUNT; i++) {
-        freeX[i] = w * 0.5 + Math.random() * w * 0.5;
-        freeY[i] = Math.random() * h;
-        freeVX[i] = (Math.random() - 0.5) * 3;
-        freeVY[i] = (Math.random() - 0.5) * 3;
       }
     }
 
-    resize();
+    setup();
+
+    const CELL = 60;
+    let gridW = 0;
+    let gridH = 0;
+    let cellHeads: Int32Array;
+    let cellNext: Int32Array;
+
+    function buildGrid() {
+      gridW = Math.ceil(w / CELL) + 1;
+      gridH = Math.ceil(h / CELL) + 1;
+      const totalCells = gridW * gridH;
+      if (!cellHeads || cellHeads.length < totalCells) {
+        cellHeads = new Int32Array(totalCells);
+      }
+      if (!cellNext || cellNext.length < count) {
+        cellNext = new Int32Array(count);
+      }
+      cellHeads.fill(-1);
+      for (let i = 0; i < count; i++) {
+        const cx = Math.min(gridW - 1, Math.max(0, (px[i] / CELL) | 0));
+        const cy = Math.min(gridH - 1, Math.max(0, (py[i] / CELL) | 0));
+        const ci = cy * gridW + cx;
+        cellNext[i] = cellHeads[ci];
+        cellHeads[ci] = i;
+      }
+    }
 
     function animate() {
       if (!ctx || w === 0) {
@@ -76,77 +107,80 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
 
       ctx.clearRect(0, 0, w, h);
 
-      for (let i = 0; i < FREE_COUNT; i++) {
-        freeVX[i] += (Math.random() - 0.5) * 1.5;
-        freeVY[i] += (Math.random() - 0.5) * 1.5;
-        freeVX[i] *= 0.92;
-        freeVY[i] *= 0.92;
-        freeX[i] += freeVX[i];
-        freeY[i] += freeVY[i];
+      for (let i = 0; i < count; i++) {
+        if (ordered[i]) {
+          const dx = ox[i] - px[i];
+          const dy = oy[i] - py[i];
+          px[i] += dx * 0.08;
+          py[i] += dy * 0.08;
+        } else {
+          vx[i] += (Math.random() - 0.5) * 2.0;
+          vy[i] += (Math.random() - 0.5) * 2.0;
+          vx[i] *= 0.91;
+          vy[i] *= 0.91;
+          px[i] += vx[i];
+          py[i] += vy[i];
 
-        if (freeX[i] < w * 0.5) { freeX[i] = w * 0.5; freeVX[i] *= -1; }
-        if (freeX[i] > w) { freeX[i] = w; freeVX[i] *= -1; }
-        if (freeY[i] < 0) { freeY[i] = 0; freeVY[i] *= -1; }
-        if (freeY[i] > h) { freeY[i] = h; freeVY[i] *= -1; }
+          if (px[i] < w * 0.5) { px[i] = w * 0.5; vx[i] *= -1; }
+          if (px[i] > w) { px[i] = w; vx[i] *= -1; }
+          if (py[i] < 0) { py[i] = 0; vy[i] *= -1; }
+          if (py[i] > h) { py[i] = h; vy[i] *= -1; }
+        }
       }
 
-      ctx.fillStyle = "rgba(255,255,255,0.35)";
+      ctx.fillStyle = "rgba(255,255,255,0.4)";
       ctx.beginPath();
-      const halfCols = Math.floor(cols / 2);
-      for (let i = 0; i < halfCols; i++) {
-        const cx = gridX[i];
-        const cy = gridY[i];
-        for (let j = 0; j < rows; j++) {
-          ctx.moveTo(cx[j] + 1.5, cy[j]);
-          ctx.arc(cx[j], cy[j], 1.5, 0, 6.2832);
+      for (let i = 0; i < count; i++) {
+        if (ordered[i]) {
+          ctx.moveTo(px[i] + 2, py[i]);
+          ctx.arc(px[i], py[i], 2, 0, 6.2832);
         }
       }
       ctx.fill();
 
-      ctx.fillStyle = "rgba(255,255,255,0.30)";
+      ctx.fillStyle = "rgba(255,255,255,0.35)";
       ctx.beginPath();
-      for (let i = 0; i < FREE_COUNT; i++) {
-        ctx.moveTo(freeX[i] + 1.5, freeY[i]);
-        ctx.arc(freeX[i], freeY[i], 1.5, 0, 6.2832);
+      for (let i = 0; i < count; i++) {
+        if (!ordered[i]) {
+          ctx.moveTo(px[i] + 2, py[i]);
+          ctx.arc(px[i], py[i], 2, 0, 6.2832);
+        }
       }
       ctx.fill();
+
+      buildGrid();
 
       ctx.strokeStyle = "rgba(255,255,255,0.07)";
       ctx.lineWidth = 0.5;
       ctx.beginPath();
 
-      for (let i = 0; i < FREE_COUNT; i++) {
-        const fx = freeX[i];
-        const fy = freeY[i];
+      for (let i = 0; i < count; i++) {
+        const x1 = px[i];
+        const y1 = py[i];
+        const cx = (x1 / CELL) | 0;
+        const cy = (y1 / CELL) | 0;
 
-        for (let k = i + 1; k < FREE_COUNT; k++) {
-          const dx = fx - freeX[k];
-          const dy = fy - freeY[k];
-          if (dx * dx + dy * dy < LINE_DIST_SQ) {
-            ctx.moveTo(fx, fy);
-            ctx.lineTo(freeX[k], freeY[k]);
-          }
-        }
-
-        const startCol = Math.max(0, Math.floor((fx - LINE_DIST) / (w / cols)));
-        const endCol = Math.min(halfCols - 1, Math.floor((fx + LINE_DIST) / (w / cols)));
-        const startRow = Math.max(0, Math.floor((fy - LINE_DIST) / (h / rows)));
-        const endRow = Math.min(rows - 1, Math.floor((fy + LINE_DIST) / (h / rows)));
-
-        for (let ci = startCol; ci <= endCol; ci++) {
-          const cx = gridX[ci];
-          const cy = gridY[ci];
-          for (let ri = startRow; ri <= endRow; ri++) {
-            const dx = fx - cx[ri];
-            const dy = fy - cy[ri];
-            if (dx * dx + dy * dy < LINE_DIST_SQ) {
-              ctx.moveTo(fx, fy);
-              ctx.lineTo(cx[ri], cy[ri]);
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = cx + dx;
+          if (nx < 0 || nx >= gridW) continue;
+          for (let dy = -1; dy <= 1; dy++) {
+            const ny = cy + dy;
+            if (ny < 0 || ny >= gridH) continue;
+            let j = cellHeads[ny * gridW + nx];
+            while (j !== -1) {
+              if (j > i) {
+                const ddx = x1 - px[j];
+                const ddy = y1 - py[j];
+                if (ddx * ddx + ddy * ddy < LINE_DIST_SQ) {
+                  ctx.moveTo(x1, y1);
+                  ctx.lineTo(px[j], py[j]);
+                }
+              }
+              j = cellNext[j];
             }
           }
         }
       }
-
       ctx.stroke();
 
       const midX = w / 2;
@@ -162,10 +196,16 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
 
     animationId = requestAnimationFrame(animate);
 
-    window.addEventListener("resize", resize);
+    const handleResize = () => {
+      cancelAnimationFrame(animationId);
+      setup();
+      animationId = requestAnimationFrame(animate);
+    };
+
+    window.addEventListener("resize", handleResize);
     return () => {
       cancelAnimationFrame(animationId);
-      window.removeEventListener("resize", resize);
+      window.removeEventListener("resize", handleResize);
     };
   }, []);
 
