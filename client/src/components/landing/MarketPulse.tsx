@@ -50,10 +50,10 @@ class Particle {
       this.y += dy * 0.08 * (1 - this.influence) + chaosInfluence.y * this.influence;
       this.influence *= 0.97;
     } else {
-      this.velocity.x += (Math.random() - 0.5) * 1.2;
-      this.velocity.y += (Math.random() - 0.5) * 1.2;
-      this.velocity.x *= 0.93;
-      this.velocity.y *= 0.93;
+      this.velocity.x += (Math.random() - 0.5) * 2.0;
+      this.velocity.y += (Math.random() - 0.5) * 2.0;
+      this.velocity.x *= 0.91;
+      this.velocity.y *= 0.91;
       this.x += this.velocity.x;
       this.y += this.velocity.y;
 
@@ -153,7 +153,7 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
       if (!ctx) return;
       ctx.clearRect(0, 0, w, h);
 
-      if (time % 10 === 0) {
+      if (time % 5 === 0) {
         updateNeighbors();
       }
 
