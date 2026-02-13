@@ -168,33 +168,31 @@ export default function Landing() {
       <section className="relative pt-14 overflow-hidden">
         <div className="relative w-full" style={{ minHeight: '70vh' }}>
           <MarketPulse />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/60 via-transparent to-background pointer-events-none" />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-transparent to-background/80 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent pointer-events-none" />
 
-          <div className="relative z-10 flex flex-col items-center justify-center text-center px-4 sm:px-6 py-20 sm:py-28 lg:py-36">
-            <h1
-              className="text-4xl sm:text-5xl lg:text-7xl font-bold tracking-tight leading-[1.05] mb-4 sm:mb-6"
-              data-testid="text-hero-title"
-            >
-              See the market
-              <br />
-              <span className="text-white/50">before it moves.</span>
-            </h1>
+          <div className="relative z-10 flex flex-col items-center justify-center text-center px-4 sm:px-6 py-16 sm:py-28 lg:py-36">
+            <div className="rounded-2xl bg-background/40 backdrop-blur-md px-6 sm:px-10 py-10 sm:py-14 max-w-2xl w-full">
+              <h1
+                className="text-3xl sm:text-5xl lg:text-7xl font-bold tracking-tight leading-[1.05] mb-4 sm:mb-6"
+                data-testid="text-hero-title"
+              >
+                See the market
+                <br />
+                <span className="text-white/50">before it moves.</span>
+              </h1>
 
-            <p className="text-[15px] sm:text-[17px] text-white/[0.85] max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
-              Track market health in real time.
-              Detect explosive earnings setups before anyone else.
-              Follow sector rotation before it becomes consensus.
-            </p>
+              <p className="text-[14px] sm:text-[17px] text-white/[0.85] max-w-xl mx-auto mb-8 sm:mb-10 leading-relaxed">
+                Track market health in real time.
+                Detect explosive earnings setups before anyone else.
+                Follow sector rotation before it becomes consensus.
+              </p>
 
-            {(
-              <>
-                <WaitlistForm size="hero" className="w-full max-w-md mb-4" />
-                <p className="text-[12px] text-white/30">
-                  100+ traders on the waitlist
-                </p>
-              </>
-            )}
+              <WaitlistForm size="hero" className="w-full max-w-md mx-auto mb-4" />
+              <p className="text-[12px] text-white/30">
+                100+ traders on the waitlist
+              </p>
+            </div>
           </div>
         </div>
 

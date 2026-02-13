@@ -66,8 +66,8 @@ class Particle {
 
   draw(ctx: CanvasRenderingContext2D) {
     const alpha = this.order
-      ? 0.6 - this.influence * 0.3
-      : 0.55;
+      ? 0.35 - this.influence * 0.15
+      : 0.3;
     ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
@@ -145,9 +145,9 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
         particle.neighbors.forEach((neighbor) => {
           const distance = Math.hypot(particle.x - neighbor.x, particle.y - neighbor.y);
           if (distance < 55) {
-            const alpha = 0.15 * (1 - distance / 55);
+            const alpha = 0.08 * (1 - distance / 55);
             ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-            ctx.lineWidth = 0.6;
+            ctx.lineWidth = 0.5;
             ctx.beginPath();
             ctx.moveTo(particle.x, particle.y);
             ctx.lineTo(neighbor.x, neighbor.y);
