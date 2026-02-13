@@ -605,9 +605,20 @@ function initBackgroundTasks() {
     const etMinutes = etNow.getHours() * 60 + etNow.getMinutes();
     const isDuringMarket = etDay >= 1 && etDay <= 5 && etMinutes >= 540 && etMinutes <= 965;
 
-    // Phase 1: Fast data — Yahoo (sectors, rotation, breadth) + Finviz industry groups page (single request)
-    console.log('[bg] Phase 1: Computing fast data (sectors, rotation, breadth, industry RS)...');
+    // Phase 1: Fast data — Yahoo (indices, sectors, rotation, breadth) + Finviz industry groups page (single request)
+    console.log('[bg] Phase 1: Computing fast data (indices, sectors, rotation, breadth, industry RS)...');
     await Promise.allSettled([
+      (async () => {
+        try {
+          const indices = await yahoo.getIndices();
+          if (indices && indices.length > 0) {
+            setCache('market_indices', indices, CACHE_TTL.INDICES);
+            console.log(`[bg] Indices pre-computed: ${indices.length} indices in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+          }
+        } catch (e: any) {
+          console.log(`[bg] Indices pre-compute error: ${e.message}`);
+        }
+      })(),
       (async () => {
         const sectors = await computeSectorsData();
         setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
@@ -762,6 +773,17 @@ function initBackgroundTasks() {
       console.log(`[scheduler] Sectors refreshed: ${sectors.length} sectors`);
 
       await Promise.allSettled([
+        (async () => {
+          try {
+            const indices = await yahoo.getIndices();
+            if (indices && indices.length > 0) {
+              setCache('market_indices', indices, CACHE_TTL.INDICES);
+              console.log(`[scheduler] Indices refreshed: ${indices.length} indices`);
+            }
+          } catch (err: any) {
+            console.log(`[scheduler] Indices refresh error: ${err.message}`);
+          }
+        })(),
         (async () => {
           try {
             const rotData = await computeRotationData();
@@ -1193,9 +1215,23 @@ export async function registerRoutes(
   initBackgroundTasks();
 
   app.get('/api/market/indices', async (req, res) => {
+    const cacheKey = 'market_indices';
+    const cached = getCached<any>(cacheKey);
+    if (cached) return res.json(cached);
+
+    const stale = getStale<any>(cacheKey);
+    if (stale) {
+      backgroundRefresh(cacheKey, async () => {
+        const data = await yahoo.getIndices();
+        return (data && data.length > 0) ? data : stale;
+      }, CACHE_TTL.INDICES);
+      return res.json(stale);
+    }
+
     try {
       const data = await yahoo.getIndices();
       if (data && data.length > 0) {
+        setCache(cacheKey, data, CACHE_TTL.INDICES);
         return res.json(data);
       }
     } catch (e: any) {
