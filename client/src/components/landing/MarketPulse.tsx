@@ -27,11 +27,11 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
     let oy: Float32Array;
     let ordered: Uint8Array;
 
-    const LINE_DIST = 55;
+    const LINE_DIST = 47;
     const LINE_DIST_SQ = LINE_DIST * LINE_DIST;
 
     function setup() {
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const rect = canvas!.getBoundingClientRect();
       w = rect.width;
       h = rect.height;
@@ -40,9 +40,9 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
       canvas!.height = h * dpr;
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-      const spacing = 28;
-      const cols = Math.max(10, Math.round(w / spacing));
-      const rows = Math.max(6, Math.round(h / spacing));
+      const spacing = 32;
+      const cols = Math.max(8, Math.round(w / spacing));
+      const rows = Math.max(5, Math.round(h / spacing));
       count = cols * rows;
 
       px = new Float32Array(count);
@@ -74,7 +74,7 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
 
     setup();
 
-    const CELL = 60;
+    const CELL = 50;
     let gridW = 0;
     let gridH = 0;
     let cellHeads: Int32Array;
@@ -101,15 +101,30 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
     }
 
     let frame = 0;
+    let lastTime = 0;
+    const halfW = () => w * 0.5;
 
-    function animate() {
-      if (!ctx || w === 0 || !visible) {
+    function animate(now: number) {
+      if (!ctx || w === 0) {
         animationId = requestAnimationFrame(animate);
         return;
       }
 
+      if (!visible) {
+        lastTime = now;
+        animationId = requestAnimationFrame(animate);
+        return;
+      }
+
+      if (lastTime && now - lastTime < 14) {
+        animationId = requestAnimationFrame(animate);
+        return;
+      }
+      lastTime = now;
+
       ctx.clearRect(0, 0, w, h);
 
+      const hw = halfW();
       for (let i = 0; i < count; i++) {
         if (ordered[i]) {
           px[i] += (ox[i] - px[i]) * 0.08;
@@ -122,7 +137,7 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
           px[i] += vx[i];
           py[i] += vy[i];
 
-          if (px[i] < w * 0.5) { px[i] = w * 0.5; vx[i] *= -1; }
+          if (px[i] < hw) { px[i] = hw; vx[i] *= -1; }
           if (px[i] > w) { px[i] = w; vx[i] *= -1; }
           if (py[i] < 0) { py[i] = 0; vy[i] *= -1; }
           if (py[i] > h) { py[i] = h; vy[i] *= -1; }
@@ -149,7 +164,7 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
       }
       ctx.fill();
 
-      if (frame % 2 === 0) {
+      if (frame % 3 === 0) {
         buildGrid();
       }
       frame++;
@@ -187,12 +202,11 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
       }
       ctx.stroke();
 
-      const midX = w / 2;
       ctx.strokeStyle = "rgba(255,255,255,0.06)";
       ctx.lineWidth = 0.5;
       ctx.beginPath();
-      ctx.moveTo(midX, 0);
-      ctx.lineTo(midX, h);
+      ctx.moveTo(hw, 0);
+      ctx.lineTo(hw, h);
       ctx.stroke();
 
       animationId = requestAnimationFrame(animate);
@@ -224,7 +238,7 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
     <canvas
       ref={canvasRef}
       className={`absolute inset-0 w-full h-full ${className}`}
-      style={{ background: "transparent", willChange: "contents" }}
+      style={{ background: "transparent" }}
       data-testid="canvas-market-pulse"
     />
   );
