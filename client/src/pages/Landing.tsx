@@ -316,96 +316,6 @@ export default function Landing() {
 
       <section
         className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/[0.04]"
-        style={{ contentVisibility: "auto", containIntrinsicSize: "0 700px" } as React.CSSProperties}
-      >
-        <div className="max-w-6xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-            <div className="order-2 lg:order-1 rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
-              <LensImage
-                src={newsScreenshot}
-                alt="News Intelligence"
-                data-testid="img-feature-news"
-              />
-            </div>
-            <div className="order-1 lg:order-2">
-              <p className="text-[11px] sm:text-[12px] text-white/30 font-medium uppercase tracking-[0.15em] mb-3">
-                News & AI Intelligence
-              </p>
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4" data-testid="text-news-heading">
-                Every headline, instantly decoded
-              </h2>
-              <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed mb-6">
-                Stop reading between the lines. TradeDeck's news feed delivers corporate
-                developments with instant visual sentiment: green for bullish, red for bearish,
-                neutral for everything else. One look tells you what matters.
-              </p>
-
-              <div className="space-y-2.5">
-                {[
-                  "Color-coded sentiment: green, red, neutral at a glance",
-                  "Daily market digest curated before the bell",
-                  "Corporate developments with direct ticker links",
-                  "Real-time feed across all major financial sources",
-                ].map((item) => (
-                  <div key={item} className="flex items-start gap-2.5">
-                    <Check className="w-3.5 h-3.5 text-white/30 mt-0.5 shrink-0" />
-                    <span className="text-[13px] text-white/50">{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section
-        className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/[0.04]"
-        style={{ contentVisibility: "auto", containIntrinsicSize: "0 700px" } as React.CSSProperties}
-      >
-        <div className="max-w-6xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-            <div>
-              <p className="text-[11px] sm:text-[12px] text-white/30 font-medium uppercase tracking-[0.15em] mb-3">
-                Stock Analysis
-              </p>
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4" data-testid="text-stock-heading">
-                Deep-dive into any stock
-              </h2>
-              <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed mb-6">
-                Every stock page is a full command center. Charts, fundamentals,
-                institutional flow, and our proprietary Quality Score that blends
-                technicals, profitability, growth, and momentum into one number.
-                See the full picture at a glance.
-              </p>
-              <div className="space-y-2.5">
-                {[
-                  "IBD-style RS ratings for all US stocks",
-                  "Quality Score combining technicals, fundamentals, and profitability",
-                  "EPS and sales columns with surprise tracking",
-                  "Insider purchases and institutional fund flow",
-                  "Weinstein stage analysis and trend health",
-                  "Latest news and sentiment directly on the stock page",
-                ].map((item) => (
-                  <div key={item} className="flex items-start gap-2.5">
-                    <Check className="w-3.5 h-3.5 text-white/30 mt-0.5 shrink-0" />
-                    <span className="text-[13px] text-white/50">{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
-              <LensImage
-                src={featureStock}
-                alt="Stock Analysis"
-                data-testid="img-feature-stock"
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section
-        className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/[0.04]"
         style={{ contentVisibility: "auto", containIntrinsicSize: "0 900px" } as React.CSSProperties}
       >
         <div className="max-w-6xl mx-auto">
@@ -489,6 +399,96 @@ export default function Landing() {
                   "Fully customizable in your account: add, edit, or remove",
                   "Top and worst performing industries ranked",
                   "Real-time cap-weighted performance across all timeframes",
+                ].map((item) => (
+                  <div key={item} className="flex items-start gap-2.5">
+                    <Check className="w-3.5 h-3.5 text-white/30 mt-0.5 shrink-0" />
+                    <span className="text-[13px] text-white/50">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/[0.04]"
+        style={{ contentVisibility: "auto", containIntrinsicSize: "0 700px" } as React.CSSProperties}
+      >
+        <div className="max-w-6xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+            <div>
+              <p className="text-[11px] sm:text-[12px] text-white/30 font-medium uppercase tracking-[0.15em] mb-3">
+                Stock Analysis
+              </p>
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4" data-testid="text-stock-heading">
+                Deep-dive into any stock
+              </h2>
+              <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed mb-6">
+                Every stock page is a full command center. Charts, fundamentals,
+                institutional flow, and our proprietary Quality Score that blends
+                technicals, profitability, growth, and momentum into one number.
+                See the full picture at a glance.
+              </p>
+              <div className="space-y-2.5">
+                {[
+                  "IBD-style RS ratings for all US stocks",
+                  "Quality Score combining technicals, fundamentals, and profitability",
+                  "EPS and sales columns with surprise tracking",
+                  "Insider purchases and institutional fund flow",
+                  "Weinstein stage analysis and trend health",
+                  "Latest news and sentiment directly on the stock page",
+                ].map((item) => (
+                  <div key={item} className="flex items-start gap-2.5">
+                    <Check className="w-3.5 h-3.5 text-white/30 mt-0.5 shrink-0" />
+                    <span className="text-[13px] text-white/50">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
+              <LensImage
+                src={featureStock}
+                alt="Stock Analysis"
+                data-testid="img-feature-stock"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/[0.04]"
+        style={{ contentVisibility: "auto", containIntrinsicSize: "0 700px" } as React.CSSProperties}
+      >
+        <div className="max-w-6xl mx-auto">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+            <div className="order-2 lg:order-1 rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
+              <LensImage
+                src={newsScreenshot}
+                alt="News Intelligence"
+                data-testid="img-feature-news"
+              />
+            </div>
+            <div className="order-1 lg:order-2">
+              <p className="text-[11px] sm:text-[12px] text-white/30 font-medium uppercase tracking-[0.15em] mb-3">
+                News & AI Intelligence
+              </p>
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mb-4" data-testid="text-news-heading">
+                Every headline, instantly decoded
+              </h2>
+              <p className="text-[14px] sm:text-[15px] text-white/40 leading-relaxed mb-6">
+                Stop reading between the lines. TradeDeck's news feed delivers corporate
+                developments with instant visual sentiment: green for bullish, red for bearish,
+                neutral for everything else. One look tells you what matters.
+              </p>
+
+              <div className="space-y-2.5">
+                {[
+                  "Color-coded sentiment: green, red, neutral at a glance",
+                  "Daily market digest curated before the bell",
+                  "Corporate developments with direct ticker links",
+                  "Real-time feed across all major financial sources",
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-2.5">
                     <Check className="w-3.5 h-3.5 text-white/30 mt-0.5 shrink-0" />
