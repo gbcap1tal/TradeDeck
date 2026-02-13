@@ -871,14 +871,14 @@ function AiSummaryDialog({ symbol, open, onOpenChange }: { symbol: string; open:
       <DialogContent className="bg-[#141414] border-white/10 w-[calc(100vw-2rem)] max-w-lg max-h-[85vh] sm:max-h-[80vh] overflow-hidden flex flex-col" data-testid="dialog-ai-summary">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2 text-white">
-            <Sparkles className="w-4 h-4 text-[#bf5af2]" />
+            <Sparkles className="w-4 h-4 text-white" />
             <span className="text-[15px]">{symbol} — AI Company Profile</span>
           </DialogTitle>
         </DialogHeader>
         <div className="flex-1 min-h-0 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
           {loading && (
             <div className="flex items-center justify-center py-12 gap-2" data-testid="ai-summary-loading">
-              <Loader2 className="w-4 h-4 text-[#bf5af2] animate-spin" />
+              <Loader2 className="w-4 h-4 text-white/60 animate-spin" />
               <span className="text-[13px] text-white/40">Generating profile...</span>
             </div>
           )}
