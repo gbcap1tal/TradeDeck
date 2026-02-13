@@ -21,7 +21,7 @@ export default function Dashboard() {
         </div>
       </main>
       <footer className="border-t border-white/5 py-6 px-3 sm:px-6 text-center">
-        <p className="text-[11px] text-white/20">TradeDeck &middot; Data is simulated for demonstration</p>
+        <p className="text-[11px] text-white/20">TradeDeck</p>
       </footer>
     </div>
   );

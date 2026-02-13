@@ -839,6 +839,8 @@ function initBackgroundTasks() {
       windowKey = `${dateStr}-close`;
     } else if (minutes >= 0 && minutes <= 10) {
       windowKey = `${dateStr}-h${hours}`;
+    } else if (minutes >= 30 && minutes <= 40) {
+      windowKey = `${dateStr}-h${hours}m30`;
     }
 
     if (windowKey && windowKey !== lastScheduledWindow) {
