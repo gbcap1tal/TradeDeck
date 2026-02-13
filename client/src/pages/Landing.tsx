@@ -18,7 +18,8 @@ import tradeDeckLogo from "@assets/Screenshot_2026-02-12_alle_21.14.42_177092729
 import { MarketPulse } from "@/components/landing/MarketPulse";
 import dashboardScreenshot from "@assets/Screenshot_2026-02-12_alle_17.20.15_1770913305164.png";
 import featureStock from "@assets/Screenshot_2026-02-12_alle_21.09.44_1770927489467.png";
-import newsScreenshot from "@assets/Screenshot_2026-02-12_alle_17.53.29_1770915277387.png";
+import newsDigest from "@assets/Screenshot_2026-02-13_alle_13.20.41_1770985327117.png";
+import newsCorporate from "@assets/Screenshot_2026-02-13_alle_13.20.31_1770985327118.png";
 import earningsScreenshot from "@assets/Screenshot_2026-02-12_alle_22.06.10_1770930498923.png";
 import megatrendsScreenshot from "@assets/Screenshot_2026-02-12_alle_22.07.20_1770930496029.png";
 
@@ -463,12 +464,21 @@ export default function Landing() {
       >
         <div className="max-w-6xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-            <div className="order-2 lg:order-1 rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
-              <LensImage
-                src={newsScreenshot}
-                alt="News Intelligence"
-                data-testid="img-feature-news"
-              />
+            <div className="order-2 lg:order-1 flex flex-col gap-4">
+              <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
+                <LensImage
+                  src={newsDigest}
+                  alt="Market Digest"
+                  data-testid="img-feature-news-digest"
+                />
+              </div>
+              <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
+                <LensImage
+                  src={newsCorporate}
+                  alt="Corporate Developments"
+                  data-testid="img-feature-news-corporate"
+                />
+              </div>
             </div>
             <div className="order-1 lg:order-2">
               <p className="text-[11px] sm:text-[12px] text-white/30 font-medium uppercase tracking-[0.15em] mb-3">
