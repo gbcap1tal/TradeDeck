@@ -18,6 +18,7 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
     let w = 0;
     let h = 0;
     let count = 0;
+    let visible = true;
     let px: Float32Array;
     let py: Float32Array;
     let vx: Float32Array;
@@ -99,8 +100,10 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
       }
     }
 
+    let frame = 0;
+
     function animate() {
-      if (!ctx || w === 0) {
+      if (!ctx || w === 0 || !visible) {
         animationId = requestAnimationFrame(animate);
         return;
       }
@@ -109,10 +112,8 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
 
       for (let i = 0; i < count; i++) {
         if (ordered[i]) {
-          const dx = ox[i] - px[i];
-          const dy = oy[i] - py[i];
-          px[i] += dx * 0.08;
-          py[i] += dy * 0.08;
+          px[i] += (ox[i] - px[i]) * 0.08;
+          py[i] += (oy[i] - py[i]) * 0.08;
         } else {
           vx[i] += (Math.random() - 0.5) * 2.0;
           vy[i] += (Math.random() - 0.5) * 2.0;
@@ -148,7 +149,10 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
       }
       ctx.fill();
 
-      buildGrid();
+      if (frame % 2 === 0) {
+        buildGrid();
+      }
+      frame++;
 
       ctx.strokeStyle = "rgba(255,255,255,0.07)";
       ctx.lineWidth = 0.5;
@@ -196,6 +200,12 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
 
     animationId = requestAnimationFrame(animate);
 
+    const observer = new IntersectionObserver(
+      ([entry]) => { visible = entry.isIntersecting; },
+      { threshold: 0 }
+    );
+    observer.observe(canvas);
+
     const handleResize = () => {
       cancelAnimationFrame(animationId);
       setup();
@@ -205,6 +215,7 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
     window.addEventListener("resize", handleResize);
     return () => {
       cancelAnimationFrame(animationId);
+      observer.disconnect();
       window.removeEventListener("resize", handleResize);
     };
   }, []);
@@ -213,7 +224,7 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
     <canvas
       ref={canvasRef}
       className={`absolute inset-0 w-full h-full ${className}`}
-      style={{ background: "transparent" }}
+      style={{ background: "transparent", willChange: "contents" }}
       data-testid="canvas-market-pulse"
     />
   );

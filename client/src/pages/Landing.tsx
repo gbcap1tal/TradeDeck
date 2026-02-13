@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,19 +14,35 @@ import {
   Loader2,
 } from "lucide-react";
 import { useTransparentLogo } from "@/hooks/use-transparent-logo";
-import logoImg from "@/assets/logo.webp";
 import tradeDeckLogo from "@assets/Screenshot_2026-02-12_alle_21.14.42_1770927291981.png";
 import { MarketPulse } from "@/components/landing/MarketPulse";
-import { ImageLens } from "@/components/landing/ImageLens";
 import dashboardScreenshot from "@assets/Screenshot_2026-02-12_alle_17.20.15_1770913305164.png";
 import featureStock from "@assets/Screenshot_2026-02-12_alle_21.09.44_1770927489467.png";
 import newsScreenshot from "@assets/Screenshot_2026-02-12_alle_17.53.29_1770915277387.png";
-import detailMQ from "@assets/Screenshot_2026-02-12_alle_18.01.09_1770915705571.png";
-import detailHeatmap from "@assets/Screenshot_2026-02-12_alle_18.01.31_1770915705569.png";
-import detailHeadlines from "@assets/Screenshot_2026-02-12_alle_18.00.20_1770915705573.png";
-import detailCorporate from "@assets/Screenshot_2026-02-12_alle_18.00.37_1770915705574.png";
 import earningsScreenshot from "@assets/Screenshot_2026-02-12_alle_22.06.10_1770930498923.png";
 import megatrendsScreenshot from "@assets/Screenshot_2026-02-12_alle_22.07.20_1770930496029.png";
+
+const LazyImageLens = lazy(() =>
+  import("@/components/landing/ImageLens").then((m) => ({ default: m.ImageLens }))
+);
+
+function LensImage(props: { src: string; alt: string; className?: string; "data-testid"?: string }) {
+  return (
+    <Suspense
+      fallback={
+        <img
+          src={props.src}
+          alt={props.alt}
+          className={`w-full h-auto ${props.className ?? ""}`}
+          loading="lazy"
+          decoding="async"
+        />
+      }
+    >
+      <LazyImageLens {...props} />
+    </Suspense>
+  );
+}
 
 const FEATURES = [
   {
@@ -147,7 +163,6 @@ export default function Landing() {
   const logoCanvasRef = useTransparentLogo(tradeDeckLogo);
   const footerLogoRef = useTransparentLogo(tradeDeckLogo);
 
-
   return (
     <div className="min-h-screen bg-background text-white overflow-x-hidden">
       <nav className="fixed top-0 left-0 right-0 z-50 glass" data-testid="landing-nav">
@@ -215,6 +230,7 @@ export default function Landing() {
       <section
         id="features"
         className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/[0.04]"
+        style={{ contentVisibility: "auto", containIntrinsicSize: "0 600px" } as React.CSSProperties}
       >
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12 sm:mb-16">
@@ -254,7 +270,10 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/[0.04]">
+      <section
+        className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/[0.04]"
+        style={{ contentVisibility: "auto", containIntrinsicSize: "0 700px" } as React.CSSProperties}
+      >
         <div className="max-w-6xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             <div>
@@ -285,7 +304,7 @@ export default function Landing() {
               </div>
             </div>
             <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
-              <ImageLens
+              <LensImage
                 src={dashboardScreenshot}
                 alt="TradeDeck Market Quality Dashboard"
                 data-testid="img-feature-breadth"
@@ -295,11 +314,14 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/[0.04]">
+      <section
+        className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/[0.04]"
+        style={{ contentVisibility: "auto", containIntrinsicSize: "0 700px" } as React.CSSProperties}
+      >
         <div className="max-w-6xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             <div className="order-2 lg:order-1 rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
-              <ImageLens
+              <LensImage
                 src={newsScreenshot}
                 alt="News Intelligence"
                 data-testid="img-feature-news"
@@ -336,7 +358,10 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/[0.04]">
+      <section
+        className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/[0.04]"
+        style={{ contentVisibility: "auto", containIntrinsicSize: "0 700px" } as React.CSSProperties}
+      >
         <div className="max-w-6xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             <div>
@@ -369,7 +394,7 @@ export default function Landing() {
               </div>
             </div>
             <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40">
-              <ImageLens
+              <LensImage
                 src={featureStock}
                 alt="Stock Analysis"
                 data-testid="img-feature-stock"
@@ -379,7 +404,10 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/[0.04]">
+      <section
+        className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/[0.04]"
+        style={{ contentVisibility: "auto", containIntrinsicSize: "0 900px" } as React.CSSProperties}
+      >
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12 sm:mb-16">
             <p className="text-[11px] sm:text-[12px] text-white/30 font-medium uppercase tracking-[0.15em] mb-3">
@@ -401,7 +429,7 @@ export default function Landing() {
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
             <div className="flex flex-col">
               <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40 mb-6 aspect-[16/10]">
-                <ImageLens
+                <LensImage
                   src={earningsScreenshot}
                   alt="Earnings Calendar with EP Detection"
                   data-testid="img-feature-earnings"
@@ -437,7 +465,7 @@ export default function Landing() {
 
             <div className="flex flex-col">
               <div className="rounded-xl overflow-hidden border border-white/[0.08] shadow-xl shadow-black/40 mb-6 aspect-[16/10]">
-                <ImageLens
+                <LensImage
                   src={megatrendsScreenshot}
                   alt="Megatrend Baskets Performance"
                   data-testid="img-feature-megatrends"
@@ -476,6 +504,7 @@ export default function Landing() {
       <section
         id="pricing"
         className="py-16 sm:py-24 px-4 sm:px-6 border-t border-white/[0.04]"
+        style={{ contentVisibility: "auto", containIntrinsicSize: "0 600px" } as React.CSSProperties}
       >
         <div className="max-w-lg mx-auto text-center">
           <p className="text-[11px] sm:text-[12px] text-white/30 font-medium uppercase tracking-[0.15em] mb-3">
