@@ -3,13 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  BarChart3,
-  TrendingUp,
   Activity,
-  Layers,
   Crown,
-  CalendarDays,
-  Newspaper,
   Shield,
   Target,
   ArrowRight,
@@ -18,7 +13,6 @@ import {
   Mail,
   Loader2,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
 import { useTransparentLogo } from "@/hooks/use-transparent-logo";
 import logoImg from "@/assets/logo.webp";
 import tradeDeckLogo from "@assets/Screenshot_2026-02-12_alle_21.14.42_1770927291981.png";
@@ -37,51 +31,21 @@ import megatrendsScreenshot from "@assets/Screenshot_2026-02-12_alle_22.07.20_17
 const FEATURES = [
   {
     icon: Activity,
-    title: "Market Quality Score",
+    title: "See What Matters First.",
     description:
-      "Proprietary algorithm synthesizing breadth, momentum, and participation data across 5,000+ US stocks into one composite signal. Powered by multi-layer analysis with adaptive weighting.",
-  },
-  {
-    icon: BarChart3,
-    title: "144 Industries Tracked",
-    description:
-      "Cap-weighted performance for every industry. Spot sector rotation and capital flows before the crowd.",
-  },
-  {
-    icon: TrendingUp,
-    title: "IBD-Style RS Ratings",
-    description:
-      "Proprietary Relative Strength ratings (1 to 99) covering all US stocks. Find market leaders with momentum on their side.",
-  },
-  {
-    icon: CalendarDays,
-    title: "Earnings Insights",
-    description:
-      "Monthly earnings calendar with EP scoring, AI-powered summaries from actual call transcripts, and EPS/revenue tracking.",
+      "Most tools tell you what already happened. TradeDeck shows what's unfolding before the crowd realizes.",
   },
   {
     icon: Crown,
-    title: "Stock Quality Score",
+    title: "Quality Where It Counts.",
     description:
-      "Proprietary composite score blending technicals, fundamentals, profitability, and institutional momentum into a single actionable rating.",
-  },
-  {
-    icon: Layers,
-    title: "Megatrend Baskets",
-    description:
-      "Custom thematic baskets tracking AI, quantum computing, nuclear energy, and more, with cap-weighted returns.",
-  },
-  {
-    icon: Newspaper,
-    title: "Sentiment-Colored News",
-    description:
-      "Corporate developments with visual sentiment indicators. Instantly see which headlines are bullish, bearish, or neutral.",
+      "Not pretty charts but actionable scores rooted in fundamentals and price action. Only stocks worthy of risk get your attention.",
   },
   {
     icon: Target,
-    title: "Sector Rotation Graph",
+    title: "Real Edges, Real Signals.",
     description:
-      "Relative Rotation Graph showing which sectors are leading, weakening, lagging, or improving in real time.",
+      "Every metric speaks to execution: leadership, sector rotation, quality, earnings, sentiment. You don't guess. You know.",
   },
 ];
 
@@ -183,10 +147,6 @@ export default function Landing() {
   const logoCanvasRef = useTransparentLogo(tradeDeckLogo);
   const footerLogoRef = useTransparentLogo(tradeDeckLogo);
 
-  const { data: waitlistData } = useQuery<{ count: number }>({
-    queryKey: ["/api/waitlist/count"],
-    refetchInterval: 30000,
-  });
 
   return (
     <div className="min-h-screen bg-background text-white overflow-x-hidden">
@@ -231,7 +191,7 @@ export default function Landing() {
               <>
                 <WaitlistForm size="hero" className="w-full max-w-md mb-4" />
                 <p className="text-[12px] text-white/30">
-                  {waitlistData?.count ? `${waitlistData.count.toLocaleString()} trader${waitlistData.count === 1 ? "" : "s"} on the waitlist` : "Be the first to get access"}
+                  100+ traders on the waitlist
                 </p>
               </>
             )}
@@ -271,21 +231,21 @@ export default function Landing() {
             </h2>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+          <div className="grid sm:grid-cols-3 gap-4 sm:gap-5">
             {FEATURES.map((f, i) => (
               <Card
                 key={f.title}
                 className="glass-card border-white/[0.06] bg-white/[0.02]"
                 data-testid={`card-feature-${i}`}
               >
-                <CardContent className="p-5 sm:p-6">
-                  <div className="w-9 h-9 rounded-lg bg-white/[0.06] flex items-center justify-center mb-4">
-                    <f.icon className="w-4 h-4 text-white/50" />
+                <CardContent className="p-6 sm:p-8">
+                  <div className="w-10 h-10 rounded-lg bg-white/[0.06] flex items-center justify-center mb-5">
+                    <f.icon className="w-5 h-5 text-white/50" />
                   </div>
-                  <h3 className="text-[14px] font-semibold mb-2 text-white/90" data-testid={`text-feature-title-${i}`}>
+                  <h3 className="text-[16px] sm:text-[18px] font-semibold mb-3 text-white/90" data-testid={`text-feature-title-${i}`}>
                     {f.title}
                   </h3>
-                  <p className="text-[12px] sm:text-[13px] text-white/35 leading-relaxed">
+                  <p className="text-[13px] sm:text-[15px] text-white/40 leading-relaxed">
                     {f.description}
                   </p>
                 </CardContent>
@@ -546,7 +506,7 @@ export default function Landing() {
 
               <div className="flex items-center justify-center gap-2 mt-4 text-[11px] text-white/25">
                 <Shield className="w-3 h-3" />
-                <span>{waitlistData?.count ? `${waitlistData.count.toLocaleString()} trader${waitlistData.count === 1 ? "" : "s"} already signed up` : "Be among the first"}</span>
+                <span>100+ traders already signed up</span>
               </div>
             </CardContent>
           </Card>
