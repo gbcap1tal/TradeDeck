@@ -46,9 +46,9 @@ class Particle {
         }
       });
 
-      this.x += dx * 0.05 * (1 - this.influence) + chaosInfluence.x * this.influence;
-      this.y += dy * 0.05 * (1 - this.influence) + chaosInfluence.y * this.influence;
-      this.influence *= 0.99;
+      this.x += dx * 0.08 * (1 - this.influence) + chaosInfluence.x * this.influence;
+      this.y += dy * 0.08 * (1 - this.influence) + chaosInfluence.y * this.influence;
+      this.influence *= 0.97;
     } else {
       this.velocity.x += (Math.random() - 0.5) * 1.2;
       this.velocity.y += (Math.random() - 0.5) * 1.2;
@@ -153,7 +153,7 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
       if (!ctx) return;
       ctx.clearRect(0, 0, w, h);
 
-      if (time % 30 === 0) {
+      if (time % 10 === 0) {
         updateNeighbors();
       }
 
