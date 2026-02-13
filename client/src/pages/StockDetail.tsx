@@ -3,7 +3,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { useStockQuote, useStockQuality, useStockEarnings, useStockNews, useInsiderBuying } from "@/hooks/use-stocks";
 import { StockChart } from "@/components/stock/StockChart";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Plus, ArrowUp, ArrowDown, Check, X, AlertTriangle, Calendar, Newspaper, Flame, Zap, Info, Building2 } from "lucide-react";
+import { ChevronRight, Plus, ArrowUp, ArrowDown, Check, X, AlertTriangle, Calendar, Newspaper, Flame, Zap, Info, Building2, Sparkles, Loader2 } from "lucide-react";
 import { useAddToWatchlist, useWatchlists } from "@/hooks/use-watchlists";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 function formatLargeNumber(n: number): string {
   if (Math.abs(n) >= 1e12) return `$${(n / 1e12).toFixed(1)}T`;
@@ -723,6 +729,164 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
   );
 }
 
+function renderMarkdown(text: string) {
+  const lines = text.split('\n');
+  const elements: JSX.Element[] = [];
+  let tableRows: string[][] = [];
+  let inTable = false;
+  let tableHeaderDone = false;
+
+  const processInline = (s: string) => {
+    const parts: (string | JSX.Element)[] = [];
+    let remaining = s;
+    let key = 0;
+    const boldRegex = /\*\*(.+?)\*\*/g;
+    let match;
+    let lastIndex = 0;
+    while ((match = boldRegex.exec(remaining)) !== null) {
+      if (match.index > lastIndex) parts.push(remaining.slice(lastIndex, match.index));
+      parts.push(<strong key={key++} className="text-white font-semibold">{match[1]}</strong>);
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < remaining.length) parts.push(remaining.slice(lastIndex));
+    return parts.length > 0 ? parts : [s];
+  };
+
+  const flushTable = () => {
+    if (tableRows.length === 0) return;
+    elements.push(
+      <div key={`table-${elements.length}`} className="overflow-x-auto my-2">
+        <table className="w-full text-[12px] border-collapse">
+          <thead>
+            <tr>
+              {tableRows[0]?.map((h, i) => (
+                <th key={i} className="text-left px-2 py-1.5 text-white/50 font-semibold border-b border-white/10 text-[11px] uppercase tracking-wider">{h.trim()}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {tableRows.slice(1).map((row, ri) => (
+              <tr key={ri} className="border-b border-white/[0.05]">
+                {row.map((cell, ci) => (
+                  <td key={ci} className={cn("px-2 py-1.5", ci === 0 ? "text-white/60 font-medium" : "text-white/80")}>{cell.trim()}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+    tableRows = [];
+    inTable = false;
+    tableHeaderDone = false;
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      if (trimmed.match(/^\|[\s\-:|]+\|$/)) {
+        tableHeaderDone = true;
+        continue;
+      }
+      const cells = trimmed.split('|').filter((_, i, arr) => i > 0 && i < arr.length - 1);
+      if (!inTable) { inTable = true; tableRows = []; tableHeaderDone = false; }
+      tableRows.push(cells);
+      continue;
+    }
+    if (inTable) flushTable();
+    if (!trimmed) continue;
+    if (trimmed.startsWith('### ')) {
+      elements.push(<h3 key={elements.length} className="text-[13px] font-semibold text-white mt-3 mb-1">{trimmed.slice(4)}</h3>);
+    } else if (trimmed.startsWith('## ')) {
+      elements.push(<h2 key={elements.length} className="text-[14px] font-bold text-white mt-3 mb-1">{trimmed.slice(3)}</h2>);
+    } else if (trimmed.startsWith('# ')) {
+      elements.push(<h1 key={elements.length} className="text-[15px] font-bold text-white mt-2 mb-1">{trimmed.slice(2)}</h1>);
+    } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ')) {
+      const bullet = trimmed.replace(/^[-*•]\s*/, '');
+      elements.push(
+        <div key={elements.length} className="flex gap-1.5 py-0.5">
+          <span className="text-white/30 flex-shrink-0 mt-0.5">•</span>
+          <span className="text-[12px] text-white/70 leading-relaxed">{processInline(bullet)}</span>
+        </div>
+      );
+    } else if (/^\d+\.\s/.test(trimmed)) {
+      const num = trimmed.match(/^(\d+)\.\s/)?.[1] || '';
+      const content = trimmed.replace(/^\d+\.\s*/, '');
+      elements.push(
+        <div key={elements.length} className="flex gap-1.5 py-0.5">
+          <span className="text-white/40 flex-shrink-0 text-[12px] font-mono w-4 text-right">{num}.</span>
+          <span className="text-[12px] text-white/70 leading-relaxed">{processInline(content)}</span>
+        </div>
+      );
+    } else {
+      elements.push(<p key={elements.length} className="text-[12px] text-white/70 leading-relaxed py-0.5">{processInline(trimmed)}</p>);
+    }
+  }
+  if (inTable) flushTable();
+  return elements;
+}
+
+function AiSummaryDialog({ symbol, open, onOpenChange }: { symbol: string; open: boolean; onOpenChange: (v: boolean) => void }) {
+  const [summary, setSummary] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchSummary = async () => {
+    if (summary) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/stocks/${symbol}/ai-summary`, { credentials: 'include' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate');
+      setSummary(data.summary);
+    } catch (e: any) {
+      setError(e.message || 'Failed to load summary');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenChange = (v: boolean) => {
+    onOpenChange(v);
+    if (v && !summary && !loading) fetchSummary();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="bg-[#141414] border-white/10 max-w-lg max-h-[80vh] overflow-hidden flex flex-col" data-testid="dialog-ai-summary">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-white">
+            <Sparkles className="w-4 h-4 text-[#bf5af2]" />
+            <span className="text-[15px]">{symbol} — AI Company Profile</span>
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+          {loading && (
+            <div className="flex items-center justify-center py-12 gap-2" data-testid="ai-summary-loading">
+              <Loader2 className="w-4 h-4 text-[#bf5af2] animate-spin" />
+              <span className="text-[13px] text-white/40">Generating profile...</span>
+            </div>
+          )}
+          {error && (
+            <div className="text-center py-8" data-testid="ai-summary-error">
+              <p className="text-[13px] text-[#ff453a]/80">{error}</p>
+              <Button size="sm" variant="ghost" onClick={fetchSummary} className="mt-2 text-white/50" data-testid="button-retry-summary">
+                Retry
+              </Button>
+            </div>
+          )}
+          {summary && (
+            <div data-testid="ai-summary-content">
+              {renderMarkdown(summary)}
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function StockDetail() {
   const [, params] = useRoute("/stocks/:symbol");
   const symbol = params?.symbol?.toUpperCase() || "";
@@ -730,6 +894,7 @@ export default function StockDetail() {
   const { mutate: addToWatchlist } = useAddToWatchlist();
   const { data: watchlists } = useWatchlists();
   const { user } = useAuth();
+  const [aiSummaryOpen, setAiSummaryOpen] = useState(false);
 
   const handleAddToWatchlist = (watchlistId: number) => {
     addToWatchlist({ id: watchlistId, symbol });
@@ -763,6 +928,15 @@ export default function StockDetail() {
                   </div>
                   <h1 className="text-lg font-bold tracking-tight text-white flex-shrink-0" data-testid="text-stock-symbol">{quote.symbol}</h1>
                   <span className="text-[12px] text-white/30 truncate hidden sm:block">{quote.name}</span>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="text-[#bf5af2]/60 flex-shrink-0"
+                    onClick={() => setAiSummaryOpen(true)}
+                    data-testid="button-ai-summary"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                  </Button>
                 </div>
                 <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
                   <div className="text-right">
@@ -826,6 +1000,7 @@ export default function StockDetail() {
           )}
         </div>
       </main>
+      <AiSummaryDialog symbol={symbol} open={aiSummaryOpen} onOpenChange={setAiSummaryOpen} />
     </div>
   );
 }

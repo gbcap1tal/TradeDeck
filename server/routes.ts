@@ -2384,6 +2384,63 @@ export async function registerRoutes(
     return res.json([]);
   });
 
+  app.get('/api/stocks/:symbol/ai-summary', async (req, res) => {
+    const { symbol } = req.params;
+    const sym = symbol.toUpperCase();
+    const cacheKey = `ai_company_summary_${sym}`;
+
+    const cached = getCached<string>(cacheKey);
+    if (cached) return res.json({ summary: cached });
+
+    const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+    const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+    if (!apiKey) return res.status(503).json({ error: 'AI not configured' });
+
+    const OpenAI = (await import('openai')).default;
+    const openai = new OpenAI({ apiKey, baseURL });
+
+    try {
+      let context = '';
+      try {
+        const q = await yahoo.getQuote(sym);
+        if (q) {
+          context = `Ticker: ${sym}, Company: ${q.name || sym}, Sector: ${q.sector || 'N/A'}, Industry: ${q.industry || 'N/A'}, Market Cap: ${q.marketCap || 'N/A'}, Price: $${q.price?.toFixed(2) || 'N/A'}, 52W Range: $${q.fiftyTwoWeekLow?.toFixed(2) || '?'}-$${q.fiftyTwoWeekHigh?.toFixed(2) || '?'}, PE: ${q.pe || 'N/A'}`;
+        }
+      } catch {}
+
+      const prompt = `You are a financial analyst. Create a company profile for ${sym}.${context ? ` Context: ${context}` : ''}
+
+1. **Explain Like I'm 12** — Three short bullet points about what the company does. Use relatable examples and analogies a kid would understand.
+
+2. **Professional Summary (max 10 sentences)** — Cover: industry, main products/services, primary competitors (list tickers), notable metrics or achievements, competitive advantage/moat, why they are unique. If biotech, state whether they have a commercial product or are in clinical stages.
+
+3. **Key Intel Table** — Provide in a markdown table with columns "Category" and "Details":
+| Category | Details |
+|----------|---------|
+| Hot Theme/Narrative | Any trending story or narrative driving the stock |
+| Catalysts | Upcoming earnings, news, macro events |
+| Key Fundamentals | Growth in earnings/revenues, moat, unique products, management quality, patents |
+| Upcoming (30 days) | Flag any earnings, product launches, or regulatory events in the next 30 days |
+| Analyst Targets | Recent changes in analyst price targets, consensus direction |
+
+Keep the entire response under 1000 characters. Be concise, direct, and useful for trading decisions.`;
+
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 600,
+        temperature: 0.5,
+      });
+
+      const summary = completion.choices?.[0]?.message?.content || 'No summary available.';
+      setCache(cacheKey, summary, 86400);
+      res.json({ summary });
+    } catch (err: any) {
+      console.error(`[ai-summary] Error for ${sym}:`, err.message);
+      res.status(500).json({ error: 'Failed to generate summary' });
+    }
+  });
+
   app.get('/api/watchlists', isAuthenticated, async (req: any, res) => {
     const userId = req.user.claims.sub;
     const lists = await storage.getWatchlists(userId);
