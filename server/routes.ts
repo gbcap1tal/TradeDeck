@@ -632,7 +632,15 @@ function initBackgroundTasks() {
       (async () => {
         const breadthFast = await computeMarketBreadth(false);
         setCache('market_breadth', breadthFast, CACHE_TTL.BREADTH);
-        console.log(`[bg] Breadth trend-only pre-computed: score=${breadthFast.overallScore} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+        console.log(`[bg] Breadth quick pre-computed: score=${breadthFast.overallScore} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+        try {
+          const breadthFull = await computeMarketBreadth(true);
+          setCache('market_breadth', breadthFull, CACHE_TTL.BREADTH);
+          console.log(`[bg] Breadth full scan complete: score=${breadthFull.overallScore} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+          clearFailures('breadth_scan');
+        } catch (err: any) {
+          console.log(`[bg] Breadth full scan error in Phase 1: ${err.message}`);
+        }
       })(),
       (async () => {
         try {
@@ -682,17 +690,6 @@ function initBackgroundTasks() {
     const sectors = await computeSectorsData();
     setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
     console.log(`[bg] Sectors re-enriched with industry data: ${sectors.length} sectors in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
-
-    try {
-      console.log('[bg] Computing full market breadth...');
-      const breadthFull = await computeMarketBreadth(true);
-      setCache('market_breadth', breadthFull, CACHE_TTL.BREADTH);
-      console.log(`[bg] Full breadth computed: score=${breadthFull.overallScore} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
-      clearFailures('breadth_scan');
-    } catch (err: any) {
-      console.log(`[bg] Breadth full scan error: ${err.message}`);
-      sendAlert('Market Breadth Scan Failed', `Full breadth scan failed during startup.\n\nError: ${err.message}`, 'breadth_scan');
-    }
 
     try {
       const mtPerf = await computeMegatrendPerformance();
