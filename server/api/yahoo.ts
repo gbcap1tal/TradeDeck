@@ -265,6 +265,32 @@ export async function getHistory(symbol: string, range: string = '1M') {
   return [];
 }
 
+async function getIntradaySparklines(symbols: string[]): Promise<Map<string, number[]>> {
+  const map = new Map<string, number[]>();
+  try {
+    const results = await Promise.allSettled(
+      symbols.map(s => throttledYahooCall(() => yf.chart(s, {
+        period1: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        interval: '5m' as const,
+      })))
+    );
+    for (let i = 0; i < symbols.length; i++) {
+      const r = results[i];
+      if (r.status === 'fulfilled' && r.value?.quotes?.length > 0) {
+        const closes = r.value.quotes
+          .filter((q: any) => q.close != null)
+          .map((q: any) => q.close);
+        if (closes.length >= 2) {
+          map.set(symbols[i], closes);
+        }
+      }
+    }
+  } catch (e: any) {
+    console.error('Sparkline fetch error:', e.message);
+  }
+  return map;
+}
+
 export async function getIndices() {
   const key = 'yf_indices';
   const cached = getCached<any[]>(key);
@@ -273,7 +299,10 @@ export async function getIndices() {
   const symbols = ['SPY', 'QQQ', 'MDY', 'IWM', 'TLT'];
 
   try {
-    const quotes = await Promise.allSettled(symbols.map(s => throttledYahooCall(() => yf.quote(s))));
+    const [quotes, sparklines] = await Promise.all([
+      Promise.allSettled(symbols.map(s => throttledYahooCall(() => yf.quote(s)))),
+      getIntradaySparklines([...symbols, '^VIX']),
+    ]);
     const results: any[] = [];
 
     for (let i = 0; i < symbols.length; i++) {
@@ -286,7 +315,7 @@ export async function getIndices() {
           price: Math.round((q.regularMarketPrice ?? 0) * 100) / 100,
           change: Math.round((q.regularMarketChange ?? 0) * 100) / 100,
           changePercent: Math.round((q.regularMarketChangePercent ?? 0) * 100) / 100,
-          sparkline: [],
+          sparkline: sparklines.get(symbols[i]) || [],
         });
       }
     }
@@ -300,7 +329,7 @@ export async function getIndices() {
           price: Math.round((vixResult.regularMarketPrice ?? 0) * 100) / 100,
           change: Math.round((vixResult.regularMarketChange ?? 0) * 100) / 100,
           changePercent: Math.round((vixResult.regularMarketChangePercent ?? 0) * 100) / 100,
-          sparkline: [],
+          sparkline: sparklines.get('^VIX') || [],
         });
       }
     } catch {
