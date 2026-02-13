@@ -119,9 +119,9 @@ export function SectorRotation() {
 
   if (isLoading) {
     return (
-      <div>
+      <div className="flex flex-col h-full">
         <div className="section-title mb-4">Sector Rotation</div>
-        <div className="glass-card rounded-xl p-5 shimmer aspect-square" />
+        <div className="glass-card rounded-xl p-5 shimmer flex-1" />
       </div>
     );
   }
@@ -168,9 +168,9 @@ export function SectorRotation() {
   const hoveredColor = hoveredData ? getQuadrantColor(hoveredData) : '';
 
   return (
-    <div>
+    <div className="flex flex-col h-full">
       <div className="section-title mb-4" data-testid="text-rotation-title">Sector Rotation</div>
-      <div className="glass-card rounded-xl p-3 sm:p-5 flex flex-col">
+      <div className="glass-card rounded-xl p-3 sm:p-5 flex flex-col flex-1">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">RRG vs SPY</span>
           <span className="text-[9px] text-white/20 ml-auto">Weekly · 10-wk tails</span>

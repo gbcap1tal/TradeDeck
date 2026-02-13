@@ -33,11 +33,11 @@ export function MarketHeatmap() {
 
   if (isLoading) {
     return (
-      <div>
+      <div className="flex flex-col h-full">
         <div className="flex items-center justify-between gap-2 mb-4">
           <div className="section-title">Market Heatmap</div>
         </div>
-        <div className="glass-card rounded-xl p-5 aspect-square">
+        <div className="glass-card rounded-xl p-5 flex-1">
           <div className="grid grid-cols-3 gap-2 h-full">
             {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(i => (
               <div key={i} className="shimmer rounded-lg" />
@@ -59,12 +59,12 @@ export function MarketHeatmap() {
   const sorted = [...sectorList].sort((a: any, b: any) => getChange(b) - getChange(a));
 
   return (
-    <div>
+    <div className="flex flex-col h-full">
       <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
         <div className="section-title" data-testid="text-heatmap-title">Market Heatmap</div>
         <TimeframeSwitch value={timeframe} onChange={setTimeframe} />
       </div>
-      <div className="glass-card rounded-xl p-3 sm:p-4 aspect-square flex flex-col">
+      <div className="glass-card rounded-xl p-3 sm:p-4 flex flex-col flex-1">
         <div className="grid grid-cols-3 gap-1.5 sm:gap-2 flex-1">
           {sorted.map((sector: any) => {
             const change = getChange(sector);
