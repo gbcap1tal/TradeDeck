@@ -99,7 +99,7 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
       ctx.scale(dpr, dpr);
 
       const particles: Particle[] = [];
-      const targetSpacing = 16;
+      const targetSpacing = 28;
       const gridCols = Math.max(10, Math.round(w / targetSpacing));
       const gridRows = Math.max(6, Math.round(h / targetSpacing));
       const spacingX = w / gridCols;
@@ -160,20 +160,21 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
       particles.forEach((particle) => {
         particle.update(w, h);
         particle.draw(ctx);
+      });
 
+      ctx.lineWidth = 0.5;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.07)";
+      ctx.beginPath();
+      particles.forEach((particle) => {
         particle.neighbors.forEach((neighbor) => {
           const distance = Math.hypot(particle.x - neighbor.x, particle.y - neighbor.y);
           if (distance < 55) {
-            const alpha = 0.1 * (1 - distance / 55);
-            ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-            ctx.lineWidth = 0.5;
-            ctx.beginPath();
             ctx.moveTo(particle.x, particle.y);
             ctx.lineTo(neighbor.x, neighbor.y);
-            ctx.stroke();
           }
         });
       });
+      ctx.stroke();
 
       const midX = w / 2;
       ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
