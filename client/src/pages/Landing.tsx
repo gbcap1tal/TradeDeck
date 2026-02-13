@@ -172,7 +172,7 @@ export default function Landing() {
           <div className="absolute inset-0 bg-gradient-to-t from-background/40 via-transparent to-transparent pointer-events-none" />
 
           <div className="relative z-10 flex flex-col items-center justify-center text-center px-4 sm:px-6 py-16 sm:py-28 lg:py-36">
-            <div className="rounded-2xl bg-background/40 backdrop-blur-md px-6 sm:px-10 py-10 sm:py-14 max-w-2xl w-full">
+            <div className="rounded-2xl bg-background/20 backdrop-blur-sm px-6 sm:px-10 py-10 sm:py-14 max-w-2xl w-full">
               <h1
                 className="text-3xl sm:text-5xl lg:text-7xl font-bold tracking-tight leading-[1.05] mb-4 sm:mb-6"
                 data-testid="text-hero-title"

@@ -50,10 +50,10 @@ class Particle {
       this.y += dy * 0.05 * (1 - this.influence) + chaosInfluence.y * this.influence;
       this.influence *= 0.99;
     } else {
-      this.velocity.x += (Math.random() - 0.5) * 0.5;
-      this.velocity.y += (Math.random() - 0.5) * 0.5;
-      this.velocity.x *= 0.95;
-      this.velocity.y *= 0.95;
+      this.velocity.x += (Math.random() - 0.5) * 1.2;
+      this.velocity.y += (Math.random() - 0.5) * 1.2;
+      this.velocity.x *= 0.93;
+      this.velocity.y *= 0.93;
       this.x += this.velocity.x;
       this.y += this.velocity.y;
 
