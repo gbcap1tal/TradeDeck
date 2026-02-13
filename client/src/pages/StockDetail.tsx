@@ -7,7 +7,7 @@ import { ChevronRight, Plus, ArrowUp, ArrowDown, Check, X, AlertTriangle, Calend
 import { useAddToWatchlist, useWatchlists } from "@/hooks/use-watchlists";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import {
   DropdownMenu,
@@ -756,7 +756,7 @@ function renderMarkdown(text: string) {
     if (tableRows.length === 0) return;
     elements.push(
       <div key={`table-${elements.length}`} className="overflow-x-auto my-2">
-        <table className="w-full text-[12px] border-collapse">
+        <table className="w-full text-[11px] sm:text-[12px] border-collapse min-w-[280px]">
           <thead>
             <tr>
               {tableRows[0]?.map((h, i) => (
@@ -806,7 +806,7 @@ function renderMarkdown(text: string) {
       elements.push(
         <div key={elements.length} className="flex gap-1.5 py-0.5">
           <span className="text-white/30 flex-shrink-0 mt-0.5">•</span>
-          <span className="text-[12px] text-white/70 leading-relaxed">{processInline(bullet)}</span>
+          <span className="text-[11px] sm:text-[12px] text-white/70 leading-relaxed">{processInline(bullet)}</span>
         </div>
       );
     } else if (/^\d+\.\s/.test(trimmed)) {
@@ -815,11 +815,11 @@ function renderMarkdown(text: string) {
       elements.push(
         <div key={elements.length} className="flex gap-1.5 py-0.5">
           <span className="text-white/40 flex-shrink-0 text-[12px] font-mono w-4 text-right">{num}.</span>
-          <span className="text-[12px] text-white/70 leading-relaxed">{processInline(content)}</span>
+          <span className="text-[11px] sm:text-[12px] text-white/70 leading-relaxed">{processInline(content)}</span>
         </div>
       );
     } else {
-      elements.push(<p key={elements.length} className="text-[12px] text-white/70 leading-relaxed py-0.5">{processInline(trimmed)}</p>);
+      elements.push(<p key={elements.length} className="text-[11px] sm:text-[12px] text-white/70 leading-relaxed py-0.5">{processInline(trimmed)}</p>);
     }
   }
   if (inTable) flushTable();
@@ -830,15 +830,21 @@ function AiSummaryDialog({ symbol, open, onOpenChange }: { symbol: string; open:
   const [summary, setSummary] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastSymbol, setLastSymbol] = useState<string>('');
 
   const fetchSummary = async () => {
-    if (summary) return;
     setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/stocks/${symbol}/ai-summary`, { credentials: 'include' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to generate');
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Server error (${res.status})`);
+      }
+      if (!res.ok) throw new Error(data.error || `Failed to generate (${res.status})`);
+      if (!data.summary) throw new Error('Empty response from AI');
       setSummary(data.summary);
     } catch (e: any) {
       setError(e.message || 'Failed to load summary');
@@ -847,14 +853,22 @@ function AiSummaryDialog({ symbol, open, onOpenChange }: { symbol: string; open:
     }
   };
 
-  const handleOpenChange = (v: boolean) => {
-    onOpenChange(v);
-    if (v && !summary && !loading) fetchSummary();
-  };
+  useEffect(() => {
+    if (symbol !== lastSymbol) {
+      setSummary(null);
+      setError(null);
+      setLoading(false);
+      setLastSymbol(symbol);
+    }
+  }, [symbol, lastSymbol]);
+
+  useEffect(() => {
+    if (open && !summary && !loading) fetchSummary();
+  }, [open, summary]);
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="bg-[#141414] border-white/10 max-w-lg max-h-[80vh] overflow-hidden flex flex-col" data-testid="dialog-ai-summary">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="bg-[#141414] border-white/10 w-[calc(100vw-2rem)] max-w-lg max-h-[85vh] sm:max-h-[80vh] overflow-hidden flex flex-col" data-testid="dialog-ai-summary">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2 text-white">
             <Sparkles className="w-4 h-4 text-[#bf5af2]" />
@@ -871,7 +885,7 @@ function AiSummaryDialog({ symbol, open, onOpenChange }: { symbol: string; open:
           {error && (
             <div className="text-center py-8" data-testid="ai-summary-error">
               <p className="text-[13px] text-[#ff453a]/80">{error}</p>
-              <Button size="sm" variant="ghost" onClick={fetchSummary} className="mt-2 text-white/50" data-testid="button-retry-summary">
+              <Button size="sm" variant="ghost" onClick={() => { setError(null); setSummary(null); }} className="mt-2 text-white/50" data-testid="button-retry-summary">
                 Retry
               </Button>
             </div>
