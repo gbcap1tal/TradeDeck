@@ -168,8 +168,8 @@ export default function Landing() {
       <section className="relative pt-14 overflow-hidden">
         <div className="relative w-full" style={{ minHeight: '70vh' }}>
           <MarketPulse />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-transparent to-background/80 pointer-events-none" />
-          <div className="absolute inset-0 bg-gradient-to-t from-background/60 via-transparent to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/30 via-transparent to-background/70 pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background/40 via-transparent to-transparent pointer-events-none" />
 
           <div className="relative z-10 flex flex-col items-center justify-center text-center px-4 sm:px-6 py-16 sm:py-28 lg:py-36">
             <div className="rounded-2xl bg-background/40 backdrop-blur-md px-6 sm:px-10 py-10 sm:py-14 max-w-2xl w-full">

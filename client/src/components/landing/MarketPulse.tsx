@@ -66,8 +66,8 @@ class Particle {
 
   draw(ctx: CanvasRenderingContext2D) {
     const alpha = this.order
-      ? 0.35 - this.influence * 0.15
-      : 0.3;
+      ? 0.4 - this.influence * 0.2
+      : 0.35;
     ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
@@ -99,8 +99,9 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
       ctx.scale(dpr, dpr);
 
       const particles: Particle[] = [];
-      const gridCols = 38;
-      const gridRows = Math.round((h / w) * gridCols);
+      const targetSpacing = 16;
+      const gridCols = Math.max(10, Math.round(w / targetSpacing));
+      const gridRows = Math.max(6, Math.round(h / targetSpacing));
       const spacingX = w / gridCols;
       const spacingY = h / gridRows;
 
@@ -121,12 +122,30 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
     let animationId: number;
 
     function updateNeighbors() {
+      const cellSize = 90;
+      const grid = new Map<string, Particle[]>();
+      particles.forEach((p) => {
+        const cx = Math.floor(p.x / cellSize);
+        const cy = Math.floor(p.y / cellSize);
+        const key = `${cx},${cy}`;
+        if (!grid.has(key)) grid.set(key, []);
+        grid.get(key)!.push(p);
+      });
       particles.forEach((particle) => {
-        particle.neighbors = particles.filter((other) => {
-          if (other === particle) return false;
-          const distance = Math.hypot(particle.x - other.x, particle.y - other.y);
-          return distance < 90;
-        });
+        const cx = Math.floor(particle.x / cellSize);
+        const cy = Math.floor(particle.y / cellSize);
+        particle.neighbors = [];
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            const cell = grid.get(`${cx + dx},${cy + dy}`);
+            if (!cell) continue;
+            for (const other of cell) {
+              if (other === particle) continue;
+              const dist = Math.hypot(particle.x - other.x, particle.y - other.y);
+              if (dist < 90) particle.neighbors.push(other);
+            }
+          }
+        }
       });
     }
 
@@ -145,7 +164,7 @@ export function MarketPulse({ className = "" }: MarketPulseProps) {
         particle.neighbors.forEach((neighbor) => {
           const distance = Math.hypot(particle.x - neighbor.x, particle.y - neighbor.y);
           if (distance < 55) {
-            const alpha = 0.08 * (1 - distance / 55);
+            const alpha = 0.1 * (1 - distance / 55);
             ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
             ctx.lineWidth = 0.5;
             ctx.beginPath();
