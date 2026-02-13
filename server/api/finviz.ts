@@ -6,10 +6,11 @@ import { FINVIZ_SECTOR_MAP } from '../data/sectors';
 
 const FINVIZ_CACHE_TTL = 86400;
 const FINVIZ_PERSIST_PATH = path.join(process.cwd(), '.finviz-cache.json');
-const REQUEST_DELAY = 600;
-const RETRY_DELAY = 3000;
-const MAX_RETRIES = 5;
+const REQUEST_DELAY = 250;
+const RETRY_DELAY = 2000;
+const MAX_RETRIES = 4;
 const MAX_CONSECUTIVE_FAILURES = 5;
+const PARALLEL_PAGES = 3;
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 export interface FinvizStock {
@@ -149,84 +150,93 @@ async function scrapeAllStocks(): Promise<FinvizStock[]> {
   let pageCount = 0;
   const maxPages = 600;
   let skippedCount = 0;
+  let done = false;
 
-  console.log('[finviz] Starting single-pass scrape of all US-exchange stocks (NYSE+NASDAQ+AMEX)...');
+  console.log('[finviz] Starting parallel scrape of all US-exchange stocks (NYSE+NASDAQ+AMEX)...');
   const startTime = Date.now();
 
-  while (pageCount < maxPages) {
-    const url = `https://finviz.com/screener.ashx?v=111&f=ind_stocksonly&r=${offset}`;
-
-    let html: string | null = null;
-    let succeeded = false;
-
+  async function fetchWithRetry(url: string): Promise<{ html: string | null; offset: number }> {
+    const m = url.match(/r=(\d+)/);
+    const off = m ? parseInt(m[1]) : 0;
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       const result = await fetchPage(url);
-      if (result.html) {
-        html = result.html;
-        succeeded = true;
-        break;
-      }
+      if (result.html) return { html: result.html, offset: off };
       if (result.status === 429) {
-        const backoff = RETRY_DELAY * Math.pow(2, attempt);
-        console.log(`[finviz] Rate limited at offset ${offset}, waiting ${backoff}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
-        await sleep(backoff);
+        await sleep(RETRY_DELAY * Math.pow(2, attempt));
       } else {
-        const backoff = RETRY_DELAY * Math.pow(1.5, attempt);
-        await sleep(backoff);
+        await sleep(RETRY_DELAY * Math.pow(1.5, attempt));
       }
     }
+    return { html: null, offset: off };
+  }
 
-    if (!succeeded || !html) {
-      consecutiveFailures++;
-      if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-        console.log(`[finviz] Stopping at offset ${offset} after ${MAX_CONSECUTIVE_FAILURES} consecutive failures`);
-        try {
-          const { sendAlert } = await import('./alerts');
-          sendAlert('Finviz Scrape Aborted', `Scrape stopped early at offset ${offset} after ${MAX_CONSECUTIVE_FAILURES} consecutive page failures.\n\nStocks scraped so far: ${allStocks.length}`, 'finviz_scrape');
-        } catch { /* ignored */ }
-        break;
-      }
-      offset += 20;
-      await sleep(REQUEST_DELAY * 2);
-      continue;
+  while (pageCount < maxPages && !done) {
+    const batch: string[] = [];
+    for (let p = 0; p < PARALLEL_PAGES && !done; p++) {
+      const batchOffset = offset + p * 20;
+      if (totalExpected > 0 && batchOffset > totalExpected) break;
+      batch.push(`https://finviz.com/screener.ashx?v=111&f=ind_stocksonly&r=${batchOffset}`);
     }
 
-    consecutiveFailures = 0;
-    const { stocks, totalRows } = parseScreenerPage(html);
+    if (batch.length === 0) break;
 
-    if (totalExpected === 0 && totalRows > 0) {
-      totalExpected = totalRows;
-      console.log(`[finviz] Total stocks to scrape: ${totalExpected}`);
-    }
+    const results = await Promise.all(batch.map(u => fetchWithRetry(u)));
 
-    if (stocks.length === 0) {
-      console.log(`[finviz] Empty page at offset ${offset}, done.`);
-      break;
-    }
-
-    for (const stock of stocks) {
-      if (seenSymbols.has(stock.symbol)) continue;
-      if (EXCLUDED_INDUSTRIES.has(stock.industry)) {
-        skippedCount++;
+    let batchFailed = 0;
+    for (const res of results) {
+      if (!res.html) {
+        batchFailed++;
+        consecutiveFailures++;
+        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+          console.log(`[finviz] Stopping after ${MAX_CONSECUTIVE_FAILURES} consecutive failures`);
+          try {
+            const { sendAlert } = await import('./alerts');
+            sendAlert('Finviz Scrape Aborted', `Scrape stopped early at offset ${res.offset} after ${MAX_CONSECUTIVE_FAILURES} consecutive page failures.\n\nStocks scraped so far: ${allStocks.length}`, 'finviz_scrape');
+          } catch { /* ignored */ }
+          done = true;
+          break;
+        }
         continue;
       }
-      seenSymbols.add(stock.symbol);
-      allStocks.push(stock);
+
+      consecutiveFailures = 0;
+      const { stocks, totalRows } = parseScreenerPage(res.html);
+
+      if (totalExpected === 0 && totalRows > 0) {
+        totalExpected = totalRows;
+        console.log(`[finviz] Total stocks to scrape: ${totalExpected}`);
+      }
+
+      if (stocks.length === 0) {
+        done = true;
+        break;
+      }
+
+      for (const stock of stocks) {
+        if (seenSymbols.has(stock.symbol)) continue;
+        if (EXCLUDED_INDUSTRIES.has(stock.industry)) {
+          skippedCount++;
+          continue;
+        }
+        seenSymbols.add(stock.symbol);
+        allStocks.push(stock);
+      }
+
+      pageCount++;
+
+      if (stocks.length < 20) {
+        done = true;
+        break;
+      }
     }
 
-    pageCount++;
-    if (pageCount % 50 === 0) {
+    if (pageCount % 30 === 0 && !done) {
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(0);
-      console.log(`[finviz] Progress: ${allStocks.length} stocks scraped (page ${pageCount}, ${elapsed}s)`);
+      console.log(`[finviz] Progress: ${allStocks.length} stocks scraped (${pageCount} pages, ${elapsed}s)`);
     }
 
-    if (stocks.length < 20) {
-      console.log(`[finviz] Last page (${stocks.length} stocks), done.`);
-      break;
-    }
-
-    offset += 20;
-    await sleep(REQUEST_DELAY);
+    offset += batch.length * 20;
+    if (!done) await sleep(REQUEST_DELAY);
   }
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
