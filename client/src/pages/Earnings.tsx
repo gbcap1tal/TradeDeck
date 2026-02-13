@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, FileText, Loader2, X } from "lucide-react";
 import { useLocation } from "wouter";
@@ -150,14 +150,26 @@ function getETDate(d: Date = new Date()): { year: number; month: number; day: nu
   return { year, month, day, dateStr };
 }
 
+function getETHour(): number {
+  const h = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', hour: 'numeric', hour12: false });
+  return parseInt(h);
+}
+
+function getPrevTradingDay(fromDateStr: string): string {
+  const [y, m, d] = fromDateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  do {
+    dt.setDate(dt.getDate() - 1);
+  } while (dt.getDay() === 0 || dt.getDay() === 6);
+  return getETDate(dt).dateStr;
+}
+
 export default function Earnings() {
   const etNow = getETDate();
   const todayStr = etNow.dateStr;
 
-  const yesterdayRaw = new Date();
-  yesterdayRaw.setDate(yesterdayRaw.getDate() - 1);
-  const etYesterday = getETDate(yesterdayRaw);
-  const yesterdayStr = etYesterday.dateStr;
+  const yesterdayStr = getPrevTradingDay(todayStr);
+  const twoDaysAgoStr = getPrevTradingDay(yesterdayStr);
 
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [currentYear, setCurrentYear] = useState(etNow.year);
@@ -169,13 +181,13 @@ export default function Earnings() {
 
   function isDateClickable(dateStr: string): boolean {
     if (dateStr >= todayStr) return true;
-    if (dateStr >= yesterdayStr) return true;
+    if (dateStr >= twoDaysAgoStr) return true;
     return false;
   }
 
   const { data: earnings = [], isLoading } = useQuery<EarningsItem[]>({
     queryKey: [`/api/earnings/calendar?date=${selectedDate}`],
-    refetchInterval: (selectedDate === todayStr || selectedDate === yesterdayStr) ? 120000 : false,
+    refetchInterval: (selectedDate >= twoDaysAgoStr && selectedDate <= todayStr) ? 120000 : false,
   });
 
   const { data: earningsDates = [] } = useQuery<string[]>({
@@ -197,6 +209,14 @@ export default function Earnings() {
 
   const earningsDatesSet = useMemo(() => new Set(earningsDates), [earningsDates]);
 
+  const [isAfterTransition, setIsAfterTransition] = useState(() => getETHour() >= 15);
+
+  useEffect(() => {
+    const check = () => setIsAfterTransition(getETHour() >= 15);
+    const id = setInterval(check, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   const { sections, totalCount } = useMemo(() => {
     const deduped = new Map<string, EarningsItem>();
     for (const item of earnings) {
@@ -209,34 +229,36 @@ export default function Earnings() {
 
     const amcItems = all.filter(e => e.timing === 'AMC');
     const bmoItems = all.filter(e => e.timing !== 'AMC');
-    const isYesterday = selectedDate === yesterdayStr;
     const isToday = selectedDate === todayStr;
     const isFuture = selectedDate > todayStr;
+    const isPast = selectedDate < todayStr;
 
     const result: { items: EarningsItem[]; label: string; badge: 'BMO' | 'AMC' }[] = [];
 
     if (isToday) {
-      if (showBMO) result.push({
-        items: bmoItems,
-        label: 'Pre-Market Movers — Before Open',
-        badge: 'BMO',
-      });
-      if (showAMC) result.push({
-        items: amcItems,
-        label: 'After Close — Upcoming',
-        badge: 'AMC',
-      });
-    } else if (isYesterday) {
-      if (showAMC) result.push({
-        items: amcItems,
-        label: 'Fresh Results — After Close',
-        badge: 'AMC',
-      });
-      if (showBMO) result.push({
-        items: bmoItems,
-        label: 'Already Traded — Before Open',
-        badge: 'BMO',
-      });
+      if (isAfterTransition) {
+        if (showAMC) result.push({
+          items: amcItems,
+          label: 'Fresh Results — After Close',
+          badge: 'AMC',
+        });
+        if (showBMO) result.push({
+          items: bmoItems,
+          label: 'Already Traded — Before Open',
+          badge: 'BMO',
+        });
+      } else {
+        if (showBMO) result.push({
+          items: bmoItems,
+          label: 'Pre-Market Movers — Before Open',
+          badge: 'BMO',
+        });
+        if (showAMC) result.push({
+          items: amcItems,
+          label: 'After Close — Upcoming',
+          badge: 'AMC',
+        });
+      }
     } else if (isFuture) {
       if (showBMO) result.push({
         items: bmoItems,
@@ -248,13 +270,13 @@ export default function Earnings() {
         label: 'After Market Close',
         badge: 'AMC',
       });
-    } else {
+    } else if (isPast) {
       if (showAMC) result.push({ items: amcItems, label: 'After Close', badge: 'AMC' });
       if (showBMO) result.push({ items: bmoItems, label: 'Before Open', badge: 'BMO' });
     }
 
     return { sections: result, totalCount: total };
-  }, [earnings, selectedDate, todayStr, yesterdayStr, showBMO, showAMC]);
+  }, [earnings, selectedDate, todayStr, showBMO, showAMC, isAfterTransition]);
 
   const prevMonth = () => {
     if (currentMonth === 1) {

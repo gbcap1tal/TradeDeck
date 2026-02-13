@@ -19,7 +19,7 @@ import { getUncachableStripeClient, getStripePublishableKey } from "./stripe/str
 import { db } from "./db";
 import { users } from "@shared/models/auth";
 import { freeUsers, earningsReports, waitlist } from "@shared/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, lt, sql } from "drizzle-orm";
 import * as fs from 'fs';
 import * as path from 'path';
 import bcrypt from 'bcryptjs';
@@ -1153,6 +1153,19 @@ function initBackgroundTasks() {
 
     if (totalFixed > 0) {
       console.log(`[earnings-watchdog] Total fixed: ${totalFixed} entries across today/yesterday`);
+    }
+
+    try {
+      const cutoffDate = new Date(et);
+      cutoffDate.setDate(cutoffDate.getDate() - 3);
+      const cutoffStr = `${cutoffDate.getFullYear()}-${String(cutoffDate.getMonth() + 1).padStart(2, '0')}-${String(cutoffDate.getDate()).padStart(2, '0')}`;
+      const deleted = await db.delete(earningsReports)
+        .where(lt(earningsReports.reportDate, cutoffStr));
+      if (deleted.rowCount && deleted.rowCount > 0) {
+        console.log(`[earnings-watchdog] Cleaned up ${deleted.rowCount} old earnings records (before ${cutoffStr})`);
+      }
+    } catch (cleanupErr: any) {
+      console.error(`[earnings-watchdog] Cleanup error: ${cleanupErr.message}`);
     }
   }, 10 * 60 * 1000);
 }
