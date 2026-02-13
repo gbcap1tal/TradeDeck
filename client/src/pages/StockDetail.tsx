@@ -945,7 +945,7 @@ export default function StockDetail() {
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="text-[#bf5af2]/60 flex-shrink-0"
+                    className="text-white/60 flex-shrink-0"
                     onClick={() => setAiSummaryOpen(true)}
                     data-testid="button-ai-summary"
                   >
