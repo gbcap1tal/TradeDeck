@@ -28,15 +28,16 @@ const PREVIEW_KEY = "__td_preview";
 
 (function initPreview() {
   try {
-    if (window.location.pathname === "/test") {
-      sessionStorage.setItem(PREVIEW_KEY, "1");
+    const p = window.location.pathname.replace(/\/+$/, "");
+    if (p === "/test") {
+      localStorage.setItem(PREVIEW_KEY, "1");
       window.history.replaceState(null, "", "/");
     }
   } catch {}
 })();
 
 function isPreviewMode() {
-  try { return sessionStorage.getItem(PREVIEW_KEY) === "1"; } catch { return false; }
+  try { return localStorage.getItem(PREVIEW_KEY) === "1"; } catch { return false; }
 }
 
 function PaymentGate({ children }: { children: React.ReactNode }) {
