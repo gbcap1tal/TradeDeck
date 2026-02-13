@@ -10,7 +10,7 @@ import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
 import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe } from "./api/breadth";
 import { getRSScore, getAllRSRatings } from "./api/rs";
-import { computeLeadersQualityBatch, getCachedLeadersQuality } from "./api/quality";
+import { computeLeadersQualityBatch, getCachedLeadersQuality, getPersistedScoresForSymbols, isBatchComputeRunning } from "./api/quality";
 import { sendAlert, clearFailures } from "./api/alerts";
 import { fetchEarningsCalendar, generateAiSummary, getEarningsDatesWithData } from "./api/earnings";
 import { getFirecrawlUsage } from "./api/transcripts";
@@ -713,6 +713,30 @@ function initBackgroundTasks() {
     } catch (err: any) {
       console.log(`[bg] YTD pre-warm error: ${err.message}`);
     }
+
+    try {
+      const qRatings = getAllRSRatings();
+      const qFinviz = getFinvizDataSync();
+      if (qFinviz) {
+        const qLookup: Record<string, number> = {};
+        for (const [_s, sd] of Object.entries(qFinviz)) {
+          for (const [_i, stocks] of Object.entries(sd.stocks)) {
+            for (const stock of stocks) qLookup[stock.symbol] = stock.marketCap;
+          }
+        }
+        const qSymbols: string[] = [];
+        for (const [sym, rs] of Object.entries(qRatings)) {
+          if (rs >= 80 && (qLookup[sym] || 0) >= 300) qSymbols.push(sym);
+        }
+        if (qSymbols.length > 0) {
+          console.log(`[bg] Pre-computing quality scores for ${qSymbols.length} leaders (RS>=80)...`);
+          const qScores = await computeLeadersQualityBatch(qSymbols);
+          console.log(`[bg] Quality scores pre-computed: ${Object.keys(qScores).length} stocks in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+        }
+      }
+    } catch (err: any) {
+      console.log(`[bg] Quality pre-compute error: ${err.message}`);
+    }
   }, 1000);
 
   let lastScheduledWindow = '';
@@ -811,6 +835,29 @@ function initBackgroundTasks() {
       } catch (err: any) {
         console.error(`[scheduler] Megatrend performance error: ${err.message}`);
         sendAlert('Megatrend Performance Refresh Failed', `Megatrend performance computation failed during ${windowLabel} refresh.\n\nError: ${(err as any).message}`, 'megatrend_perf');
+      }
+
+      try {
+        const qRatings = getAllRSRatings();
+        const qFinviz = getFinvizDataSync();
+        if (qFinviz) {
+          const qLookup: Record<string, number> = {};
+          for (const [_s, sd] of Object.entries(qFinviz)) {
+            for (const [_i, stocks] of Object.entries(sd.stocks)) {
+              for (const stock of stocks) qLookup[stock.symbol] = stock.marketCap;
+            }
+          }
+          const qSymbols: string[] = [];
+          for (const [sym, rs] of Object.entries(qRatings)) {
+            if (rs >= 80 && (qLookup[sym] || 0) >= 300) qSymbols.push(sym);
+          }
+          if (qSymbols.length > 0) {
+            const qScores = await computeLeadersQualityBatch(qSymbols);
+            console.log(`[scheduler] Quality scores refreshed: ${Object.keys(qScores).length} stocks`);
+          }
+        }
+      } catch (err: any) {
+        console.log(`[scheduler] Quality refresh error: ${err.message}`);
       }
 
       try {
@@ -1495,12 +1542,17 @@ export async function registerRoutes(
         return res.json({ scores: cached, ready: true });
       }
 
-      const hasSomeScores = Object.keys(cached).length > 0;
-      if (hasSomeScores) {
-        computeLeadersQualityBatch(symbols).catch(err =>
-          console.error(`[leaders-quality] Background compute failed: ${err.message}`)
-        );
-        return res.json({ scores: cached, ready: false });
+      const { scores: persisted, complete: persistedComplete } = getPersistedScoresForSymbols(symbols);
+      const merged = { ...persisted, ...cached };
+      const hasMergedScores = Object.keys(merged).length > 0;
+
+      if (hasMergedScores) {
+        if (!isBatchComputeRunning()) {
+          computeLeadersQualityBatch(symbols).catch(err =>
+            console.error(`[leaders-quality] Background compute failed: ${err.message}`)
+          );
+        }
+        return res.json({ scores: merged, ready: persistedComplete || Object.keys(merged).length >= symbols.length });
       }
 
       const scores = await computeLeadersQualityBatch(symbols);

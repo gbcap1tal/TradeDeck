@@ -5,8 +5,7 @@ import * as yahoo from './yahoo';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const _LEADERS_QUALITY_CACHE_PREFIX = 'leaders_quality_scores';
-const _LEADERS_QUALITY_TTL = 86400;
+const BATCH_CONCURRENCY = 10;
 
 const QUALITY_PERSIST_PATH = path.join(process.cwd(), '.cache', 'quality_scores.json');
 
@@ -323,8 +322,8 @@ export async function computeLeadersQualityBatch(symbols: string[]): Promise<Rec
   try {
     console.log(`[quality] Computing quality scores for ${toCompute.length} leaders (${Object.keys(scores).length} already cached)...`);
 
-    for (let i = 0; i < toCompute.length; i += 5) {
-      const batch = toCompute.slice(i, i + 5);
+    for (let i = 0; i < toCompute.length; i += BATCH_CONCURRENCY) {
+      const batch = toCompute.slice(i, i + BATCH_CONCURRENCY);
       const results = await Promise.allSettled(
         batch.map(async (sym) => {
           const score = await computeQualityScore(sym);
@@ -346,4 +345,20 @@ export async function computeLeadersQualityBatch(symbols: string[]): Promise<Rec
   }
 
   return scores;
+}
+
+export function getPersistedScoresForSymbols(symbols: string[]): { scores: Record<string, number>; complete: boolean } {
+  const scores: Record<string, number> = {};
+  const persisted = loadPersistedQualityScores();
+  if (!persisted) return { scores, complete: false };
+  for (const sym of symbols) {
+    if (sym in persisted) {
+      scores[sym] = persisted[sym];
+    }
+  }
+  return { scores, complete: symbols.every(s => s in scores) };
+}
+
+export function isBatchComputeRunning(): boolean {
+  return batchComputeInProgress;
 }
