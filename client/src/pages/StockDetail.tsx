@@ -423,9 +423,24 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
   const revValues = data.map(d => Math.abs(d.revenue));
   const epsValues = data.map(d => d.eps);
   const maxRev = Math.max(...revValues, 0.01);
+  const minRev = Math.min(...revValues.filter(v => v > 0), maxRev);
+  const epsAbsValues = epsValues.map(v => Math.abs(v)).filter(v => v > 0);
   const maxEpsAbs = Math.max(...epsValues.map(v => Math.abs(v)), 0.01);
+  const minEpsAbs = epsAbsValues.length > 0 ? Math.min(...epsAbsValues) : maxEpsAbs;
   const hasNegativeEps = epsValues.some(v => v < 0);
   const hasPositiveEps = epsValues.some(v => v > 0);
+
+  const scaleBar = (value: number, max: number, min: number) => {
+    if (value <= 0 || max <= 0) return 0;
+    const ratio = value / max;
+    const minRatio = min / max;
+    const BASE = 15;
+    const TOP = 92;
+    const sqrtNorm = minRatio < 1
+      ? (Math.sqrt(ratio) - Math.sqrt(minRatio)) / (1 - Math.sqrt(minRatio))
+      : 1;
+    return BASE + sqrtNorm * (TOP - BASE);
+  };
 
   const formatRev = (v: number) => {
     const abs = Math.abs(v);
@@ -577,8 +592,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
           <div className="flex-1 min-h-0 relative" data-testid="bars-revenue">
             <div className="absolute inset-0 flex items-end" style={{ gap: `${barGap}px` }}>
               {data.map((d, i) => {
-                const pct = maxRev > 0 ? Math.abs(d.revenue) / maxRev : 0;
-                const barPct = Math.max(pct * 100, 4);
+                const barPct = scaleBar(Math.abs(d.revenue), maxRev, minRev);
                 const isHov = hoveredRevIdx === i;
                 return (
                   <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0 h-full"
@@ -622,8 +636,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                 <div className="flex flex-col justify-end h-full">
                   <div className="flex items-end" style={{ gap: `${barGap}px`, flex: '3 1 0', minHeight: '20px' }}>
                     {data.map((d, i) => {
-                      const pct = d.eps >= 0 ? d.eps / maxEpsAbs : 0;
-                      const barPct = d.eps > 0 ? Math.max(pct * 100, 4) : 0;
+                      const barPct = d.eps > 0 ? scaleBar(d.eps, maxEpsAbs, minEpsAbs) : 0;
                       const isHov = hoveredEpsIdx === i;
                       return (
                         <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0 h-full"
@@ -643,8 +656,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                   <div className="border-t border-white/15" />
                   <div className="flex items-start" style={{ gap: `${barGap}px`, flex: '1 1 0' }}>
                     {data.map((d, i) => {
-                      const pct = d.eps < 0 ? Math.abs(d.eps) / maxEpsAbs : 0;
-                      const barPct = d.eps < 0 ? Math.max(pct * 100, 4) : 0;
+                      const barPct = d.eps < 0 ? scaleBar(Math.abs(d.eps), maxEpsAbs, minEpsAbs) : 0;
                       const isHov = hoveredEpsIdx === i;
                       return (
                         <div key={i} className="flex-1 flex flex-col items-center min-w-0 h-full"
@@ -667,8 +679,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                   <div className="border-t border-white/15" />
                   <div className="flex-1 flex items-start" style={{ gap: `${barGap}px` }}>
                     {data.map((d, i) => {
-                      const pct = maxEpsAbs > 0 ? Math.abs(d.eps) / maxEpsAbs : 0;
-                      const barPct = Math.max(pct * 100, 4);
+                      const barPct = scaleBar(Math.abs(d.eps), maxEpsAbs, minEpsAbs);
                       const isHov = hoveredEpsIdx === i;
                       return (
                         <div key={i} className="flex-1 flex flex-col items-center min-w-0 h-full"
@@ -689,8 +700,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
               ) : (
                 <div className="flex items-end h-full" style={{ gap: `${barGap}px` }}>
                   {data.map((d, i) => {
-                    const pct = maxEpsAbs > 0 ? Math.abs(d.eps) / maxEpsAbs : 0;
-                    const barPct = Math.max(pct * 100, 4);
+                    const barPct = scaleBar(Math.abs(d.eps), maxEpsAbs, minEpsAbs);
                     const isHov = hoveredEpsIdx === i;
                     return (
                       <div key={i} className="flex-1 flex flex-col items-center justify-end min-w-0 h-full"
