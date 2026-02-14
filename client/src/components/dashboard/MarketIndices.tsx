@@ -1,32 +1,6 @@
 import { useMarketIndices } from "@/hooks/use-market";
 import { ArrowUp, ArrowDown } from "lucide-react";
 
-function Sparkline({ data, color, width = 80, height = 28 }: { data: number[]; color: string; width?: number; height?: number }) {
-  if (!data || data.length < 2) return null;
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-
-  const points = data.map((value, i) => {
-    const x = (i / (data.length - 1)) * width;
-    const y = height - ((value - min) / range) * height;
-    return `${x},${y}`;
-  }).join(' ');
-
-  return (
-    <svg width={width} height={height} className="block">
-      <polyline
-        points={points}
-        fill="none"
-        stroke={color}
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 export function MarketIndices() {
   const { data: indices, isLoading } = useMarketIndices();
 
@@ -66,11 +40,10 @@ export function MarketIndices() {
               <div className="text-lg font-bold font-mono-nums tracking-tight text-white mb-1">
                 {index.symbol === 'VIX' ? '' : '$'}{index.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <div className="flex items-center justify-between gap-1">
+              <div className="flex items-center gap-1">
                 <span className="text-xs font-mono-nums font-medium" style={{ color }}>
                   {isPositive ? "+" : ""}{index.changePercent.toFixed(2)}%
                 </span>
-                <Sparkline data={index.sparkline || []} color={color} width={60} height={20} />
               </div>
             </div>
           );
