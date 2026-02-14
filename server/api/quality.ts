@@ -10,7 +10,7 @@ const BATCH_CONCURRENCY = 25;
 
 async function persistQualityScoresToDB(scores: Record<string, number>): Promise<void> {
   try {
-    const entries = Object.entries(scores).filter(([, v]) => typeof v === 'number' && v > 0);
+    const entries = Object.entries(scores).filter(([, v]) => typeof v === 'number');
     if (entries.length === 0) return;
     const batchSize = 100;
     for (let i = 0; i < entries.length; i += batchSize) {
@@ -39,7 +39,7 @@ async function loadPersistedQualityScoresFromDB(): Promise<Record<string, number
     const scores: Record<string, number> = {};
     const sevenDaysAgo = Date.now() - 7 * 24 * 3600 * 1000;
     for (const row of rows) {
-      if (row.updatedAt && row.updatedAt.getTime() > sevenDaysAgo && row.score > 0) {
+      if (row.updatedAt && row.updatedAt.getTime() > sevenDaysAgo) {
         scores[row.symbol] = row.score;
       }
     }
@@ -96,7 +96,7 @@ export async function computeQualityScore(sym: string): Promise<number> {
 
     const finvizData = snap.status === 'fulfilled' ? snap.value : null;
     if (!finvizData || !finvizData.snapshot || Object.keys(finvizData.snapshot).length === 0) {
-      return -1;
+      return 0;
     }
 
     const s = finvizData.snapshot;
@@ -269,7 +269,7 @@ export async function computeQualityScore(sym: string): Promise<number> {
     return rawTotal / 2;
   } catch (e: any) {
     console.error(`[quality] Error computing score for ${sym}: ${e.message}`);
-    return -1;
+    return 0;
   }
 }
 
@@ -280,12 +280,6 @@ let batchComputeInProgress = false;
 
 export function getCachedScoreForSymbol(sym: string): number | undefined {
   return getCached<number>(`${PER_SYMBOL_CACHE_PREFIX}${sym}`);
-}
-
-export function updateLeadersQualityScore(sym: string, score: number): void {
-  if (score <= 0) return;
-  setCache(`${PER_SYMBOL_CACHE_PREFIX}${sym}`, score, PER_SYMBOL_TTL);
-  persistQualityScoresToDB({ [sym]: score }).catch(() => {});
 }
 
 export function getCachedLeadersQuality(symbols: string[]): { scores: Record<string, number>; complete: boolean } {
@@ -336,7 +330,7 @@ export async function computeLeadersQualityBatch(symbols: string[]): Promise<Rec
         })
       );
       for (const r of results) {
-        if (r.status === 'fulfilled' && r.value.score >= 0) {
+        if (r.status === 'fulfilled') {
           scores[r.value.sym] = r.value.score;
           setCache(`${PER_SYMBOL_CACHE_PREFIX}${r.value.sym}`, r.value.score, PER_SYMBOL_TTL);
         }

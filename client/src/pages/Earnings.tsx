@@ -187,13 +187,11 @@ export default function Earnings() {
 
   const { data: earnings = [], isLoading } = useQuery<EarningsItem[]>({
     queryKey: [`/api/earnings/calendar?date=${selectedDate}`],
-    staleTime: 60000,
     refetchInterval: (selectedDate >= twoDaysAgoStr && selectedDate <= todayStr) ? 120000 : false,
   });
 
   const { data: earningsDates = [] } = useQuery<string[]>({
     queryKey: [`/api/earnings/dates?year=${currentYear}&month=${currentMonth}`],
-    staleTime: 300000,
   });
 
   const summaryMutation = useMutation({

@@ -20,7 +20,6 @@ export function useMarketIndices() {
       return res.json();
     },
     refetchInterval: 30000,
-    staleTime: 20000,
   });
 }
 
@@ -29,7 +28,6 @@ export function useSectorPerformance() {
     queryKey: ['/api/market/sectors'],
     queryFn: () => fetchWithWarmingRetry('/api/market/sectors'),
     refetchInterval: 120000,
-    staleTime: 90000,
     retry: (failureCount, error) => {
       if (error?.message === "Data warming up") return failureCount < 60;
       return false;
@@ -46,7 +44,6 @@ export function useSectorRotation() {
       return data.sectors || [];
     },
     refetchInterval: 300000,
-    staleTime: 240000,
     retry: (failureCount, error) => {
       if (error?.message === "Data warming up") return failureCount < 60;
       return false;

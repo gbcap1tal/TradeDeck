@@ -2,7 +2,6 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import compression from "compression";
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from "./stripe/stripeClient";
 import { WebhookHandlers } from "./stripe/webhookHandlers";
@@ -21,7 +20,6 @@ if (missingOptional.length > 0) {
 }
 
 const app = express();
-app.use(compression());
 const httpServer = createServer(app);
 
 declare module "http" {

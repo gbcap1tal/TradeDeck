@@ -12,8 +12,7 @@ export function useStockQuote(symbol: string) {
       return res.json();
     },
     enabled: !!symbol,
-    refetchInterval: 30000,
-    staleTime: 20000,
+    refetchInterval: 15000,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 8000),
   });
@@ -28,7 +27,6 @@ export function useStockHistory(symbol: string, range: string = '1M') {
       return res.json();
     },
     enabled: !!symbol,
-    staleTime: 300_000,
     retry: 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });
@@ -64,7 +62,6 @@ export function useStockQuality(symbol: string, rsTimeframe: string = 'current')
     enabled: !!symbol,
     retry: 4,
     retryDelay: (attempt) => Math.min(2000 * 2 ** attempt, 15000),
-    staleTime: 60000,
   });
 }
 
@@ -83,7 +80,6 @@ export function useStockNews(symbol: string) {
     enabled: !!symbol,
     retry: 3,
     retryDelay: (attempt) => Math.min(2000 * 2 ** attempt, 10000),
-    staleTime: 120000,
   });
 }
 
@@ -96,7 +92,6 @@ export function useInsiderBuying(symbol: string) {
       return res.json();
     },
     enabled: !!symbol,
-    staleTime: 300_000,
     retry: 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });
@@ -111,7 +106,6 @@ export function useStockSnapshot(symbol: string) {
       return res.json();
     },
     enabled: !!symbol,
-    staleTime: 300_000,
     retry: 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });

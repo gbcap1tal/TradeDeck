@@ -10,7 +10,7 @@ import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
 import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe, isUSMarketOpen, getFrozenBreadth } from "./api/breadth";
 import { getRSScore, getAllRSRatings } from "./api/rs";
-import { computeLeadersQualityBatch, getCachedLeadersQuality, getPersistedScoresForSymbols, isBatchComputeRunning, warmUpQualityCache, updateLeadersQualityScore } from "./api/quality";
+import { computeLeadersQualityBatch, getCachedLeadersQuality, getPersistedScoresForSymbols, isBatchComputeRunning, warmUpQualityCache } from "./api/quality";
 import { sendAlert, clearFailures } from "./api/alerts";
 import { fetchEarningsCalendar, generateAiSummary, getEarningsDatesWithData } from "./api/earnings";
 import { getFirecrawlUsage } from "./api/transcripts";
@@ -661,17 +661,6 @@ function initBackgroundTasks() {
 
     console.log(`[bg] Phase 1 complete in ${((Date.now() - bgStart) / 1000).toFixed(1)}s — dashboard data ready`);
 
-    try {
-      const etNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
-      const todayStr = `${etNow.getFullYear()}-${String(etNow.getMonth() + 1).padStart(2, '0')}-${String(etNow.getDate()).padStart(2, '0')}`;
-      const earningsData = await fetchEarningsCalendar(todayStr, false);
-      const earningsCacheKey = `earnings_cal_${todayStr}`;
-      setCache(earningsCacheKey, earningsData, CACHE_TTL.EARNINGS);
-      console.log(`[bg] Earnings pre-warmed: ${earningsData.length} items for ${todayStr}`);
-    } catch (err: any) {
-      console.log(`[bg] Earnings pre-warm error: ${err.message}`);
-    }
-
     // Phase 2: Slow Finviz full stock universe scrape + industry enrichment
     console.log(`[bg] Phase 2: Loading Finviz stock universe... ${isDuringMarket ? '(market hours — force refresh)' : '(off hours — using cache)'}`);
     const finvizData = await getFinvizData(isDuringMarket);
@@ -747,7 +736,7 @@ function initBackgroundTasks() {
     } catch (err: any) {
       console.log(`[bg] Quality pre-compute error: ${err.message}`);
     }
-  }, 5000);
+  }, 1000);
 
   let lastScheduledWindow = '';
   let isFullRefreshRunning = false;
@@ -932,7 +921,7 @@ function initBackgroundTasks() {
       lastScheduledWindow = windowKey;
       runFullDataRefresh(windowKey);
     }
-  }, 90000);
+  }, 60000);
 
   let overnightDigestDate = '';
   let overnightDigestDone = false;
@@ -1032,7 +1021,7 @@ function initBackgroundTasks() {
       console.error(`[rs-scheduler] Failed to spawn RS script: ${err.message}`);
       sendAlert('RS Ratings Script Spawn Failed', `Could not start RS computation script.\n\nError: ${err.message}`, 'general');
     });
-  }, 120000);
+  }, 60000);
 
   // === SELF-HEALING WATCHDOG ===
   // Checks every 5 minutes if market data is broken (0 stocks, missing breadth/indices)
@@ -1159,7 +1148,7 @@ function initBackgroundTasks() {
     } finally {
       selfHealingInProgress = false;
     }
-  }, 8 * 60 * 1000); // every 8 minutes
+  }, 5 * 60 * 1000); // every 5 minutes
 
   let lastEarningsWatchdogRun = 0;
   const EARNINGS_WATCHDOG_COOLDOWN = 10 * 60 * 1000;
@@ -1296,10 +1285,7 @@ export async function registerRoutes(
         }
         if (qSymbols.length > 0 && !isBatchComputeRunning()) {
           console.log(`[warm-up] First API request — triggering background quality refresh for ${qSymbols.length} leaders`);
-          warmUpQualityCache().then(count => {
-            if (count > 0) console.log(`[warm-up] Loaded ${count} persisted quality scores before batch`);
-            return computeLeadersQualityBatch(qSymbols);
-          }).catch(err =>
+          computeLeadersQualityBatch(qSymbols).catch(err =>
             console.error(`[warm-up] Quality refresh failed: ${err.message}`)
           );
         }
@@ -1466,21 +1452,7 @@ export async function registerRoutes(
         await db.delete(earningsReports).where(eq(earningsReports.reportDate, dateStr));
       }
 
-      if (!forceRefresh) {
-        const earningsCacheKey = `earnings_cal_${dateStr}`;
-        const cachedEarnings = getCached<any>(earningsCacheKey);
-        if (cachedEarnings) return res.json(cachedEarnings);
-
-        const staleEarnings = getStale<any>(earningsCacheKey);
-        if (staleEarnings) {
-          backgroundRefresh(earningsCacheKey, () => fetchEarningsCalendar(dateStr, false), CACHE_TTL.EARNINGS);
-          return res.json(staleEarnings);
-        }
-      }
-
       const data = await fetchEarningsCalendar(dateStr, forceRefresh);
-      const earningsCacheKey = `earnings_cal_${dateStr}`;
-      setCache(earningsCacheKey, data, CACHE_TTL.EARNINGS);
       res.json(data);
     } catch (e: any) {
       console.error('Earnings calendar error:', e.message);
@@ -1614,14 +1586,6 @@ export async function registerRoutes(
       }
 
       const merged = { ...cached };
-      for (const sym of symbols) {
-        if (!(sym in merged)) {
-          const detailCache = getCached<any>(`quality_response_${sym}_current`);
-          if (detailCache?.qualityScore?.total != null) {
-            merged[sym] = detailCache.qualityScore.total;
-          }
-        }
-      }
       if (Object.keys(merged).length < symbols.length) {
         const { scores: persisted } = await getPersistedScoresForSymbols(symbols);
         for (const [sym, score] of Object.entries(persisted)) {
@@ -1629,8 +1593,8 @@ export async function registerRoutes(
         }
       }
 
-      const mergedCount = Object.keys(merged).length;
-      const hasAnyScores = mergedCount > 0;
+      const coverage = Object.keys(merged).length / symbols.length;
+      const hasGoodCoverage = coverage >= 0.8;
 
       if (!complete && !isBatchComputeRunning()) {
         computeLeadersQualityBatch(symbols).catch(err =>
@@ -1638,7 +1602,7 @@ export async function registerRoutes(
         );
       }
 
-      res.json({ scores: merged, ready: hasAnyScores });
+      res.json({ scores: merged, ready: hasGoodCoverage });
     } catch (err: any) {
       console.error(`[leaders-quality] Error: ${err.message}`);
       res.json({ scores: {}, ready: false });
@@ -1720,10 +1684,6 @@ export async function registerRoutes(
     const sectorName = decodeURIComponent(req.params.sectorName);
     const industryName = decodeURIComponent(req.params.industryName);
 
-    const industryCacheKey = `industry_${sectorName}_${industryName}`;
-    const cachedIndustry = getCached<any>(industryCacheKey);
-    if (cachedIndustry) return res.json(cachedIndustry);
-
     const sectorConfig = SECTORS_DATA.find(s => s.name.toLowerCase() === sectorName.toLowerCase());
     if (!sectorConfig) {
       return res.status(404).json({ message: "Sector not found" });
@@ -1776,7 +1736,7 @@ export async function registerRoutes(
 
     stocks.sort((a, b) => (b.marketCap || 0) - (a.marketCap || 0));
 
-    const industryResult = {
+    res.json({
       industry: {
         name: industryName,
         sector: sectorName,
@@ -1788,10 +1748,7 @@ export async function registerRoutes(
         totalStocks: stockDefs.length,
       },
       stocks,
-    };
-    const industryTtl = isUSMarketOpen() ? 120 : 600;
-    setCache(industryCacheKey, industryResult, industryTtl);
-    res.json(industryResult);
+    });
   });
 
   app.get('/api/stocks/search', (req, res) => {
@@ -1801,47 +1758,18 @@ export async function registerRoutes(
     res.json(results);
   });
 
-  const quoteCache = new Map<string, { data: any; ts: number }>();
-  const QUOTE_CACHE_TTL = 30000;
-
   app.get('/api/stocks/:symbol/quote', async (req, res) => {
     const { symbol } = req.params;
-    const sym = symbol.toUpperCase();
-    const cacheKey = sym;
-    const cached = quoteCache.get(cacheKey);
-    if (cached && Date.now() - cached.ts < QUOTE_CACHE_TTL) {
-      return res.json(cached.data);
-    }
-
-    if (cached) {
-      backgroundRefresh(`stock_quote_${sym}`, async () => {
-        const quote = await yahoo.getQuote(sym);
-        if (!quote) return cached.data;
-        const profile = await fmp.getCompanyProfile(sym);
-        const result = {
-          ...quote,
-          sector: quote.sector || profile?.sector || '',
-          industry: quote.industry || profile?.industry || '',
-          rs: 0,
-        };
-        quoteCache.set(cacheKey, { data: result, ts: Date.now() });
-        return result;
-      }, CACHE_TTL.QUOTE);
-      return res.json(cached.data);
-    }
-
     try {
-      const quote = await yahoo.getQuote(sym);
+      const quote = await yahoo.getQuote(symbol.toUpperCase());
       if (quote) {
-        const profile = await fmp.getCompanyProfile(sym);
-        const result = {
+        const profile = await fmp.getCompanyProfile(symbol.toUpperCase());
+        return res.json({
           ...quote,
           sector: quote.sector || profile?.sector || '',
           industry: quote.industry || profile?.industry || '',
           rs: 0,
-        };
-        quoteCache.set(cacheKey, { data: result, ts: Date.now() });
-        return res.json(result);
+        });
       }
     } catch (e: any) {
       if (e instanceof yahoo.RateLimitError || e.name === 'RateLimitError') {
@@ -1864,22 +1792,6 @@ export async function registerRoutes(
     return res.json([]);
   });
 
-  async function computeQualityBackground(sym: string, rsTimeframe: string, cacheKey: string) {
-    try {
-      const port = process.env.PORT || 5000;
-      const url = `http://localhost:${port}/api/stocks/${sym}/quality?rsTimeframe=${rsTimeframe}&_skipStale=1`;
-      const response = await fetch(url, { signal: AbortSignal.timeout(90000) });
-      if (response.ok) {
-        const data = await response.json();
-        if (!data._failed) {
-          setCache(cacheKey, data, CACHE_TTL.QUOTE);
-        }
-      }
-    } catch (err: any) {
-      console.error(`[quality-bg] Background refresh failed for ${sym}: ${err.message}`);
-    }
-  }
-
   app.get('/api/stocks/:symbol/quality', async (req, res) => {
     const { symbol } = req.params;
     const sym = symbol.toUpperCase();
@@ -1896,19 +1808,6 @@ export async function registerRoutes(
     const qualityCacheKey = `quality_response_${sym}_${rsTimeframe}`;
     const cachedQuality = getCached<any>(qualityCacheKey);
     if (cachedQuality) return res.json(cachedQuality);
-
-    const skipStale = req.query._skipStale === '1';
-    if (!skipStale) {
-      const staleQualityEarly = getStale<any>(qualityCacheKey);
-      if (staleQualityEarly) {
-        setCache(qualityCacheKey, staleQualityEarly, CACHE_TTL.QUOTE);
-        if (!isRefreshing(qualityCacheKey)) {
-          markRefreshing(qualityCacheKey);
-          computeQualityBackground(sym, rsTimeframe, qualityCacheKey).finally(() => clearRefreshing(qualityCacheKey));
-        }
-        return res.json(staleQualityEarly);
-      }
-    }
 
     try {
       const parsePercent = (val: string | undefined): number => {
@@ -2336,7 +2235,6 @@ export async function registerRoutes(
         },
       };
       setCache(qualityCacheKey, qualityResponse, CACHE_TTL.QUOTE);
-      updateLeadersQualityScore(sym, totalScore);
       return res.json(qualityResponse);
     } catch (e: any) {
       console.error(`Quality error for ${symbol}:`, e.message);
