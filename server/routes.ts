@@ -2208,7 +2208,7 @@ export async function registerRoutes(
             if (prev.eps !== 0) result[i].epsYoY = Math.round(((result[i].eps - prev.eps) / Math.abs(prev.eps)) * 1000) / 10;
           }
 
-          return res.json(result);
+          if (result.length > 0) return res.json(result);
         }
 
         const _now = new Date();
@@ -2219,53 +2219,55 @@ export async function registerRoutes(
         const displayEstimates = estimates.slice(0, 4);
         const display = [...displayActuals, ...displayEstimates];
 
-        const result = display.map(e => {
-          const m = e.fiscalPeriod.match(/(\d{4})Q(\d)/);
-          const label = m ? `Q${m[2]} '${m[1].slice(-2)}` : e.fiscalPeriod;
-          const isEst = e.epsActual == null && e.salesActual == null;
-          const rev = isEst
-            ? Math.round((e.salesEstimate || 0) * 100) / 100
-            : Math.round((e.salesActual || 0) * 100) / 100;
-          const eps = isEst ? (e.epsEstimate || 0) : (e.epsActual || 0);
+        if (display.length > 0) {
+          const result = display.map(e => {
+            const m = e.fiscalPeriod.match(/(\d{4})Q(\d)/);
+            const label = m ? `Q${m[2]} '${m[1].slice(-2)}` : e.fiscalPeriod;
+            const isEst = e.epsActual == null && e.salesActual == null;
+            const rev = isEst
+              ? Math.round((e.salesEstimate || 0) * 100) / 100
+              : Math.round((e.salesActual || 0) * 100) / 100;
+            const eps = isEst ? (e.epsEstimate || 0) : (e.epsActual || 0);
 
-          const surprise = (!isEst && e.epsEstimate != null && e.epsActual != null && e.epsEstimate !== 0)
-            ? Math.round(((e.epsActual - e.epsEstimate) / Math.abs(e.epsEstimate)) * 1000) / 10
-            : undefined;
+            const surprise = (!isEst && e.epsEstimate != null && e.epsActual != null && e.epsEstimate !== 0)
+              ? Math.round(((e.epsActual - e.epsEstimate) / Math.abs(e.epsEstimate)) * 1000) / 10
+              : undefined;
 
-          return {
-            quarter: label,
-            revenue: rev,
-            eps: Math.round(eps * 100) / 100,
-            revenueYoY: null as number | null,
-            epsYoY: null as number | null,
-            isEstimate: isEst,
-            epsEstimate: e.epsEstimate != null ? Math.round(e.epsEstimate * 100) / 100 : undefined,
-            epsSurprise: surprise,
-            salesEstimate: e.salesEstimate != null ? Math.round(e.salesEstimate * 100) / 100 : undefined,
-            numAnalysts: e.epsAnalysts ?? undefined,
-          };
-        });
+            return {
+              quarter: label,
+              revenue: rev,
+              eps: Math.round(eps * 100) / 100,
+              revenueYoY: null as number | null,
+              epsYoY: null as number | null,
+              isEstimate: isEst,
+              epsEstimate: e.epsEstimate != null ? Math.round(e.epsEstimate * 100) / 100 : undefined,
+              epsSurprise: surprise,
+              salesEstimate: e.salesEstimate != null ? Math.round(e.salesEstimate * 100) / 100 : undefined,
+              numAnalysts: e.epsAnalysts ?? undefined,
+            };
+          });
 
-        const qKeyMap = new Map<string, number>();
-        for (let i = 0; i < result.length; i++) {
-          const m2 = result[i].quarter.match(/Q(\d)\s+'(\d{2})/);
-          if (m2) qKeyMap.set(`${m2[1]}Q20${m2[2]}`, i);
-        }
-        for (let i = 0; i < result.length; i++) {
-          const m2 = result[i].quarter.match(/Q(\d)\s+'(\d{2})/);
-          if (!m2) continue;
-          const qNum = parseInt(m2[1]);
-          const yr = 2000 + parseInt(m2[2]);
-          const prevIdx = qKeyMap.get(`${qNum}Q${yr - 1}`);
-          if (prevIdx != null) {
-            const prevRev = result[prevIdx].revenue;
-            const prevEps = result[prevIdx].eps;
-            if (prevRev !== 0) result[i].revenueYoY = Math.round(((result[i].revenue - prevRev) / Math.abs(prevRev)) * 1000) / 10;
-            if (prevEps !== 0) result[i].epsYoY = Math.round(((result[i].eps - prevEps) / Math.abs(prevEps)) * 1000) / 10;
+          const qKeyMap = new Map<string, number>();
+          for (let i = 0; i < result.length; i++) {
+            const m2 = result[i].quarter.match(/Q(\d)\s+'(\d{2})/);
+            if (m2) qKeyMap.set(`${m2[1]}Q20${m2[2]}`, i);
           }
-        }
+          for (let i = 0; i < result.length; i++) {
+            const m2 = result[i].quarter.match(/Q(\d)\s+'(\d{2})/);
+            if (!m2) continue;
+            const qNum = parseInt(m2[1]);
+            const yr = 2000 + parseInt(m2[2]);
+            const prevIdx = qKeyMap.get(`${qNum}Q${yr - 1}`);
+            if (prevIdx != null) {
+              const prevRev = result[prevIdx].revenue;
+              const prevEps = result[prevIdx].eps;
+              if (prevRev !== 0) result[i].revenueYoY = Math.round(((result[i].revenue - prevRev) / Math.abs(prevRev)) * 1000) / 10;
+              if (prevEps !== 0) result[i].epsYoY = Math.round(((result[i].eps - prevEps) / Math.abs(prevEps)) * 1000) / 10;
+            }
+          }
 
-        return res.json(result);
+          return res.json(result);
+        }
       }
     } catch (e: any) {
       console.error(`Finviz earnings error for ${sym}:`, e.message);

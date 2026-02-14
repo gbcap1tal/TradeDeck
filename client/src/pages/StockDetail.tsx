@@ -372,12 +372,12 @@ interface EarningsQuarterData {
 
 function EarningsSalesChart({ symbol }: { symbol: string }) {
   const [view, setView] = useState<'quarterly' | 'annual'>('quarterly');
-  const { data: rawData, isLoading } = useStockEarnings(symbol, view);
+  const { data: rawData, isLoading, isError } = useStockEarnings(symbol, view);
   const [hoveredRevIdx, setHoveredRevIdx] = useState<number | null>(null);
   const [hoveredEpsIdx, setHoveredEpsIdx] = useState<number | null>(null);
 
   if (isLoading) return <div className="glass-card rounded-xl shimmer h-full" />;
-  if (!rawData || !Array.isArray(rawData) || rawData.length === 0) {
+  if (isError || !rawData || !Array.isArray(rawData) || rawData.length === 0) {
     return (
       <div className="glass-card rounded-xl p-6 flex flex-col items-center justify-center h-full min-h-[200px] gap-2" data-testid="earnings-empty-state">
         <span className="text-muted-foreground text-sm" data-testid="text-earnings-unavailable">No earnings data available for this stock</span>

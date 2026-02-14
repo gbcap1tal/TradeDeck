@@ -23,10 +23,12 @@ export function useStockHistory(symbol: string, range: string = '1M') {
     queryKey: ['/api/stocks', symbol, 'history', range],
     queryFn: async () => {
       const res = await fetch(`/api/stocks/${symbol}/history?range=${range}`, { credentials: "include" });
-      if (!res.ok) return [];
+      if (!res.ok) throw new Error(`History fetch failed: ${res.status}`);
       return res.json();
     },
     enabled: !!symbol,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });
 }
 
@@ -35,10 +37,13 @@ export function useStockEarnings(symbol: string, view: 'quarterly' | 'annual' = 
     queryKey: ['/api/stocks', symbol, 'earnings', view],
     queryFn: async () => {
       const res = await fetch(`/api/stocks/${symbol}/earnings?view=${view}`, { credentials: "include" });
-      if (!res.ok) return null;
+      if (!res.ok) throw new Error(`Earnings fetch failed: ${res.status}`);
       return res.json();
     },
     enabled: !!symbol,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -47,10 +52,12 @@ export function useStockQuality(symbol: string, rsTimeframe: string = 'current')
     queryKey: ['/api/stocks', symbol, 'quality', rsTimeframe],
     queryFn: async () => {
       const res = await fetch(`/api/stocks/${symbol}/quality?rsTimeframe=${rsTimeframe}`, { credentials: "include" });
-      if (!res.ok) return null;
+      if (!res.ok) throw new Error(`Quality fetch failed: ${res.status}`);
       return res.json();
     },
     enabled: !!symbol,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });
 }
 
@@ -83,9 +90,11 @@ export function useStockSnapshot(symbol: string) {
     queryKey: ['/api/stocks', symbol, 'snapshot'],
     queryFn: async () => {
       const res = await fetch(`/api/stocks/${symbol}/snapshot`, { credentials: "include" });
-      if (!res.ok) return null;
+      if (!res.ok) throw new Error(`Snapshot fetch failed: ${res.status}`);
       return res.json();
     },
     enabled: !!symbol,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });
 }
