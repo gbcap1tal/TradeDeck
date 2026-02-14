@@ -1769,6 +1769,11 @@ export async function registerRoutes(
       trend: { weinsteinStage: 1, aboveEma10: false, aboveEma20: false, aboveSma50: false, aboveSma200: false, distFromSma50: 0, overextensionFlag: '<4', atrMultiple: 0 },
     };
 
+    const rsTimeframe = (req.query.rsTimeframe as string) || 'current';
+    const qualityCacheKey = `quality_response_${sym}_${rsTimeframe}`;
+    const cachedQuality = getCached<any>(qualityCacheKey);
+    if (cachedQuality) return res.json(cachedQuality);
+
     try {
       const snap = await scrapeFinvizQuote(sym);
       if (!snap || !snap.snapshot || Object.keys(snap.snapshot).length === 0) {
@@ -2140,7 +2145,7 @@ export async function registerRoutes(
       else if (totalScore >= 5.0) interpretation = 'Watchlist';
       else interpretation = 'Pass';
 
-      return res.json({
+      const qualityResponse = {
         qualityScore: {
           total: totalScore,
           pillars: {
@@ -2156,7 +2161,7 @@ export async function registerRoutes(
           marketCap,
           floatShares,
           rsVsSpy: rsRating,
-          rsTimeframe: req.query.rsTimeframe || 'current',
+          rsTimeframe: rsTimeframe,
           adr,
           instOwnership,
           numInstitutions: 0,
@@ -2192,7 +2197,9 @@ export async function registerRoutes(
           overextensionFlag,
           atrMultiple,
         },
-      });
+      };
+      setCache(qualityCacheKey, qualityResponse, CACHE_TTL.QUOTE);
+      return res.json(qualityResponse);
     } catch (e: any) {
       console.error(`Quality error for ${symbol}:`, e.message);
       return res.json(defaultResponse);
