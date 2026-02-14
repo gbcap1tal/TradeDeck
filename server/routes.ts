@@ -661,6 +661,17 @@ function initBackgroundTasks() {
 
     console.log(`[bg] Phase 1 complete in ${((Date.now() - bgStart) / 1000).toFixed(1)}s — dashboard data ready`);
 
+    try {
+      const etNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      const todayStr = `${etNow.getFullYear()}-${String(etNow.getMonth() + 1).padStart(2, '0')}-${String(etNow.getDate()).padStart(2, '0')}`;
+      const earningsData = await fetchEarningsCalendar(todayStr, false);
+      const earningsCacheKey = `earnings_cal_${todayStr}`;
+      setCache(earningsCacheKey, earningsData, CACHE_TTL.EARNINGS);
+      console.log(`[bg] Earnings pre-warmed: ${earningsData.length} items for ${todayStr}`);
+    } catch (err: any) {
+      console.log(`[bg] Earnings pre-warm error: ${err.message}`);
+    }
+
     // Phase 2: Slow Finviz full stock universe scrape + industry enrichment
     console.log(`[bg] Phase 2: Loading Finviz stock universe... ${isDuringMarket ? '(market hours — force refresh)' : '(off hours — using cache)'}`);
     const finvizData = await getFinvizData(isDuringMarket);
@@ -1452,7 +1463,21 @@ export async function registerRoutes(
         await db.delete(earningsReports).where(eq(earningsReports.reportDate, dateStr));
       }
 
+      if (!forceRefresh) {
+        const earningsCacheKey = `earnings_cal_${dateStr}`;
+        const cachedEarnings = getCached<any>(earningsCacheKey);
+        if (cachedEarnings) return res.json(cachedEarnings);
+
+        const staleEarnings = getStale<any>(earningsCacheKey);
+        if (staleEarnings) {
+          backgroundRefresh(earningsCacheKey, () => fetchEarningsCalendar(dateStr, false), CACHE_TTL.EARNINGS);
+          return res.json(staleEarnings);
+        }
+      }
+
       const data = await fetchEarningsCalendar(dateStr, forceRefresh);
+      const earningsCacheKey = `earnings_cal_${dateStr}`;
+      setCache(earningsCacheKey, data, CACHE_TTL.EARNINGS);
       res.json(data);
     } catch (e: any) {
       console.error('Earnings calendar error:', e.message);
@@ -1593,8 +1618,8 @@ export async function registerRoutes(
         }
       }
 
-      const coverage = Object.keys(merged).length / symbols.length;
-      const hasGoodCoverage = coverage >= 0.8;
+      const mergedCount = Object.keys(merged).length;
+      const hasAnyScores = mergedCount > 0;
 
       if (!complete && !isBatchComputeRunning()) {
         computeLeadersQualityBatch(symbols).catch(err =>
@@ -1602,7 +1627,7 @@ export async function registerRoutes(
         );
       }
 
-      res.json({ scores: merged, ready: hasGoodCoverage });
+      res.json({ scores: merged, ready: hasAnyScores });
     } catch (err: any) {
       console.error(`[leaders-quality] Error: ${err.message}`);
       res.json({ scores: {}, ready: false });
@@ -1770,16 +1795,34 @@ export async function registerRoutes(
 
   app.get('/api/stocks/:symbol/quote', async (req, res) => {
     const { symbol } = req.params;
-    const cacheKey = symbol.toUpperCase();
+    const sym = symbol.toUpperCase();
+    const cacheKey = sym;
     const cached = quoteCache.get(cacheKey);
     if (cached && Date.now() - cached.ts < QUOTE_CACHE_TTL) {
       return res.json(cached.data);
     }
 
+    if (cached) {
+      backgroundRefresh(`stock_quote_${sym}`, async () => {
+        const quote = await yahoo.getQuote(sym);
+        if (!quote) return cached.data;
+        const profile = await fmp.getCompanyProfile(sym);
+        const result = {
+          ...quote,
+          sector: quote.sector || profile?.sector || '',
+          industry: quote.industry || profile?.industry || '',
+          rs: 0,
+        };
+        quoteCache.set(cacheKey, { data: result, ts: Date.now() });
+        return result;
+      }, CACHE_TTL.QUOTE);
+      return res.json(cached.data);
+    }
+
     try {
-      const quote = await yahoo.getQuote(cacheKey);
+      const quote = await yahoo.getQuote(sym);
       if (quote) {
-        const profile = await fmp.getCompanyProfile(cacheKey);
+        const profile = await fmp.getCompanyProfile(sym);
         const result = {
           ...quote,
           sector: quote.sector || profile?.sector || '',
@@ -1794,9 +1837,6 @@ export async function registerRoutes(
         return res.status(503).json({ message: "Temporarily unavailable, please retry" });
       }
       console.error(`Quote error for ${symbol}:`, e.message);
-      if (cached) {
-        return res.json(cached.data);
-      }
     }
     return res.status(404).json({ message: "Stock not found" });
   });
@@ -1812,6 +1852,22 @@ export async function registerRoutes(
     }
     return res.json([]);
   });
+
+  async function computeQualityBackground(sym: string, rsTimeframe: string, cacheKey: string) {
+    try {
+      const port = process.env.PORT || 5000;
+      const url = `http://localhost:${port}/api/stocks/${sym}/quality?rsTimeframe=${rsTimeframe}&_skipStale=1`;
+      const response = await fetch(url, { signal: AbortSignal.timeout(90000) });
+      if (response.ok) {
+        const data = await response.json();
+        if (!data._failed) {
+          setCache(cacheKey, data, CACHE_TTL.QUOTE);
+        }
+      }
+    } catch (err: any) {
+      console.error(`[quality-bg] Background refresh failed for ${sym}: ${err.message}`);
+    }
+  }
 
   app.get('/api/stocks/:symbol/quality', async (req, res) => {
     const { symbol } = req.params;
@@ -1829,6 +1885,19 @@ export async function registerRoutes(
     const qualityCacheKey = `quality_response_${sym}_${rsTimeframe}`;
     const cachedQuality = getCached<any>(qualityCacheKey);
     if (cachedQuality) return res.json(cachedQuality);
+
+    const skipStale = req.query._skipStale === '1';
+    if (!skipStale) {
+      const staleQualityEarly = getStale<any>(qualityCacheKey);
+      if (staleQualityEarly) {
+        setCache(qualityCacheKey, staleQualityEarly, CACHE_TTL.QUOTE);
+        if (!isRefreshing(qualityCacheKey)) {
+          markRefreshing(qualityCacheKey);
+          computeQualityBackground(sym, rsTimeframe, qualityCacheKey).finally(() => clearRefreshing(qualityCacheKey));
+        }
+        return res.json(staleQualityEarly);
+      }
+    }
 
     try {
       const parsePercent = (val: string | undefined): number => {

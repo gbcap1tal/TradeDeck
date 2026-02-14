@@ -28,6 +28,7 @@ export function useStockHistory(symbol: string, range: string = '1M') {
       return res.json();
     },
     enabled: !!symbol,
+    staleTime: 300_000,
     retry: 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });
@@ -95,6 +96,7 @@ export function useInsiderBuying(symbol: string) {
       return res.json();
     },
     enabled: !!symbol,
+    staleTime: 300_000,
     retry: 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });
@@ -109,6 +111,7 @@ export function useStockSnapshot(symbol: string) {
       return res.json();
     },
     enabled: !!symbol,
+    staleTime: 300_000,
     retry: 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });
