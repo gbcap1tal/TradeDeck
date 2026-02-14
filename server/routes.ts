@@ -595,12 +595,12 @@ function initBackgroundTasks() {
   if (bgInitialized) return;
   bgInitialized = true;
 
-  const warmCount = warmUpQualityCache();
-  if (warmCount > 0) {
-    console.log(`[bg] Quality cache warm-up: loaded ${warmCount} persisted scores into memory`);
-  }
-
   setTimeout(async () => {
+    const warmCount = await warmUpQualityCache();
+    if (warmCount > 0) {
+      console.log(`[bg] Quality cache warm-up: loaded ${warmCount} persisted scores from DB into memory`);
+    }
+
     console.log('[bg] Starting background data pre-computation...');
     const bgStart = Date.now();
 
@@ -1587,7 +1587,7 @@ export async function registerRoutes(
 
       const merged = { ...cached };
       if (Object.keys(merged).length < symbols.length) {
-        const { scores: persisted } = getPersistedScoresForSymbols(symbols);
+        const { scores: persisted } = await getPersistedScoresForSymbols(symbols);
         for (const [sym, score] of Object.entries(persisted)) {
           if (!(sym in merged)) merged[sym] = score;
         }

@@ -2,31 +2,52 @@ import { scrapeFinvizQuote, scrapeFinvizInsiderBuying } from './finviz';
 import { getCached, setCache } from './cache';
 import { getRSScore } from './rs';
 import * as yahoo from './yahoo';
-import * as fs from 'fs';
-import * as path from 'path';
+import { db } from '../db';
+import { qualityScoresCache } from '@shared/schema';
+import { sql } from 'drizzle-orm';
 
 const BATCH_CONCURRENCY = 25;
 
-const QUALITY_PERSIST_PATH = path.join(process.cwd(), '.cache', 'quality_scores.json');
-
-function persistQualityScores(scores: Record<string, number>): void {
+async function persistQualityScoresToDB(scores: Record<string, number>): Promise<void> {
   try {
-    const dir = path.dirname(QUALITY_PERSIST_PATH);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(QUALITY_PERSIST_PATH, JSON.stringify({ scores, savedAt: Date.now() }), 'utf-8');
-  } catch { /* ignored */ }
+    const entries = Object.entries(scores).filter(([, v]) => typeof v === 'number');
+    if (entries.length === 0) return;
+    const batchSize = 100;
+    for (let i = 0; i < entries.length; i += batchSize) {
+      const batch = entries.slice(i, i + batchSize);
+      const values = batch.map(([symbol, score]) => ({
+        symbol,
+        score,
+        updatedAt: new Date(),
+      }));
+      await db.insert(qualityScoresCache)
+        .values(values)
+        .onConflictDoUpdate({
+          target: qualityScoresCache.symbol,
+          set: { score: sql`excluded.score`, updatedAt: sql`now()` },
+        });
+    }
+  } catch (err: any) {
+    console.error(`[quality] DB persist error: ${err.message}`);
+  }
 }
 
-function loadPersistedQualityScores(): Record<string, number> | null {
+async function loadPersistedQualityScoresFromDB(): Promise<Record<string, number> | null> {
   try {
-    if (!fs.existsSync(QUALITY_PERSIST_PATH)) return null;
-    const raw = JSON.parse(fs.readFileSync(QUALITY_PERSIST_PATH, 'utf-8'));
-    if (raw?.scores && typeof raw.scores === 'object') {
-      const ageMs = Date.now() - (raw.savedAt || 0);
-      if (ageMs < 7 * 24 * 3600 * 1000) return raw.scores;
+    const rows = await db.select().from(qualityScoresCache);
+    if (rows.length === 0) return null;
+    const scores: Record<string, number> = {};
+    const sevenDaysAgo = Date.now() - 7 * 24 * 3600 * 1000;
+    for (const row of rows) {
+      if (row.updatedAt && row.updatedAt.getTime() > sevenDaysAgo) {
+        scores[row.symbol] = row.score;
+      }
     }
+    return Object.keys(scores).length > 0 ? scores : null;
+  } catch (err: any) {
+    console.error(`[quality] DB load error: ${err.message}`);
     return null;
-  } catch { return null; }
+  }
 }
 
 export interface QualityResult {
@@ -272,20 +293,6 @@ export function getCachedLeadersQuality(symbols: string[]): { scores: Record<str
       allFound = false;
     }
   }
-
-  if (!allFound) {
-    const persisted = loadPersistedQualityScores();
-    if (persisted) {
-      for (const sym of symbols) {
-        if (!(sym in scores) && sym in persisted) {
-          scores[sym] = persisted[sym];
-          setCache(`${PER_SYMBOL_CACHE_PREFIX}${sym}`, persisted[sym], PER_SYMBOL_TTL);
-        }
-      }
-      allFound = symbols.every(s => s in scores);
-    }
-  }
-
   return { scores, complete: allFound };
 }
 
@@ -293,15 +300,10 @@ export async function computeLeadersQualityBatch(symbols: string[]): Promise<Rec
   const scores: Record<string, number> = {};
   const toCompute: string[] = [];
 
-  const persisted = loadPersistedQualityScores();
-
   for (const sym of symbols) {
     const cached = getCached<number>(`${PER_SYMBOL_CACHE_PREFIX}${sym}`);
     if (cached !== undefined) {
       scores[sym] = cached;
-    } else if (persisted && sym in persisted) {
-      scores[sym] = persisted[sym];
-      setCache(`${PER_SYMBOL_CACHE_PREFIX}${sym}`, persisted[sym], PER_SYMBOL_TTL);
     } else {
       toCompute.push(sym);
     }
@@ -339,7 +341,9 @@ export async function computeLeadersQualityBatch(symbols: string[]): Promise<Rec
     }
 
     console.log(`[quality] Finished computing ${toCompute.length} quality scores in ${((Date.now() - startTime) / 1000).toFixed(1)}s. Total: ${Object.keys(scores).length}`);
-    persistQualityScores(scores);
+    persistQualityScoresToDB(scores).catch(err =>
+      console.error(`[quality] Failed to persist scores to DB: ${err.message}`)
+    );
   } finally {
     batchComputeInProgress = false;
   }
@@ -347,9 +351,9 @@ export async function computeLeadersQualityBatch(symbols: string[]): Promise<Rec
   return scores;
 }
 
-export function getPersistedScoresForSymbols(symbols: string[]): { scores: Record<string, number>; complete: boolean } {
+export async function getPersistedScoresForSymbols(symbols: string[]): Promise<{ scores: Record<string, number>; complete: boolean }> {
   const scores: Record<string, number> = {};
-  const persisted = loadPersistedQualityScores();
+  const persisted = await loadPersistedQualityScoresFromDB();
   if (!persisted) return { scores, complete: false };
   for (const sym of symbols) {
     if (sym in persisted) {
@@ -363,8 +367,8 @@ export function isBatchComputeRunning(): boolean {
   return batchComputeInProgress;
 }
 
-export function warmUpQualityCache(): number {
-  const persisted = loadPersistedQualityScores();
+export async function warmUpQualityCache(): Promise<number> {
+  const persisted = await loadPersistedQualityScoresFromDB();
   if (!persisted) return 0;
   let count = 0;
   for (const [sym, score] of Object.entries(persisted)) {

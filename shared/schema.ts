@@ -62,6 +62,14 @@ export const earningsReports = pgTable("earnings_reports", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const qualityScoresCache = pgTable("quality_scores_cache", {
+  symbol: varchar("symbol", { length: 20 }).primaryKey(),
+  score: real("score").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type QualityScoreCache = typeof qualityScoresCache.$inferSelect;
+
 export const epScores = pgTable("ep_scores", {
   id: serial("id").primaryKey(),
   earningsReportId: integer("earnings_report_id").notNull().references(() => earningsReports.id, { onDelete: 'cascade' }),
