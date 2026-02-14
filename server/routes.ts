@@ -8,7 +8,7 @@ import * as fmp from "./api/fmp";
 import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
 import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying } from "./api/finviz";
-import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe } from "./api/breadth";
+import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe, isUSMarketOpen, getFrozenBreadth } from "./api/breadth";
 import { getRSScore, getAllRSRatings } from "./api/rs";
 import { computeLeadersQualityBatch, getCachedLeadersQuality, getPersistedScoresForSymbols, isBatchComputeRunning } from "./api/quality";
 import { sendAlert, clearFailures } from "./api/alerts";
@@ -630,17 +630,11 @@ function initBackgroundTasks() {
         console.log(`[bg] Rotation pre-computed: ${rotData.sectors?.length} sectors in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
       })(),
       (async () => {
-        const breadthFast = await computeMarketBreadth(false);
-        setCache('market_breadth', breadthFast, CACHE_TTL.BREADTH);
-        console.log(`[bg] Breadth quick pre-computed: score=${breadthFast.overallScore} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
-        try {
-          const breadthFull = await computeMarketBreadth(true);
-          setCache('market_breadth', breadthFull, CACHE_TTL.BREADTH);
-          console.log(`[bg] Breadth full scan complete: score=${breadthFull.overallScore} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
-          clearFailures('breadth_scan');
-        } catch (err: any) {
-          console.log(`[bg] Breadth full scan error in Phase 1: ${err.message}`);
-        }
+        const breadth = await computeMarketBreadth(true);
+        const ttl = isUSMarketOpen() ? CACHE_TTL.BREADTH : 43200;
+        setCache('market_breadth', breadth, ttl);
+        console.log(`[bg] Breadth atomic scan complete: score=${breadth.overallScore} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+        clearFailures('breadth_scan');
       })(),
       (async () => {
         try {
@@ -818,8 +812,17 @@ function initBackgroundTasks() {
         })(),
         (async () => {
           try {
+            if (!isUSMarketOpen()) {
+              const frozen = getFrozenBreadth();
+              if (frozen) {
+                setCache('market_breadth', frozen, 43200);
+                console.log(`[scheduler] Market closed — using frozen breadth: score=${frozen.overallScore}`);
+                return;
+              }
+            }
             const breadth = await computeMarketBreadth(true);
-            setCache('market_breadth', breadth, CACHE_TTL.BREADTH);
+            const ttl = isUSMarketOpen() ? CACHE_TTL.BREADTH : 43200;
+            setCache('market_breadth', breadth, ttl);
             console.log(`[scheduler] Market Quality refreshed: score=${breadth.overallScore}`);
             clearFailures('breadth_scan');
           } catch (err: any) {
@@ -1106,12 +1109,12 @@ function initBackgroundTasks() {
       // Step 2: Wait a moment for Yahoo rate limits to cool down
       await new Promise(r => setTimeout(r, 3000));
 
-      // Step 3: Retry breadth computation with fresh auth
       try {
         const breadth = await computeMarketBreadth(true);
         const universe = breadth.universeSize ?? 0;
         if (universe > 0) {
-          setCache('market_breadth', breadth, CACHE_TTL.BREADTH);
+          const ttl = isUSMarketOpen() ? CACHE_TTL.BREADTH : 43200;
+          setCache('market_breadth', breadth, ttl);
           console.log(`[watchdog] Breadth healed: score=${breadth.overallScore}, universe=${universe} stocks`);
           clearFailures('breadth_scan');
         } else {
@@ -1353,23 +1356,30 @@ export async function registerRoutes(
 
   app.get('/api/market/breadth', async (req, res) => {
     const cacheKey = 'market_breadth';
+    const marketOpen = isUSMarketOpen();
+
     const cached = getCached<any>(cacheKey);
     if (cached) return res.json(cached);
 
+    const frozen = getFrozenBreadth();
+    if (frozen) {
+      const ttl = marketOpen ? CACHE_TTL.BREADTH : 43200;
+      setCache(cacheKey, frozen, ttl);
+      if (marketOpen) {
+        backgroundRefresh(cacheKey, () => computeMarketBreadth(true), CACHE_TTL.BREADTH);
+      }
+      return res.json(frozen);
+    }
+
     const stale = getStale<any>(cacheKey);
     if (stale) {
-      backgroundRefresh(cacheKey, () => computeMarketBreadth(true), CACHE_TTL.BREADTH);
+      if (marketOpen) {
+        backgroundRefresh(cacheKey, () => computeMarketBreadth(true), CACHE_TTL.BREADTH);
+      }
       return res.json(stale);
     }
 
-    const persisted = loadPersistedBreadthData();
-    if (persisted) {
-      setCache(cacheKey, persisted, CACHE_TTL.BREADTH);
-      backgroundRefresh(cacheKey, () => computeMarketBreadth(true), CACHE_TTL.BREADTH);
-      return res.json(persisted);
-    }
-
-    backgroundRefresh(cacheKey, () => computeMarketBreadth(true), CACHE_TTL.BREADTH);
+    backgroundRefresh(cacheKey, () => computeMarketBreadth(true), marketOpen ? CACHE_TTL.BREADTH : 43200);
     res.status(202).json({ _warming: true });
   });
 

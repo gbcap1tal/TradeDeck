@@ -6,6 +6,24 @@ import * as path from 'path';
 
 const BREADTH_PERSIST_PATH = path.join(process.cwd(), '.breadth-cache.json');
 
+export function isUSMarketOpen(): boolean {
+  const now = new Date();
+  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const day = et.getDay();
+  if (day === 0 || day === 6) return false;
+  const timeMinutes = et.getHours() * 60 + et.getMinutes();
+  return timeMinutes >= 570 && timeMinutes <= 960;
+}
+
+export function isExtendedMarketHours(): boolean {
+  const now = new Date();
+  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const day = et.getDay();
+  if (day === 0 || day === 6) return false;
+  const timeMinutes = et.getHours() * 60 + et.getMinutes();
+  return timeMinutes >= 240 && timeMinutes <= 1080;
+}
+
 function persistBreadthToFile(data: BreadthData): void {
   try {
     fs.writeFileSync(BREADTH_PERSIST_PATH, JSON.stringify({ data, savedAt: Date.now() }), 'utf-8');
@@ -23,7 +41,7 @@ function loadPersistedBreadth(): BreadthData | null {
     if (raw?.data && raw.savedAt) {
       const ageHours = (Date.now() - raw.savedAt) / (1000 * 60 * 60);
       const d = raw.data as BreadthData;
-      if (ageHours < 24 && d.fullyEnriched && d.universeSize > 0 && d.tiers) {
+      if (ageHours < 48 && d.fullyEnriched && d.universeSize > 0 && d.tiers) {
         return d;
       }
     }
@@ -399,144 +417,120 @@ export async function computeQuarterlyBreadth(): Promise<{
 
 let lastFullComputeTime: string | null = null;
 
-export async function computeMarketBreadth(fullScan: boolean = false): Promise<BreadthData> {
-  const cachedFull = getCached<BreadthData>('breadth_full_result');
-  if (cachedFull && !fullScan) {
-    return cachedFull;
-  }
+export function getFrozenBreadth(): BreadthData | null {
+  const cached = getCached<BreadthData>('breadth_full_result');
+  if (cached) return cached;
+  return loadPersistedBreadth();
+}
 
+export async function computeMarketBreadth(fullScan: boolean = false): Promise<BreadthData> {
   if (!fullScan) {
+    const cached = getCached<BreadthData>('breadth_full_result');
+    if (cached) return cached;
     const persisted = loadPersistedBreadth();
     if (persisted) {
-      setCache('breadth_full_result', persisted, 1800);
+      const ttl = isUSMarketOpen() ? 1800 : 43200;
+      setCache('breadth_full_result', persisted, ttl);
       return persisted;
     }
   }
 
-  const trendTier = await computeTrendTier();
-
-  let momentumScore = 0;
-  let breadthScore = 0;
-  let strengthScore = 0;
-  let universeSize = 0;
-
-  let fourPercentData = { value: 1, bulls: 0, bears: 0, score: 7, max: 16 };
-  let twentyFivePercentData = { value: 1, bulls: 0, bears: 0, score: 4, max: 11 };
-  let above50maData = { value: 50, above: 0, below: 0, total: 0, score: 5, max: 11 };
-  let above200maData = { value: 50, above: 0, below: 0, total: 0, score: 4, max: 11 };
-  let netHighsData = { value: 0, highs: 0, lows: 0, score: 2, max: 9 };
-  let vixData = { value: 20, score: 5, max: 7 };
-  let advDecl = { advancing: 0, declining: 0 };
-
-  if (fullScan) {
-    const [quoteBreadth, quarterlyBreadth, finvizBreadth] = await Promise.all([
-      computeQuoteBreadth(),
-      computeQuarterlyBreadth(),
-      scrapeFinvizBreadth(),
-    ]);
-
-    fourPercentData = quoteBreadth.fourPercent;
-    twentyFivePercentData = quarterlyBreadth.twentyFivePercent;
-    above50maData = quoteBreadth.above50ma;
-    above200maData = quoteBreadth.above200ma;
-    netHighsData = quoteBreadth.netHighs52w;
-    vixData = quoteBreadth.vixLevel;
-    advDecl = quoteBreadth.advancingDeclining;
-    universeSize = quoteBreadth.universeSize;
-    lastFullComputeTime = new Date().toISOString();
-
-    if (finvizBreadth) {
-      if (finvizBreadth.advancingDeclining.advancing > 0) {
-        advDecl = {
-          advancing: finvizBreadth.advancingDeclining.advancing,
-          declining: finvizBreadth.advancingDeclining.declining,
-        };
-      }
-      if (finvizBreadth.aboveSMA50.above > 0) {
-        const fvTotal50 = finvizBreadth.aboveSMA50.above + finvizBreadth.aboveSMA50.below;
-        const fvPct50 = finvizBreadth.aboveSMA50.abovePct;
-        above50maData = {
-          value: fvPct50,
-          above: finvizBreadth.aboveSMA50.above,
-          below: finvizBreadth.aboveSMA50.below,
-          total: fvTotal50,
-          score: scoreAbove50MA(fvPct50),
-          max: 11,
-        };
-      }
-      if (finvizBreadth.aboveSMA200.above > 0) {
-        const fvTotal200 = finvizBreadth.aboveSMA200.above + finvizBreadth.aboveSMA200.below;
-        const fvPct200 = finvizBreadth.aboveSMA200.abovePct;
-        above200maData = {
-          value: fvPct200,
-          above: finvizBreadth.aboveSMA200.above,
-          below: finvizBreadth.aboveSMA200.below,
-          total: fvTotal200,
-          score: scoreAbove200MA(fvPct200),
-          max: 11,
-        };
-      }
-      if (finvizBreadth.newHighLow.highs > 0 || finvizBreadth.newHighLow.lows > 0) {
-        const fvNetHighs = finvizBreadth.newHighLow.highs - finvizBreadth.newHighLow.lows;
-        netHighsData = {
-          value: fvNetHighs,
-          highs: finvizBreadth.newHighLow.highs,
-          lows: finvizBreadth.newHighLow.lows,
-          score: scoreNetHighs(fvNetHighs),
-          max: 9,
-        };
-      }
-      console.log(`[breadth] Using Finviz exchange-level data: A/D=${advDecl.advancing}/${advDecl.declining}, SMA50=${above50maData.value}%, SMA200=${above200maData.value}%, H/L=${netHighsData.highs}/${netHighsData.lows}`);
-    }
-  } else {
-    try {
-      const [vixQuote, finvizBreadth] = await Promise.all([
-        yahoo.getQuote('^VIX'),
-        scrapeFinvizBreadth(),
-      ]);
-      if (vixQuote) {
-        vixData = { value: Math.round(vixQuote.price * 100) / 100, score: scoreVIX(vixQuote.price), max: 7 };
-      }
-      if (finvizBreadth && finvizBreadth.advancingDeclining.advancing > 0) {
-        advDecl = {
-          advancing: finvizBreadth.advancingDeclining.advancing,
-          declining: finvizBreadth.advancingDeclining.declining,
-        };
-      }
-    } catch { /* ignored */ }
-
-    if (advDecl.advancing === 0 && advDecl.declining === 0) {
-      const previousFull = getCached<BreadthData>('breadth_full_result') || loadPersistedBreadth();
-      if (previousFull && previousFull.advancingDeclining) {
-        advDecl = previousFull.advancingDeclining;
-      }
+  if (!isUSMarketOpen() && !isExtendedMarketHours()) {
+    const frozen = getFrozenBreadth();
+    if (frozen) {
+      console.log(`[breadth] Market closed — serving frozen snapshot (score=${frozen.overallScore})`);
+      setCache('breadth_full_result', frozen, 43200);
+      return frozen;
     }
   }
 
-  momentumScore = fourPercentData.score + twentyFivePercentData.score;
-  breadthScore = above50maData.score + above200maData.score;
-  strengthScore = netHighsData.score + vixData.score;
+  console.log(`[breadth] Starting atomic full breadth computation...`);
+  const computeStart = Date.now();
+
+  const [trendTier, quoteBreadth, quarterlyBreadth, finvizBreadth] = await Promise.all([
+    computeTrendTier(),
+    computeQuoteBreadth(),
+    computeQuarterlyBreadth(),
+    scrapeFinvizBreadth(),
+  ]);
+
+  let fourPercentData = quoteBreadth.fourPercent;
+  let twentyFivePercentData = quarterlyBreadth.twentyFivePercent;
+  let above50maData = quoteBreadth.above50ma;
+  let above200maData = quoteBreadth.above200ma;
+  let netHighsData = quoteBreadth.netHighs52w;
+  let vixData = quoteBreadth.vixLevel;
+  let advDecl = quoteBreadth.advancingDeclining;
+  let universeSize = quoteBreadth.universeSize;
+  lastFullComputeTime = new Date().toISOString();
+
+  if (finvizBreadth) {
+    if (finvizBreadth.advancingDeclining.advancing > 0) {
+      advDecl = {
+        advancing: finvizBreadth.advancingDeclining.advancing,
+        declining: finvizBreadth.advancingDeclining.declining,
+      };
+    }
+    if (finvizBreadth.aboveSMA50.above > 0) {
+      const fvTotal50 = finvizBreadth.aboveSMA50.above + finvizBreadth.aboveSMA50.below;
+      const fvPct50 = finvizBreadth.aboveSMA50.abovePct;
+      above50maData = {
+        value: fvPct50,
+        above: finvizBreadth.aboveSMA50.above,
+        below: finvizBreadth.aboveSMA50.below,
+        total: fvTotal50,
+        score: scoreAbove50MA(fvPct50),
+        max: 11,
+      };
+    }
+    if (finvizBreadth.aboveSMA200.above > 0) {
+      const fvTotal200 = finvizBreadth.aboveSMA200.above + finvizBreadth.aboveSMA200.below;
+      const fvPct200 = finvizBreadth.aboveSMA200.abovePct;
+      above200maData = {
+        value: fvPct200,
+        above: finvizBreadth.aboveSMA200.above,
+        below: finvizBreadth.aboveSMA200.below,
+        total: fvTotal200,
+        score: scoreAbove200MA(fvPct200),
+        max: 11,
+      };
+    }
+    if (finvizBreadth.newHighLow.highs > 0 || finvizBreadth.newHighLow.lows > 0) {
+      const fvNetHighs = finvizBreadth.newHighLow.highs - finvizBreadth.newHighLow.lows;
+      netHighsData = {
+        value: fvNetHighs,
+        highs: finvizBreadth.newHighLow.highs,
+        lows: finvizBreadth.newHighLow.lows,
+        score: scoreNetHighs(fvNetHighs),
+        max: 9,
+      };
+    }
+    console.log(`[breadth] Using Finviz exchange-level data: A/D=${advDecl.advancing}/${advDecl.declining}, SMA50=${above50maData.value}%, SMA200=${above200maData.value}%, H/L=${netHighsData.highs}/${netHighsData.lows}`);
+  }
+
+  const momentumScore = fourPercentData.score + twentyFivePercentData.score;
+  const breadthScore = above50maData.score + above200maData.score;
+  const strengthScore = netHighsData.score + vixData.score;
 
   const overallScore = Math.round(trendTier.score + momentumScore + breadthScore + strengthScore);
 
   const previousScores = getCached<number[]>('breadth_score_history') || [];
-
-  if (fullScan) {
-    const updatedHistory = [...previousScores, overallScore].slice(-6);
-    setCache('breadth_score_history', updatedHistory, 86400);
-  }
+  const updatedHistory = [...previousScores, overallScore].slice(-6);
+  setCache('breadth_score_history', updatedHistory, 86400);
 
   const scoreChange5d = previousScores.length > 0
     ? overallScore - previousScores[0]
     : 0;
+
+  const cacheTTL = isUSMarketOpen() ? 1800 : 43200;
 
   const result: BreadthData = {
     overallScore,
     scoreChange5d,
     status: getScoreStatus(overallScore),
     statusColor: getScoreColor(overallScore),
-    fullyEnriched: fullScan,
-    lastComputedAt: lastFullComputeTime || new Date().toISOString(),
+    fullyEnriched: true,
+    lastComputedAt: lastFullComputeTime,
     tiers: {
       trend: trendTier,
       momentum: {
@@ -571,11 +565,11 @@ export async function computeMarketBreadth(fullScan: boolean = false): Promise<B
     universeSize,
   };
 
-  if (fullScan) {
-    setCache('breadth_full_result', result, 1800);
-    persistBreadthToFile(result);
-    saveDailySnapshot(result);
-  }
+  setCache('breadth_full_result', result, cacheTTL);
+  persistBreadthToFile(result);
+  saveDailySnapshot(result);
+
+  console.log(`[breadth] Atomic computation complete: score=${overallScore} (trend=${trendTier.score}, momentum=${momentumScore}, breadth=${breadthScore}, strength=${strengthScore}) in ${((Date.now() - computeStart) / 1000).toFixed(1)}s`);
 
   return result;
 }
