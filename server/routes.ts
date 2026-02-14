@@ -902,11 +902,11 @@ function initBackgroundTasks() {
 
     let windowKey = '';
 
-    if (timeMinutes >= 570 && timeMinutes <= 580) {
+    if (timeMinutes >= 571 && timeMinutes <= 573) {
       windowKey = `${dateStr}-open`;
-    } else if (timeMinutes >= 960 && timeMinutes <= 965) {
+    } else if (timeMinutes >= 961 && timeMinutes <= 963) {
       windowKey = `${dateStr}-close`;
-    } else if (minutes >= 0 && minutes <= 10) {
+    } else if (minutes >= 0 && minutes <= 10 && timeMinutes !== 960) {
       windowKey = `${dateStr}-h${hours}`;
     } else if (minutes >= 30 && minutes <= 40) {
       windowKey = `${dateStr}-h${hours}m30`;
