@@ -146,9 +146,9 @@ function SmartMoneyIndicator({ symbol }: { symbol: string }) {
 }
 
 function StockQualityPanel({ symbol }: { symbol: string }) {
-  const { data: quality, isLoading } = useStockQuality(symbol, 'current');
+  const { data: quality, isLoading, isError, isFetching } = useStockQuality(symbol, 'current');
 
-  if (isLoading) return <div className="glass-card rounded-xl shimmer h-full" />;
+  if (isLoading || (isError && isFetching)) return <div className="glass-card rounded-xl shimmer h-full" />;
   if (!quality) return null;
 
   const stageColors: Record<number, string> = {
@@ -281,7 +281,7 @@ function isRecentET(timestamp: number): boolean {
 }
 
 function NewsPanel({ symbol }: { symbol: string }) {
-  const { data: news, isLoading } = useStockNews(symbol);
+  const { data: news, isLoading, isError } = useStockNews(symbol);
 
   return (
     <div className="glass-card rounded-xl px-4 py-3 h-full min-h-0 flex flex-col overflow-hidden" data-testid="card-news">
@@ -289,7 +289,7 @@ function NewsPanel({ symbol }: { symbol: string }) {
         <Newspaper className="w-3.5 h-3.5 text-white/30" />
         <span className="text-[13px] font-semibold text-white/90 tracking-wide">Latest News</span>
       </div>
-      {isLoading ? (
+      {(isLoading || isError) ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => <div key={i} className="shimmer h-7 rounded" />)}
         </div>

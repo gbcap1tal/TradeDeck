@@ -1831,7 +1831,9 @@ export async function registerRoutes(
       ]);
 
       if (!snap || !snap.snapshot || Object.keys(snap.snapshot).length === 0) {
-        return res.json(defaultResponse);
+        const staleQuality = getStale<any>(qualityCacheKey);
+        if (staleQuality) return res.json(staleQuality);
+        return res.json({ ...defaultResponse, _failed: true });
       }
 
       const s = snap.snapshot;
@@ -2196,7 +2198,9 @@ export async function registerRoutes(
       return res.json(qualityResponse);
     } catch (e: any) {
       console.error(`Quality error for ${symbol}:`, e.message);
-      return res.json(defaultResponse);
+      const staleQuality = getStale<any>(qualityCacheKey);
+      if (staleQuality) return res.json(staleQuality);
+      return res.json({ ...defaultResponse, _failed: true });
     }
   });
 

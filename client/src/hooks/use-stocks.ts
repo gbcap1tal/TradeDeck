@@ -53,11 +53,15 @@ export function useStockQuality(symbol: string, rsTimeframe: string = 'current')
     queryFn: async () => {
       const res = await fetch(`/api/stocks/${symbol}/quality?rsTimeframe=${rsTimeframe}`, { credentials: "include" });
       if (!res.ok) throw new Error(`Quality fetch failed: ${res.status}`);
-      return res.json();
+      const data = await res.json();
+      if (data._failed) {
+        throw new Error('Quality data temporarily unavailable');
+      }
+      return data;
     },
     enabled: !!symbol,
-    retry: 2,
-    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
+    retry: 4,
+    retryDelay: (attempt) => Math.min(2000 * 2 ** attempt, 15000),
   });
 }
 
@@ -67,9 +71,15 @@ export function useStockNews(symbol: string) {
     queryFn: async () => {
       const res = await fetch(`/api/stocks/${symbol}/news`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch stock news");
-      return res.json();
+      const data = await res.json();
+      if (Array.isArray(data) && data.length === 0) {
+        throw new Error('No news data available yet');
+      }
+      return data;
     },
     enabled: !!symbol,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(2000 * 2 ** attempt, 10000),
   });
 }
 
@@ -82,6 +92,8 @@ export function useInsiderBuying(symbol: string) {
       return res.json();
     },
     enabled: !!symbol,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });
 }
 
