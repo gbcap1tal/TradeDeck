@@ -375,6 +375,12 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
   const { data: rawData, isLoading, isError } = useStockEarnings(symbol, view);
   const [hoveredRevIdx, setHoveredRevIdx] = useState<number | null>(null);
   const [hoveredEpsIdx, setHoveredEpsIdx] = useState<number | null>(null);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 640);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   if (isLoading) return <div className="glass-card rounded-xl shimmer h-full" />;
   if (isError || !rawData || !Array.isArray(rawData) || rawData.length === 0) {
@@ -521,17 +527,17 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
 
   const labelRow = (quarter: string, value: string, growth: number | null, isEst: boolean, colorClass?: string) => {
     return (
-      <div className="flex flex-col items-center gap-[5px] w-full py-[4px]">
+      <div className="flex flex-col items-center gap-[3px] sm:gap-[5px] w-full py-[2px] sm:py-[4px]">
         <span className={cn(
           "font-mono-nums leading-none truncate w-full text-center font-semibold",
-          isQuarterly ? "text-[13px]" : "text-[14px]",
+          isQuarterly ? "text-[10px] sm:text-[13px]" : "text-[11px] sm:text-[14px]",
           isEst ? "text-white/30" : "text-white/70"
         )}>
           {quarter}
         </span>
         <span className={cn(
           "font-mono-nums leading-none truncate w-full text-center font-medium",
-          isQuarterly ? "text-[12px]" : "text-[13px]",
+          isQuarterly ? "text-[9px] sm:text-[12px]" : "text-[10px] sm:text-[13px]",
           colorClass || "text-white/45"
         )}>
           {value}
@@ -539,20 +545,23 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
         {growth != null ? (
           <span className={cn(
             "font-mono-nums font-bold leading-none",
-            isQuarterly ? "text-[12px]" : "text-[13px]",
+            isQuarterly ? "text-[9px] sm:text-[12px]" : "text-[10px] sm:text-[13px]",
             growth >= 0 ? "text-[#30d158]" : "text-[#ff453a]"
           )}>
             {growth > 0 ? '+' : ''}{growth.toFixed(0)}%
           </span>
         ) : (
-          <span className={cn("leading-none invisible", isQuarterly ? "text-[12px]" : "text-[13px]")}>0%</span>
+          <span className={cn("leading-none invisible", isQuarterly ? "text-[9px] sm:text-[12px]" : "text-[10px] sm:text-[13px]")}>0%</span>
         )}
       </div>
     );
   };
 
+  const visibleCount = isMobile ? Math.min(data.length, 8) : data.length;
+  const visibleData = data.slice(-visibleCount);
+
   return (
-    <div className="glass-card rounded-xl px-5 py-4 h-full flex flex-col" data-testid="card-earnings-sales">
+    <div className="glass-card rounded-xl px-3 sm:px-5 py-3 sm:py-4 h-full flex flex-col" data-testid="card-earnings-sales">
       {/* TOP BAR: Sales title + Legend + Q/Y toggle */}
       <div className="flex items-center justify-between mb-2 flex-shrink-0 flex-wrap gap-2">
         <div className="flex items-center gap-3">
@@ -584,14 +593,14 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
       </div>
 
       {/* GRID: 2 equal rows for SALES and EPS */}
-      <div className="flex-1 min-h-0 grid grid-rows-2 gap-4">
+      <div className="flex-1 min-h-0 grid grid-rows-2 gap-3 sm:gap-4">
 
         {/* === SALES SECTION === */}
         <div className="flex flex-col min-h-0">
           {/* Chart content: relative wrapper so absolute children get percentage heights */}
           <div className="flex-1 min-h-0 relative" data-testid="bars-revenue">
             <div className="absolute inset-0 flex items-end" style={{ gap: `${barGap}px` }}>
-              {data.map((d, i) => {
+              {visibleData.map((d, i) => {
                 const barPct = scaleBar(Math.abs(d.revenue), maxRev, minRev);
                 const isHov = hoveredRevIdx === i;
                 return (
@@ -611,8 +620,8 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
             </div>
           </div>
           {/* Labels below bars */}
-          <div className="flex items-start mt-1.5 flex-shrink-0" style={{ gap: `${barGap}px` }}>
-            {data.map((d, i) => (
+          <div className="flex items-start mt-1 sm:mt-1.5 flex-shrink-0" style={{ gap: `${barGap}px` }}>
+            {visibleData.map((d, i) => (
               <div key={i} className="flex-1 min-w-0"
                 onMouseEnter={() => setHoveredRevIdx(i)} onMouseLeave={() => setHoveredRevIdx(null)}
                 style={{ cursor: 'pointer' }}>
@@ -635,7 +644,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
               {hasNegativeEps && hasPositiveEps ? (
                 <div className="flex flex-col justify-end h-full">
                   <div className="flex items-end" style={{ gap: `${barGap}px`, flex: '3 1 0', minHeight: '20px' }}>
-                    {data.map((d, i) => {
+                    {visibleData.map((d, i) => {
                       const barPct = d.eps > 0 ? scaleBar(d.eps, maxEpsAbs, minEpsAbs) : 0;
                       const isHov = hoveredEpsIdx === i;
                       return (
@@ -655,7 +664,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                   </div>
                   <div className="border-t border-white/15" />
                   <div className="flex items-start" style={{ gap: `${barGap}px`, flex: '1 1 0' }}>
-                    {data.map((d, i) => {
+                    {visibleData.map((d, i) => {
                       const barPct = d.eps < 0 ? scaleBar(Math.abs(d.eps), maxEpsAbs, minEpsAbs) : 0;
                       const isHov = hoveredEpsIdx === i;
                       return (
@@ -678,7 +687,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                 <div className="flex flex-col h-full">
                   <div className="border-t border-white/15" />
                   <div className="flex-1 flex items-start" style={{ gap: `${barGap}px` }}>
-                    {data.map((d, i) => {
+                    {visibleData.map((d, i) => {
                       const barPct = scaleBar(Math.abs(d.eps), maxEpsAbs, minEpsAbs);
                       const isHov = hoveredEpsIdx === i;
                       return (
@@ -699,7 +708,7 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
                 </div>
               ) : (
                 <div className="flex items-end h-full" style={{ gap: `${barGap}px` }}>
-                  {data.map((d, i) => {
+                  {visibleData.map((d, i) => {
                     const barPct = scaleBar(Math.abs(d.eps), maxEpsAbs, minEpsAbs);
                     const isHov = hoveredEpsIdx === i;
                     return (
@@ -721,8 +730,8 @@ function EarningsSalesChart({ symbol }: { symbol: string }) {
             </div>
           </div>
           {/* Labels below bars */}
-          <div className="flex items-start mt-1.5 flex-shrink-0" style={{ gap: `${barGap}px` }}>
-            {data.map((d, i) => (
+          <div className="flex items-start mt-1 sm:mt-1.5 flex-shrink-0" style={{ gap: `${barGap}px` }}>
+            {visibleData.map((d, i) => (
               <div key={i} className="flex-1 min-w-0"
                 onMouseEnter={() => setHoveredEpsIdx(i)} onMouseLeave={() => setHoveredEpsIdx(null)}
                 style={{ cursor: 'pointer' }}>
@@ -996,16 +1005,16 @@ export default function StockDetail() {
 
               <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-2">
                 <div className="lg:col-span-7 flex flex-col gap-2 min-h-0 h-auto lg:h-[calc(100vh-100px)]">
-                  <div className="min-h-[250px] sm:min-h-[300px] lg:flex-[3] lg:min-h-0">
+                  <div className="h-[220px] sm:min-h-[300px] lg:flex-[3] lg:min-h-0 lg:h-auto">
                     <StockChart symbol={symbol} currentPrice={quote.price} compact />
                   </div>
-                  <div className="min-h-[300px] sm:min-h-[350px] lg:flex-[4] lg:min-h-0">
+                  <div className="h-[340px] sm:min-h-[350px] lg:flex-[4] lg:min-h-0 lg:h-auto">
                     <EarningsSalesChart symbol={symbol} />
                   </div>
                 </div>
 
-                <div className="lg:col-span-5 flex flex-col gap-1 min-h-0 h-auto lg:h-[calc(100vh-100px)]">
-                  <div className="min-h-[200px] lg:flex-[7] lg:min-h-0 overflow-auto">
+                <div className="lg:col-span-5 flex flex-col gap-2 min-h-0 h-auto lg:h-[calc(100vh-100px)]">
+                  <div className="lg:flex-[7] lg:min-h-0 overflow-auto">
                     <StockQualityPanel symbol={symbol} />
                   </div>
                   <div className="min-h-[150px] lg:flex-[3] lg:min-h-0">
