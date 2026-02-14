@@ -10,7 +10,7 @@ import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
 import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe, isUSMarketOpen, getFrozenBreadth } from "./api/breadth";
 import { getRSScore, getAllRSRatings } from "./api/rs";
-import { computeLeadersQualityBatch, getCachedLeadersQuality, getPersistedScoresForSymbols, isBatchComputeRunning } from "./api/quality";
+import { computeLeadersQualityBatch, getCachedLeadersQuality, getPersistedScoresForSymbols, isBatchComputeRunning, warmUpQualityCache } from "./api/quality";
 import { sendAlert, clearFailures } from "./api/alerts";
 import { fetchEarningsCalendar, generateAiSummary, getEarningsDatesWithData } from "./api/earnings";
 import { getFirecrawlUsage } from "./api/transcripts";
@@ -594,6 +594,11 @@ let bgInitialized = false;
 function initBackgroundTasks() {
   if (bgInitialized) return;
   bgInitialized = true;
+
+  const warmCount = warmUpQualityCache();
+  if (warmCount > 0) {
+    console.log(`[bg] Quality cache warm-up: loaded ${warmCount} persisted scores into memory`);
+  }
 
   setTimeout(async () => {
     console.log('[bg] Starting background data pre-computation...');
@@ -1261,6 +1266,34 @@ export async function registerRoutes(
 
   initBackgroundTasks();
 
+  let firstVisitRefreshTriggered = false;
+  app.use('/api', (req, _res, next) => {
+    if (!firstVisitRefreshTriggered) {
+      firstVisitRefreshTriggered = true;
+      const ratings = getAllRSRatings();
+      const finvizData = getFinvizDataSync();
+      if (finvizData && Object.keys(ratings).length > 0) {
+        const stockLookup: Record<string, number> = {};
+        for (const [_s, sd] of Object.entries(finvizData)) {
+          for (const [_i, stocks] of Object.entries(sd.stocks)) {
+            for (const stock of stocks) stockLookup[stock.symbol] = stock.marketCap;
+          }
+        }
+        const qSymbols: string[] = [];
+        for (const [sym, rs] of Object.entries(ratings)) {
+          if (rs >= 80 && (stockLookup[sym] || 0) >= 300) qSymbols.push(sym);
+        }
+        if (qSymbols.length > 0 && !isBatchComputeRunning()) {
+          console.log(`[warm-up] First API request — triggering background quality refresh for ${qSymbols.length} leaders`);
+          computeLeadersQualityBatch(qSymbols).catch(err =>
+            console.error(`[warm-up] Quality refresh failed: ${err.message}`)
+          );
+        }
+      }
+    }
+    next();
+  });
+
   app.get('/api/market/indices', async (req, res) => {
     const cacheKey = 'market_indices';
     const cached = getCached<any>(cacheKey);
@@ -1552,17 +1585,24 @@ export async function registerRoutes(
         return res.json({ scores: cached, ready: true });
       }
 
-      const { scores: persisted, complete: persistedComplete } = getPersistedScoresForSymbols(symbols);
-      const merged = { ...persisted, ...cached };
-      const mergedComplete = persistedComplete || Object.keys(merged).length >= symbols.length;
+      const merged = { ...cached };
+      if (Object.keys(merged).length < symbols.length) {
+        const { scores: persisted } = getPersistedScoresForSymbols(symbols);
+        for (const [sym, score] of Object.entries(persisted)) {
+          if (!(sym in merged)) merged[sym] = score;
+        }
+      }
 
-      if (!mergedComplete && !isBatchComputeRunning()) {
+      const coverage = Object.keys(merged).length / symbols.length;
+      const hasGoodCoverage = coverage >= 0.8;
+
+      if (!complete && !isBatchComputeRunning()) {
         computeLeadersQualityBatch(symbols).catch(err =>
           console.error(`[leaders-quality] Background compute failed: ${err.message}`)
         );
       }
 
-      res.json({ scores: merged, ready: mergedComplete });
+      res.json({ scores: merged, ready: hasGoodCoverage });
     } catch (err: any) {
       console.error(`[leaders-quality] Error: ${err.message}`);
       res.json({ scores: {}, ready: false });

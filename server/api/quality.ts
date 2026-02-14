@@ -362,3 +362,16 @@ export function getPersistedScoresForSymbols(symbols: string[]): { scores: Recor
 export function isBatchComputeRunning(): boolean {
   return batchComputeInProgress;
 }
+
+export function warmUpQualityCache(): number {
+  const persisted = loadPersistedQualityScores();
+  if (!persisted) return 0;
+  let count = 0;
+  for (const [sym, score] of Object.entries(persisted)) {
+    if (typeof score === 'number') {
+      setCache(`${PER_SYMBOL_CACHE_PREFIX}${sym}`, score, PER_SYMBOL_TTL);
+      count++;
+    }
+  }
+  return count;
+}
