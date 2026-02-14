@@ -215,10 +215,10 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
 
         <div className="mb-2 pt-2 border-t border-white/[0.06]">
           <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Fundamentals</div>
-          <QualityRow label="EPS QoQ" value={`${quality.fundamentals.epsQoQ > 0 ? '+' : ''}${quality.fundamentals.epsQoQ}%`} color={pctColor(quality.fundamentals.epsQoQ)} />
-          <QualityRow label="Sales QoQ" value={`${quality.fundamentals.salesQoQ > 0 ? '+' : ''}${quality.fundamentals.salesQoQ}%`} color={pctColor(quality.fundamentals.salesQoQ)} />
-          <QualityRow label="EPS YoY" value={`${quality.fundamentals.epsYoY > 0 ? '+' : ''}${quality.fundamentals.epsYoY}%`} color={pctColor(quality.fundamentals.epsYoY)} />
-          <QualityRow label="Sales YoY" value={`${quality.fundamentals.salesYoY > 0 ? '+' : ''}${quality.fundamentals.salesYoY}%`} color={pctColor(quality.fundamentals.salesYoY)} />
+          <QualityRow label="EPS QoQ" value={quality.fundamentals.epsQoQ != null ? `${quality.fundamentals.epsQoQ > 0 ? '+' : ''}${quality.fundamentals.epsQoQ}%` : '—'} color={quality.fundamentals.epsQoQ != null ? pctColor(quality.fundamentals.epsQoQ) : 'text-white/30'} />
+          <QualityRow label="Sales QoQ" value={quality.fundamentals.salesQoQ != null ? `${quality.fundamentals.salesQoQ > 0 ? '+' : ''}${quality.fundamentals.salesQoQ}%` : '—'} color={quality.fundamentals.salesQoQ != null ? pctColor(quality.fundamentals.salesQoQ) : 'text-white/30'} />
+          <QualityRow label="EPS YoY" value={quality.fundamentals.epsYoY != null ? `${quality.fundamentals.epsYoY > 0 ? '+' : ''}${quality.fundamentals.epsYoY}%` : '—'} color={quality.fundamentals.epsYoY != null ? pctColor(quality.fundamentals.epsYoY) : 'text-white/30'} />
+          <QualityRow label="Sales YoY" value={quality.fundamentals.salesYoY != null ? `${quality.fundamentals.salesYoY > 0 ? '+' : ''}${quality.fundamentals.salesYoY}%` : '—'} color={quality.fundamentals.salesYoY != null ? pctColor(quality.fundamentals.salesYoY) : 'text-white/30'} />
           <div className="flex items-center justify-between py-[3px]">
             <span className="text-[12px] text-white/50">Earnings Accel.</span>
             <span className="text-[11px] font-medium">

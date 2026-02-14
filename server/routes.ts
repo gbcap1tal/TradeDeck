@@ -1872,10 +1872,10 @@ export async function registerRoutes(
         }
       }
 
-      let epsQoQ = 0;
-      let salesQoQ = 0;
-      let epsYoY = 0;
-      let salesYoY = 0;
+      let epsQoQ: number | null = null;
+      let salesQoQ: number | null = null;
+      let epsYoY: number | null = null;
+      let salesYoY: number | null = null;
 
       if (snap && snap.earnings && snap.earnings.length > 0) {
         const sorted = [...snap.earnings]
@@ -1913,6 +1913,43 @@ export async function registerRoutes(
               }
             }
           }
+        }
+      }
+
+      if (epsYoY === null || salesYoY === null || epsQoQ === null || salesQoQ === null) {
+        try {
+          const incomeData = await fmp.getIncomeStatement(sym, 'quarter', 10);
+          if (incomeData && incomeData.length >= 2) {
+            const fmpSorted = [...incomeData].reverse();
+            const latest = fmpSorted[fmpSorted.length - 1];
+            const prev = fmpSorted[fmpSorted.length - 2];
+            if (epsQoQ === null && prev && latest) {
+              const prevEps = prev.epsDiluted || prev.eps || 0;
+              const latestEps = latest.epsDiluted || latest.eps || 0;
+              if (prevEps !== 0) epsQoQ = Math.round(((latestEps - prevEps) / Math.abs(prevEps)) * 10000) / 100;
+            }
+            if (salesQoQ === null && prev && latest) {
+              const prevRev = prev.revenue || 0;
+              const latestRev = latest.revenue || 0;
+              if (prevRev !== 0) salesQoQ = Math.round(((latestRev - prevRev) / Math.abs(prevRev)) * 10000) / 100;
+            }
+            if ((epsYoY === null || salesYoY === null) && fmpSorted.length >= 5) {
+              const latestQ = fmpSorted[fmpSorted.length - 1];
+              const yoyQ = fmpSorted[fmpSorted.length - 5];
+              if (epsYoY === null && latestQ && yoyQ) {
+                const prevEps = yoyQ.epsDiluted || yoyQ.eps || 0;
+                const latEps = latestQ.epsDiluted || latestQ.eps || 0;
+                if (prevEps !== 0) epsYoY = Math.round(((latEps - prevEps) / Math.abs(prevEps)) * 10000) / 100;
+              }
+              if (salesYoY === null && latestQ && yoyQ) {
+                const prevRev = yoyQ.revenue || 0;
+                const latRev = latestQ.revenue || 0;
+                if (prevRev !== 0) salesYoY = Math.round(((latRev - prevRev) / Math.abs(prevRev)) * 10000) / 100;
+              }
+            }
+          }
+        } catch (fmpErr: any) {
+          console.log(`[quality] FMP fallback failed for ${sym}: ${fmpErr.message}`);
         }
       }
 
@@ -1963,7 +2000,8 @@ export async function registerRoutes(
       const operMarginPositive = operMargin > 0;
 
       const pFcf = parseNumVal(s['P/FCF']);
-      const fcfPositive = pFcf > 0;
+      let fcfPositive = pFcf > 0;
+      let fcfTTM = 0;
 
       const rsRating = await getRSScore(sym);
 
@@ -1979,9 +2017,24 @@ export async function registerRoutes(
         avgVolume10d = yahooQuote.avgVolume10Day || 0;
       } catch { /* ignored */ }
 
+      if (!fcfPositive) {
+        try {
+          const cashFlowData = await fmp.getCashFlowStatement(sym);
+          if (cashFlowData && cashFlowData.length > 0) {
+            let ttlFcf = 0;
+            const quarters = cashFlowData.slice(0, 4);
+            for (const q of quarters) {
+              ttlFcf += (q.freeCashFlow || 0);
+            }
+            fcfTTM = Math.round(ttlFcf / 1e6 * 100) / 100;
+            fcfPositive = fcfTTM > 0;
+          }
+        } catch { /* ignored */ }
+      }
+
       let salesAccelQuarters = 0;
-      const latestQEpsYoY = epsYoY;
-      const latestQSalesYoY = salesYoY;
+      const latestQEpsYoY = epsYoY ?? 0;
+      const latestQSalesYoY = salesYoY ?? 0;
 
       const epsQoQValues: number[] = [];
       const salesQoQValues: number[] = [];
@@ -2135,7 +2188,7 @@ export async function registerRoutes(
         },
         profitability: {
           epsTTM,
-          fcfTTM: 0,
+          fcfTTM,
           operMarginPositive,
           fcfPositive,
         },
