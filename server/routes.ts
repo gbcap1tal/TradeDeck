@@ -1775,13 +1775,6 @@ export async function registerRoutes(
     if (cachedQuality) return res.json(cachedQuality);
 
     try {
-      const snap = await scrapeFinvizQuote(sym);
-      if (!snap || !snap.snapshot || Object.keys(snap.snapshot).length === 0) {
-        return res.json(defaultResponse);
-      }
-
-      const s = snap.snapshot;
-
       const parsePercent = (val: string | undefined): number => {
         if (!val) return 0;
         return parseFloat(val.replace('%', '')) || 0;
@@ -1808,6 +1801,45 @@ export async function registerRoutes(
         if (suffix === 'K') return num * 1e3;
         return num;
       };
+
+      const [
+        snap,
+        emaIndicators,
+        weinsteinStage,
+        rsRating,
+        finnhubResult,
+        insiderResult,
+        yahooQuoteResult,
+        cashFlowResult,
+        incomeResult,
+      ] = await Promise.all([
+        scrapeFinvizQuote(sym).catch(() => null),
+        yahoo.getEMAIndicators(sym).catch(() => ({ aboveEma10: false, aboveEma20: false })),
+        yahoo.getWeinsteinStage(sym).catch(() => 1),
+        getRSScore(sym).catch(() => 0),
+        (async () => {
+          try {
+            const finnhubKey = process.env.FINNHUB_API_KEY;
+            if (!finnhubKey) return null;
+            const now = new Date();
+            const fromDate = now.toISOString().split('T')[0];
+            const toDate = new Date(now.getTime() + 365 * 86400000).toISOString().split('T')[0];
+            const fhUrl = `https://finnhub.io/api/v1/calendar/earnings?symbol=${symbol}&from=${fromDate}&to=${toDate}&token=${finnhubKey}`;
+            const fhRes = await fetch(fhUrl);
+            return await fhRes.json();
+          } catch { return null; }
+        })(),
+        scrapeFinvizInsiderBuying(sym).catch(() => []),
+        yahoo.getQuote(sym).catch(() => null),
+        fmp.getCashFlowStatement(sym).catch(() => null),
+        fmp.getIncomeStatement(sym, 'quarter', 10).catch(() => null),
+      ]);
+
+      if (!snap || !snap.snapshot || Object.keys(snap.snapshot).length === 0) {
+        return res.json(defaultResponse);
+      }
+
+      const s = snap.snapshot;
 
       const sma20Pct = parsePercent(s['SMA20']);
       const sma50Pct = parsePercent(s['SMA50']);
@@ -1839,39 +1871,6 @@ export async function registerRoutes(
       const epsTTM = parseNumVal(s['EPS (ttm)']);
       const operMargin = parsePercent(s['Oper. Margin']);
       const operMarginPositive = operMargin > 0;
-
-      const needsFmpFallback = !snap.earnings || snap.earnings.length < 2;
-
-      const [
-        emaIndicators,
-        weinsteinStage,
-        rsRating,
-        finnhubResult,
-        insiderResult,
-        yahooQuoteResult,
-        cashFlowResult,
-        incomeResult,
-      ] = await Promise.all([
-        yahoo.getEMAIndicators(sym).catch(() => ({ aboveEma10: false, aboveEma20: false })),
-        yahoo.getWeinsteinStage(sym).catch(() => 1),
-        getRSScore(sym).catch(() => 0),
-        (async () => {
-          try {
-            const finnhubKey = process.env.FINNHUB_API_KEY;
-            if (!finnhubKey) return null;
-            const now = new Date();
-            const fromDate = now.toISOString().split('T')[0];
-            const toDate = new Date(now.getTime() + 365 * 86400000).toISOString().split('T')[0];
-            const fhUrl = `https://finnhub.io/api/v1/calendar/earnings?symbol=${symbol}&from=${fromDate}&to=${toDate}&token=${finnhubKey}`;
-            const fhRes = await fetch(fhUrl);
-            return await fhRes.json();
-          } catch { return null; }
-        })(),
-        scrapeFinvizInsiderBuying(sym).catch(() => []),
-        yahoo.getQuote(sym).catch(() => null),
-        pFcf <= 0 ? fmp.getCashFlowStatement(sym).catch(() => null) : Promise.resolve(null),
-        needsFmpFallback ? fmp.getIncomeStatement(sym, 'quarter', 10).catch(() => null) : Promise.resolve(null),
-      ]);
 
       const aboveEma10 = emaIndicators.aboveEma10;
       const aboveEma20 = emaIndicators.aboveEma20;
