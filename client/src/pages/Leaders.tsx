@@ -325,7 +325,32 @@ export default function Leaders() {
           </div>
         ) : (
           <div className="glass-card rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="sm:hidden divide-y divide-white/[0.04]" data-testid="list-leaders-mobile">
+              {filtered.map((leader) => (
+                <div
+                  key={leader.symbol}
+                  className="px-3 py-3 cursor-pointer active:bg-white/[0.03] transition-colors"
+                  onClick={() => navigate(`/stocks/${leader.symbol}`)}
+                  data-testid={`card-leader-mobile-${leader.symbol}`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-[13px] font-semibold text-white font-mono-nums">{leader.symbol}</span>
+                      <span className="text-[10px] text-white/30 truncate">{leader.name}</span>
+                    </div>
+                    <span className={cn("text-[13px] font-semibold font-mono-nums", leader.changePercent >= 0 ? "text-[#30d158]" : "text-[#ff453a]")}>
+                      {leader.changePercent >= 0 ? '+' : ''}{leader.changePercent.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 text-[10px]">
+                    <span className="text-white/40">RS <span className="text-white/70 font-mono-nums">{leader.rsRating}</span></span>
+                    <span className="text-white/40">Q <span className="text-white/70 font-mono-nums">{leader.qualityScore?.toFixed(1) ?? '--'}</span></span>
+                    <span className="text-white/30 truncate">{leader.industry}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full" data-testid="table-leaders">
                 <thead>
                   <tr className="border-b border-white/[0.06]">

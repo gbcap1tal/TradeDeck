@@ -936,7 +936,7 @@ export default function StockDetail() {
   if (!symbol) return null;
 
   return (
-    <div className="min-h-screen lg:h-screen bg-background flex flex-col lg:overflow-hidden">
+    <div className="min-h-screen lg:h-screen bg-background flex flex-col lg:overflow-hidden overflow-x-hidden">
       <Navbar />
       <main className="flex-1 min-h-0 flex flex-col">
         <div className="max-w-[1440px] w-full mx-auto px-3 sm:px-4 py-2 flex-1 min-h-0 flex flex-col gap-2">
@@ -1004,7 +1004,7 @@ export default function StockDetail() {
               </div>
 
               <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-2">
-                <div className="lg:col-span-7 flex flex-col gap-2 min-h-0 h-auto lg:h-[calc(100vh-100px)]">
+                <div className="lg:col-span-7 flex flex-col gap-2 min-h-0 h-auto lg:h-[calc(100vh-100px)] touch-pan-y">
                   <div className="h-[220px] sm:min-h-[300px] lg:flex-[3] lg:min-h-0 lg:h-auto">
                     <StockChart symbol={symbol} currentPrice={quote.price} compact />
                   </div>
@@ -1013,7 +1013,7 @@ export default function StockDetail() {
                   </div>
                 </div>
 
-                <div className="lg:col-span-5 flex flex-col gap-2 min-h-0 h-auto lg:h-[calc(100vh-100px)]">
+                <div className="lg:col-span-5 flex flex-col gap-2 min-h-0 h-auto lg:h-[calc(100vh-100px)] touch-pan-y">
                   <div className="lg:flex-[7] lg:min-h-0 overflow-auto">
                     <StockQualityPanel symbol={symbol} />
                   </div>

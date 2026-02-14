@@ -736,7 +736,7 @@ function initBackgroundTasks() {
     } catch (err: any) {
       console.log(`[bg] Quality pre-compute error: ${err.message}`);
     }
-  }, 1000);
+  }, 5000);
 
   let lastScheduledWindow = '';
   let isFullRefreshRunning = false;
@@ -921,7 +921,7 @@ function initBackgroundTasks() {
       lastScheduledWindow = windowKey;
       runFullDataRefresh(windowKey);
     }
-  }, 60000);
+  }, 90000);
 
   let overnightDigestDate = '';
   let overnightDigestDone = false;
@@ -1021,7 +1021,7 @@ function initBackgroundTasks() {
       console.error(`[rs-scheduler] Failed to spawn RS script: ${err.message}`);
       sendAlert('RS Ratings Script Spawn Failed', `Could not start RS computation script.\n\nError: ${err.message}`, 'general');
     });
-  }, 60000);
+  }, 120000);
 
   // === SELF-HEALING WATCHDOG ===
   // Checks every 5 minutes if market data is broken (0 stocks, missing breadth/indices)
@@ -1148,7 +1148,7 @@ function initBackgroundTasks() {
     } finally {
       selfHealingInProgress = false;
     }
-  }, 5 * 60 * 1000); // every 5 minutes
+  }, 8 * 60 * 1000); // every 8 minutes
 
   let lastEarningsWatchdogRun = 0;
   const EARNINGS_WATCHDOG_COOLDOWN = 10 * 60 * 1000;
@@ -1684,6 +1684,10 @@ export async function registerRoutes(
     const sectorName = decodeURIComponent(req.params.sectorName);
     const industryName = decodeURIComponent(req.params.industryName);
 
+    const industryCacheKey = `industry_${sectorName}_${industryName}`;
+    const cachedIndustry = getCached<any>(industryCacheKey);
+    if (cachedIndustry) return res.json(cachedIndustry);
+
     const sectorConfig = SECTORS_DATA.find(s => s.name.toLowerCase() === sectorName.toLowerCase());
     if (!sectorConfig) {
       return res.status(404).json({ message: "Sector not found" });
@@ -1736,7 +1740,7 @@ export async function registerRoutes(
 
     stocks.sort((a, b) => (b.marketCap || 0) - (a.marketCap || 0));
 
-    res.json({
+    const industryResult = {
       industry: {
         name: industryName,
         sector: sectorName,
@@ -1748,7 +1752,10 @@ export async function registerRoutes(
         totalStocks: stockDefs.length,
       },
       stocks,
-    });
+    };
+    const industryTtl = isUSMarketOpen() ? 120 : 600;
+    setCache(industryCacheKey, industryResult, industryTtl);
+    res.json(industryResult);
   });
 
   app.get('/api/stocks/search', (req, res) => {
@@ -1758,24 +1765,38 @@ export async function registerRoutes(
     res.json(results);
   });
 
+  const quoteCache = new Map<string, { data: any; ts: number }>();
+  const QUOTE_CACHE_TTL = 30000;
+
   app.get('/api/stocks/:symbol/quote', async (req, res) => {
     const { symbol } = req.params;
+    const cacheKey = symbol.toUpperCase();
+    const cached = quoteCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < QUOTE_CACHE_TTL) {
+      return res.json(cached.data);
+    }
+
     try {
-      const quote = await yahoo.getQuote(symbol.toUpperCase());
+      const quote = await yahoo.getQuote(cacheKey);
       if (quote) {
-        const profile = await fmp.getCompanyProfile(symbol.toUpperCase());
-        return res.json({
+        const profile = await fmp.getCompanyProfile(cacheKey);
+        const result = {
           ...quote,
           sector: quote.sector || profile?.sector || '',
           industry: quote.industry || profile?.industry || '',
           rs: 0,
-        });
+        };
+        quoteCache.set(cacheKey, { data: result, ts: Date.now() });
+        return res.json(result);
       }
     } catch (e: any) {
       if (e instanceof yahoo.RateLimitError || e.name === 'RateLimitError') {
         return res.status(503).json({ message: "Temporarily unavailable, please retry" });
       }
       console.error(`Quote error for ${symbol}:`, e.message);
+      if (cached) {
+        return res.json(cached.data);
+      }
     }
     return res.status(404).json({ message: "Stock not found" });
   });

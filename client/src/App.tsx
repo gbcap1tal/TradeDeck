@@ -4,24 +4,26 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import NotFound from "@/pages/not-found";
-import Dashboard from "@/pages/Dashboard";
-import StockDetail from "@/pages/StockDetail";
-import SectorDetail from "@/pages/SectorDetail";
-import IndustryDetail from "@/pages/IndustryDetail";
-import Login from "@/pages/Login";
-import Market from "@/pages/Market";
-import MegatrendDetail from "@/pages/MegatrendDetail";
-import News from "@/pages/News";
-import Leaders from "@/pages/Leaders";
-import Earnings from "@/pages/Earnings";
-import Payment from "@/pages/Payment";
-import PaymentSuccess from "@/pages/PaymentSuccess";
-import PaymentCancel from "@/pages/PaymentCancel";
-import Admin from "@/pages/Admin";
+import { lazy, Suspense } from "react";
 import Landing from "@/pages/Landing";
+import Payment from "@/pages/Payment";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
+
+const NotFound = lazy(() => import("@/pages/not-found"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const StockDetail = lazy(() => import("@/pages/StockDetail"));
+const SectorDetail = lazy(() => import("@/pages/SectorDetail"));
+const IndustryDetail = lazy(() => import("@/pages/IndustryDetail"));
+const Login = lazy(() => import("@/pages/Login"));
+const Market = lazy(() => import("@/pages/Market"));
+const MegatrendDetail = lazy(() => import("@/pages/MegatrendDetail"));
+const News = lazy(() => import("@/pages/News"));
+const Leaders = lazy(() => import("@/pages/Leaders"));
+const Earnings = lazy(() => import("@/pages/Earnings"));
+const PaymentSuccess = lazy(() => import("@/pages/PaymentSuccess"));
+const PaymentCancel = lazy(() => import("@/pages/PaymentCancel"));
+const Admin = lazy(() => import("@/pages/Admin"));
 
 const isProduction = import.meta.env.PROD;
 const PREVIEW_KEY = "__td_preview";
@@ -115,7 +117,13 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <Suspense fallback={
+            <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+              <div className="w-5 h-5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+            </div>
+          }>
+            <Router />
+          </Suspense>
         </TooltipProvider>
       </QueryClientProvider>
     </ErrorBoundary>
