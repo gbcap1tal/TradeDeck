@@ -1812,8 +1812,8 @@ export async function registerRoutes(
       const price = parseNumVal(s['Price']);
       const atrMultiple = (price > 0 && atr > 0) ? Math.round((Math.abs(sma50Pct / 100 * price) / atr) * 10) / 10 : 0;
       let overextensionFlag: string;
-      if (atrMultiple <= 3) overextensionFlag = '≤3';
-      else if (atrMultiple <= 6) overextensionFlag = '4-6';
+      if (atrMultiple < 4) overextensionFlag = '≤3';
+      else if (atrMultiple < 7) overextensionFlag = '4-6';
       else overextensionFlag = '7+';
 
       let daysToEarnings = 0;
