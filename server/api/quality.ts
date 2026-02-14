@@ -5,7 +5,7 @@ import * as yahoo from './yahoo';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const BATCH_CONCURRENCY = 10;
+const BATCH_CONCURRENCY = 25;
 
 const QUALITY_PERSIST_PATH = path.join(process.cwd(), '.cache', 'quality_scores.json');
 
@@ -64,12 +64,21 @@ function parseBigNum(val: string | undefined): number {
 
 export async function computeQualityScore(sym: string): Promise<number> {
   try {
-    const snap = await scrapeFinvizQuote(sym);
-    if (!snap || !snap.snapshot || Object.keys(snap.snapshot).length === 0) {
+    const [snap, emaResult, weinsteinResult, rsRating, insiderResult, yahooQuoteResult] = await Promise.allSettled([
+      scrapeFinvizQuote(sym),
+      yahoo.getEMAIndicators(sym),
+      yahoo.getWeinsteinStage(sym),
+      getRSScore(sym),
+      scrapeFinvizInsiderBuying(sym),
+      yahoo.getQuote(sym),
+    ]);
+
+    const finvizData = snap.status === 'fulfilled' ? snap.value : null;
+    if (!finvizData || !finvizData.snapshot || Object.keys(finvizData.snapshot).length === 0) {
       return 0;
     }
 
-    const s = snap.snapshot;
+    const s = finvizData.snapshot;
 
     const _sma20Pct = parsePercent(s['SMA20']);
     const sma50Pct = parsePercent(s['SMA50']);
@@ -79,15 +88,11 @@ export async function computeQualityScore(sym: string): Promise<number> {
 
     let aboveEma10 = false;
     let aboveEma20 = false;
-    let weinsteinStage = 1;
-    try {
-      const emaIndicators = await yahoo.getEMAIndicators(sym);
-      aboveEma10 = emaIndicators.aboveEma10;
-      aboveEma20 = emaIndicators.aboveEma20;
-    } catch { /* ignored */ }
-    try {
-      weinsteinStage = await yahoo.getWeinsteinStage(sym);
-    } catch { /* ignored */ }
+    if (emaResult.status === 'fulfilled') {
+      aboveEma10 = emaResult.value.aboveEma10;
+      aboveEma20 = emaResult.value.aboveEma20;
+    }
+    const weinsteinStage = weinsteinResult.status === 'fulfilled' ? weinsteinResult.value : 1;
 
     const distFromSma50 = Math.round(sma50Pct * 100) / 100;
     const atr = parseNumVal(s['ATR (14)']);
@@ -97,8 +102,8 @@ export async function computeQualityScore(sym: string): Promise<number> {
     let epsYoY = 0;
     let salesYoY = 0;
 
-    if (snap.earnings && snap.earnings.length > 0) {
-      const sorted = [...snap.earnings]
+    if (finvizData.earnings && finvizData.earnings.length > 0) {
+      const sorted = [...finvizData.earnings]
         .filter(e => e.epsActual != null || e.salesActual != null)
         .sort((a, b) => a.fiscalEndDate.localeCompare(b.fiscalEndDate));
 
@@ -125,8 +130,8 @@ export async function computeQualityScore(sym: string): Promise<number> {
     }
 
     let epsGrowthStreak = 0;
-    if (snap.earnings && snap.earnings.length > 0) {
-      const entries = [...snap.earnings]
+    if (finvizData.earnings && finvizData.earnings.length > 0) {
+      const entries = [...finvizData.earnings]
         .filter(e => e.epsActual != null)
         .sort((a, b) => a.fiscalEndDate.localeCompare(b.fiscalEndDate));
       const qMap = new Map<string, number>();
@@ -155,25 +160,15 @@ export async function computeQualityScore(sym: string): Promise<number> {
     const pFcf = parseNumVal(s['P/FCF']);
     const fcfPositive = pFcf > 0;
 
-    const rsRating = await getRSScore(sym);
+    const smartMoney = insiderResult.status === 'fulfilled' && insiderResult.value.length > 0;
 
-    let smartMoney = false;
-    try {
-      const insiderTx = await scrapeFinvizInsiderBuying(sym);
-      smartMoney = insiderTx.length > 0;
-    } catch { /* ignored */ }
-
-    let avgVolume10d = 0;
-    try {
-      const yahooQuote = await yahoo.getQuote(sym);
-      avgVolume10d = yahooQuote.avgVolume10Day || 0;
-    } catch { /* ignored */ }
+    const avgVolume10d = yahooQuoteResult.status === 'fulfilled' ? (yahooQuoteResult.value.avgVolume10Day || 0) : 0;
 
     const epsQoQValues: number[] = [];
     const salesQoQValues: number[] = [];
 
-    if (snap.earnings && snap.earnings.length > 0) {
-      const allEntries = [...snap.earnings].sort((a, b) => a.fiscalEndDate.localeCompare(b.fiscalEndDate));
+    if (finvizData.earnings && finvizData.earnings.length > 0) {
+      const allEntries = [...finvizData.earnings].sort((a, b) => a.fiscalEndDate.localeCompare(b.fiscalEndDate));
       const actuals = allEntries.filter(e => e.salesActual != null);
 
       const salesQMap = new Map<string, number>();
@@ -203,7 +198,8 @@ export async function computeQualityScore(sym: string): Promise<number> {
     const r1Tight = (distFromSma50 >= 0 && distFromSma50 <= 15 && atrMultiple <= 2) ? 1 : 0;
     const rawP1 = r1Stage + r1Ema + r1Sma + r1Tight;
 
-    const r2Rs = rsRating >= 90 ? 2 : rsRating >= 80 ? 1 : 0;
+    const rsScore = rsRating.status === 'fulfilled' ? rsRating.value : 0;
+    const r2Rs = rsScore >= 90 ? 2 : rsScore >= 80 ? 1 : 0;
     const mcapB = marketCap / 1e9;
     let r2Inst = 0;
     if (mcapB >= 10) {
@@ -322,6 +318,7 @@ export async function computeLeadersQualityBatch(symbols: string[]): Promise<Rec
   try {
     console.log(`[quality] Computing quality scores for ${toCompute.length} leaders (${Object.keys(scores).length} already cached)...`);
 
+    const startTime = Date.now();
     for (let i = 0; i < toCompute.length; i += BATCH_CONCURRENCY) {
       const batch = toCompute.slice(i, i + BATCH_CONCURRENCY);
       const results = await Promise.allSettled(
@@ -336,9 +333,12 @@ export async function computeLeadersQualityBatch(symbols: string[]): Promise<Rec
           setCache(`${PER_SYMBOL_CACHE_PREFIX}${r.value.sym}`, r.value.score, PER_SYMBOL_TTL);
         }
       }
+      if ((i + BATCH_CONCURRENCY) < toCompute.length) {
+        console.log(`[quality] Progress: ${Math.min(i + BATCH_CONCURRENCY, toCompute.length)}/${toCompute.length} computed (${((Date.now() - startTime) / 1000).toFixed(1)}s)`);
+      }
     }
 
-    console.log(`[quality] Finished computing ${toCompute.length} quality scores. Total: ${Object.keys(scores).length}`);
+    console.log(`[quality] Finished computing ${toCompute.length} quality scores in ${((Date.now() - startTime) / 1000).toFixed(1)}s. Total: ${Object.keys(scores).length}`);
     persistQualityScores(scores);
   } finally {
     batchComputeInProgress = false;

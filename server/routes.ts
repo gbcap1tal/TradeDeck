@@ -1554,20 +1554,15 @@ export async function registerRoutes(
 
       const { scores: persisted, complete: persistedComplete } = getPersistedScoresForSymbols(symbols);
       const merged = { ...persisted, ...cached };
-      const hasMergedScores = Object.keys(merged).length > 0;
+      const mergedComplete = persistedComplete || Object.keys(merged).length >= symbols.length;
 
-      if (hasMergedScores) {
-        if (!isBatchComputeRunning()) {
-          computeLeadersQualityBatch(symbols).catch(err =>
-            console.error(`[leaders-quality] Background compute failed: ${err.message}`)
-          );
-        }
-        return res.json({ scores: merged, ready: persistedComplete || Object.keys(merged).length >= symbols.length });
+      if (!mergedComplete && !isBatchComputeRunning()) {
+        computeLeadersQualityBatch(symbols).catch(err =>
+          console.error(`[leaders-quality] Background compute failed: ${err.message}`)
+        );
       }
 
-      const scores = await computeLeadersQualityBatch(symbols);
-      const allComplete = symbols.every(s => s in scores);
-      res.json({ scores, ready: allComplete });
+      res.json({ scores: merged, ready: mergedComplete });
     } catch (err: any) {
       console.error(`[leaders-quality] Error: ${err.message}`);
       res.json({ scores: {}, ready: false });

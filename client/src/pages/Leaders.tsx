@@ -89,10 +89,13 @@ export default function Leaders() {
       if (!res.ok) return { scores: {}, ready: false };
       return res.json();
     },
-    staleTime: 86400000,
+    staleTime: (query) => {
+      if (query.state.data?.ready) return 86400000;
+      return 0;
+    },
     refetchInterval: (query) => {
       if (query.state.data?.ready) return false;
-      return 10000;
+      return 5000;
     },
   });
 
