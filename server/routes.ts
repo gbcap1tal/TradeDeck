@@ -10,7 +10,7 @@ import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
 import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe, isUSMarketOpen, getFrozenBreadth } from "./api/breadth";
 import { getRSScore, getAllRSRatings } from "./api/rs";
-import { computeLeadersQualityBatch, getCachedLeadersQuality, getPersistedScoresForSymbols, isBatchComputeRunning, warmUpQualityCache } from "./api/quality";
+import { computeLeadersQualityBatch, getCachedLeadersQuality, getPersistedScoresForSymbols, isBatchComputeRunning, warmUpQualityCache, updateLeadersQualityScore } from "./api/quality";
 import { sendAlert, clearFailures } from "./api/alerts";
 import { fetchEarningsCalendar, generateAiSummary, getEarningsDatesWithData } from "./api/earnings";
 import { getFirecrawlUsage } from "./api/transcripts";
@@ -1296,7 +1296,10 @@ export async function registerRoutes(
         }
         if (qSymbols.length > 0 && !isBatchComputeRunning()) {
           console.log(`[warm-up] First API request — triggering background quality refresh for ${qSymbols.length} leaders`);
-          computeLeadersQualityBatch(qSymbols).catch(err =>
+          warmUpQualityCache().then(count => {
+            if (count > 0) console.log(`[warm-up] Loaded ${count} persisted quality scores before batch`);
+            return computeLeadersQualityBatch(qSymbols);
+          }).catch(err =>
             console.error(`[warm-up] Quality refresh failed: ${err.message}`)
           );
         }
@@ -1611,6 +1614,14 @@ export async function registerRoutes(
       }
 
       const merged = { ...cached };
+      for (const sym of symbols) {
+        if (!(sym in merged)) {
+          const detailCache = getCached<any>(`quality_response_${sym}_current`);
+          if (detailCache?.qualityScore?.total != null) {
+            merged[sym] = detailCache.qualityScore.total;
+          }
+        }
+      }
       if (Object.keys(merged).length < symbols.length) {
         const { scores: persisted } = await getPersistedScoresForSymbols(symbols);
         for (const [sym, score] of Object.entries(persisted)) {
@@ -2325,6 +2336,7 @@ export async function registerRoutes(
         },
       };
       setCache(qualityCacheKey, qualityResponse, CACHE_TTL.QUOTE);
+      updateLeadersQualityScore(sym, totalScore);
       return res.json(qualityResponse);
     } catch (e: any) {
       console.error(`Quality error for ${symbol}:`, e.message);
