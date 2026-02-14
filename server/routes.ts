@@ -1810,14 +1810,8 @@ export async function registerRoutes(
       const _aboveSma20 = sma20Pct > 0;
       const aboveSma50 = sma50Pct > 0;
       const aboveSma200 = sma200Pct > 0;
-      const emaIndicators = await yahoo.getEMAIndicators(sym);
-      const aboveEma10 = emaIndicators.aboveEma10;
-      const aboveEma20 = emaIndicators.aboveEma20;
-
-      const weinsteinStage = await yahoo.getWeinsteinStage(sym);
 
       const distFromSma50 = Math.round(sma50Pct * 100) / 100;
-
       const atr = parseNumVal(s['ATR (14)']);
       const price = parseNumVal(s['Price']);
       const atrMultiple = (price > 0 && atr > 0) ? Math.round((Math.abs(sma50Pct / 100 * price) / atr) * 10) / 10 : 0;
@@ -1826,32 +1820,70 @@ export async function registerRoutes(
       else if (atrMultiple < 7) overextensionFlag = '4-6';
       else overextensionFlag = '7+';
 
+      const pFcf = parseNumVal(s['P/FCF']);
+      const marketCap = parseBigNum(s['Market Cap']);
+      const floatShares = parseBigNum(s['Shs Float']);
+      const avgVolume50d = parseBigNum(s['Avg Volume']);
+      const shortInterest = parseBigNum(s['Short Interest']);
+      const volatilityStr = s['Volatility'] || '';
+      const volatilityParts = volatilityStr.split(' ');
+      const adr = parsePercent(volatilityParts[0]);
+      const instOwnership = parsePercent(s['Inst Own']);
+      const shortPercentOfFloat = parsePercent(s['Short Float']);
+      const shortRatio = parseNumVal(s['Short Ratio']);
+      const epsTTM = parseNumVal(s['EPS (ttm)']);
+      const operMargin = parsePercent(s['Oper. Margin']);
+      const operMarginPositive = operMargin > 0;
+
+      const needsFmpFallback = !snap.earnings || snap.earnings.length < 2;
+
+      const [
+        emaIndicators,
+        weinsteinStage,
+        rsRating,
+        finnhubResult,
+        insiderResult,
+        yahooQuoteResult,
+        cashFlowResult,
+        incomeResult,
+      ] = await Promise.all([
+        yahoo.getEMAIndicators(sym).catch(() => ({ aboveEma10: false, aboveEma20: false })),
+        yahoo.getWeinsteinStage(sym).catch(() => 1),
+        getRSScore(sym).catch(() => 0),
+        (async () => {
+          try {
+            const finnhubKey = process.env.FINNHUB_API_KEY;
+            if (!finnhubKey) return null;
+            const now = new Date();
+            const fromDate = now.toISOString().split('T')[0];
+            const toDate = new Date(now.getTime() + 365 * 86400000).toISOString().split('T')[0];
+            const fhUrl = `https://finnhub.io/api/v1/calendar/earnings?symbol=${symbol}&from=${fromDate}&to=${toDate}&token=${finnhubKey}`;
+            const fhRes = await fetch(fhUrl);
+            return await fhRes.json();
+          } catch { return null; }
+        })(),
+        scrapeFinvizInsiderBuying(sym).catch(() => []),
+        yahoo.getQuote(sym).catch(() => null),
+        pFcf <= 0 ? fmp.getCashFlowStatement(sym).catch(() => null) : Promise.resolve(null),
+        needsFmpFallback ? fmp.getIncomeStatement(sym, 'quarter', 10).catch(() => null) : Promise.resolve(null),
+      ]);
+
+      const aboveEma10 = emaIndicators.aboveEma10;
+      const aboveEma20 = emaIndicators.aboveEma20;
+
       let daysToEarnings = 0;
       let nextEarningsDate = '';
-      try {
-        const finnhubKey = process.env.FINNHUB_API_KEY;
-        if (finnhubKey) {
-          const now = new Date();
-          const fromDate = now.toISOString().split('T')[0];
-          const toDate = new Date(now.getTime() + 365 * 86400000).toISOString().split('T')[0];
-          const fhUrl = `https://finnhub.io/api/v1/calendar/earnings?symbol=${symbol}&from=${fromDate}&to=${toDate}&token=${finnhubKey}`;
-          const fhRes = await fetch(fhUrl);
-          const fhData = await fhRes.json();
-          if (fhData.earningsCalendar && fhData.earningsCalendar.length > 0) {
-            const futureEntries = fhData.earningsCalendar
-              .filter((e: any) => new Date(e.date).getTime() > Date.now() - 86400000)
-              .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
-            if (futureEntries.length > 0) {
-              const next = futureEntries[0];
-              const ed = new Date(next.date);
-              const hourTag = next.hour === 'bmo' ? ' BMO' : next.hour === 'amc' ? ' AMC' : '';
-              nextEarningsDate = ed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + hourTag;
-              daysToEarnings = Math.max(0, Math.ceil((ed.getTime() - Date.now()) / 86400000));
-            }
-          }
+      if (finnhubResult && finnhubResult.earningsCalendar && finnhubResult.earningsCalendar.length > 0) {
+        const futureEntries = finnhubResult.earningsCalendar
+          .filter((e: any) => new Date(e.date).getTime() > Date.now() - 86400000)
+          .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        if (futureEntries.length > 0) {
+          const next = futureEntries[0];
+          const ed = new Date(next.date);
+          const hourTag = next.hour === 'bmo' ? ' BMO' : next.hour === 'amc' ? ' AMC' : '';
+          nextEarningsDate = ed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + hourTag;
+          daysToEarnings = Math.max(0, Math.ceil((ed.getTime() - Date.now()) / 86400000));
         }
-      } catch {
-        // Finnhub failed, fall back to Finviz
       }
       if (!nextEarningsDate) {
         const finvizEarnings = s['Earnings'] || '';
@@ -1870,6 +1902,21 @@ export async function registerRoutes(
             }
           }
         }
+      }
+
+      const smartMoney = (insiderResult as any[]).length > 0;
+      const avgVolume10d = yahooQuoteResult?.avgVolume10Day || 0;
+
+      let fcfPositive = pFcf > 0;
+      let fcfTTM = 0;
+      if (!fcfPositive && cashFlowResult && cashFlowResult.length > 0) {
+        let ttlFcf = 0;
+        const quarters = cashFlowResult.slice(0, 4);
+        for (const q of quarters) {
+          ttlFcf += (q.freeCashFlow || 0);
+        }
+        fcfTTM = Math.round(ttlFcf / 1e6 * 100) / 100;
+        fcfPositive = fcfTTM > 0;
       }
 
       let epsQoQ: number | null = null;
@@ -1916,40 +1963,33 @@ export async function registerRoutes(
         }
       }
 
-      if (epsYoY === null || salesYoY === null || epsQoQ === null || salesQoQ === null) {
-        try {
-          const incomeData = await fmp.getIncomeStatement(sym, 'quarter', 10);
-          if (incomeData && incomeData.length >= 2) {
-            const fmpSorted = [...incomeData].reverse();
-            const latest = fmpSorted[fmpSorted.length - 1];
-            const prev = fmpSorted[fmpSorted.length - 2];
-            if (epsQoQ === null && prev && latest) {
-              const prevEps = prev.epsDiluted || prev.eps || 0;
-              const latestEps = latest.epsDiluted || latest.eps || 0;
-              if (prevEps !== 0) epsQoQ = Math.round(((latestEps - prevEps) / Math.abs(prevEps)) * 10000) / 100;
-            }
-            if (salesQoQ === null && prev && latest) {
-              const prevRev = prev.revenue || 0;
-              const latestRev = latest.revenue || 0;
-              if (prevRev !== 0) salesQoQ = Math.round(((latestRev - prevRev) / Math.abs(prevRev)) * 10000) / 100;
-            }
-            if ((epsYoY === null || salesYoY === null) && fmpSorted.length >= 5) {
-              const latestQ = fmpSorted[fmpSorted.length - 1];
-              const yoyQ = fmpSorted[fmpSorted.length - 5];
-              if (epsYoY === null && latestQ && yoyQ) {
-                const prevEps = yoyQ.epsDiluted || yoyQ.eps || 0;
-                const latEps = latestQ.epsDiluted || latestQ.eps || 0;
-                if (prevEps !== 0) epsYoY = Math.round(((latEps - prevEps) / Math.abs(prevEps)) * 10000) / 100;
-              }
-              if (salesYoY === null && latestQ && yoyQ) {
-                const prevRev = yoyQ.revenue || 0;
-                const latRev = latestQ.revenue || 0;
-                if (prevRev !== 0) salesYoY = Math.round(((latRev - prevRev) / Math.abs(prevRev)) * 10000) / 100;
-              }
-            }
+      if ((epsYoY === null || salesYoY === null || epsQoQ === null || salesQoQ === null) && incomeResult && incomeResult.length >= 2) {
+        const fmpSorted = [...incomeResult].reverse();
+        const latest = fmpSorted[fmpSorted.length - 1];
+        const prev = fmpSorted[fmpSorted.length - 2];
+        if (epsQoQ === null && prev && latest) {
+          const prevEps = prev.epsDiluted || prev.eps || 0;
+          const latestEps = latest.epsDiluted || latest.eps || 0;
+          if (prevEps !== 0) epsQoQ = Math.round(((latestEps - prevEps) / Math.abs(prevEps)) * 10000) / 100;
+        }
+        if (salesQoQ === null && prev && latest) {
+          const prevRev = prev.revenue || 0;
+          const latestRev = latest.revenue || 0;
+          if (prevRev !== 0) salesQoQ = Math.round(((latestRev - prevRev) / Math.abs(prevRev)) * 10000) / 100;
+        }
+        if ((epsYoY === null || salesYoY === null) && fmpSorted.length >= 5) {
+          const latestQ = fmpSorted[fmpSorted.length - 1];
+          const yoyQ = fmpSorted[fmpSorted.length - 5];
+          if (epsYoY === null && latestQ && yoyQ) {
+            const prevEps = yoyQ.epsDiluted || yoyQ.eps || 0;
+            const latEps = latestQ.epsDiluted || latestQ.eps || 0;
+            if (prevEps !== 0) epsYoY = Math.round(((latEps - prevEps) / Math.abs(prevEps)) * 10000) / 100;
           }
-        } catch (fmpErr: any) {
-          console.log(`[quality] FMP fallback failed for ${sym}: ${fmpErr.message}`);
+          if (salesYoY === null && latestQ && yoyQ) {
+            const prevRev = yoyQ.revenue || 0;
+            const latRev = latestQ.revenue || 0;
+            if (prevRev !== 0) salesYoY = Math.round(((latRev - prevRev) / Math.abs(prevRev)) * 10000) / 100;
+          }
         }
       }
 
@@ -1981,56 +2021,6 @@ export async function registerRoutes(
         }
       }
       const earningsAcceleration = epsGrowthStreak;
-
-      const marketCap = parseBigNum(s['Market Cap']);
-      const floatShares = parseBigNum(s['Shs Float']);
-      const avgVolume50d = parseBigNum(s['Avg Volume']);
-      const shortInterest = parseBigNum(s['Short Interest']);
-
-      const volatilityStr = s['Volatility'] || '';
-      const volatilityParts = volatilityStr.split(' ');
-      const adr = parsePercent(volatilityParts[0]);
-
-      const instOwnership = parsePercent(s['Inst Own']);
-      const shortPercentOfFloat = parsePercent(s['Short Float']);
-      const shortRatio = parseNumVal(s['Short Ratio']);
-
-      const epsTTM = parseNumVal(s['EPS (ttm)']);
-      const operMargin = parsePercent(s['Oper. Margin']);
-      const operMarginPositive = operMargin > 0;
-
-      const pFcf = parseNumVal(s['P/FCF']);
-      let fcfPositive = pFcf > 0;
-      let fcfTTM = 0;
-
-      const rsRating = await getRSScore(sym);
-
-      let smartMoney = false;
-      try {
-        const insiderTx = await scrapeFinvizInsiderBuying(sym);
-        smartMoney = insiderTx.length > 0;
-      } catch { /* ignored */ }
-
-      let avgVolume10d = 0;
-      try {
-        const yahooQuote = await yahoo.getQuote(sym);
-        avgVolume10d = yahooQuote.avgVolume10Day || 0;
-      } catch { /* ignored */ }
-
-      if (!fcfPositive) {
-        try {
-          const cashFlowData = await fmp.getCashFlowStatement(sym);
-          if (cashFlowData && cashFlowData.length > 0) {
-            let ttlFcf = 0;
-            const quarters = cashFlowData.slice(0, 4);
-            for (const q of quarters) {
-              ttlFcf += (q.freeCashFlow || 0);
-            }
-            fcfTTM = Math.round(ttlFcf / 1e6 * 100) / 100;
-            fcfPositive = fcfTTM > 0;
-          }
-        } catch { /* ignored */ }
-      }
 
       let salesAccelQuarters = 0;
       const latestQEpsYoY = epsYoY ?? 0;
