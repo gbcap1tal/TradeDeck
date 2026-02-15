@@ -10,6 +10,19 @@ interface State {
   error: Error | null;
 }
 
+function clearCachesAndReload() {
+  const doReload = () => window.location.reload();
+  if (typeof caches !== "undefined") {
+    caches
+      .keys()
+      .then((names) => Promise.all(names.map((name) => caches.delete(name))))
+      .then(doReload)
+      .catch(doReload);
+  } else {
+    doReload();
+  }
+}
+
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
@@ -22,6 +35,17 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("[ErrorBoundary] Uncaught error:", error, errorInfo);
+
+    const msg = error?.message || "";
+    if (
+      msg.includes("Failed to fetch dynamically imported module") ||
+      msg.includes("Importing a module script failed") ||
+      msg.includes("error loading dynamically imported module") ||
+      msg.includes("Loading chunk") ||
+      msg.includes("Loading CSS chunk")
+    ) {
+      clearCachesAndReload();
+    }
   }
 
   render() {
@@ -31,15 +55,23 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="flex items-center justify-center min-h-screen bg-background" data-testid="error-boundary-fallback">
-          <div className="text-center p-8 max-w-md">
-            <h2 className="text-xl font-semibold text-foreground mb-2">Something went wrong</h2>
-            <p className="text-muted-foreground mb-4">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", backgroundColor: "#0a0a0a" }} data-testid="error-boundary-fallback">
+          <div style={{ textAlign: "center", padding: "2rem", maxWidth: "28rem" }}>
+            <h2 style={{ fontSize: "1.25rem", fontWeight: 600, color: "#e5e5e5", marginBottom: "0.5rem" }}>Something went wrong</h2>
+            <p style={{ color: "#737373", marginBottom: "1rem", fontSize: "0.875rem" }}>
               An unexpected error occurred. Please try refreshing the page.
             </p>
             <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover-elevate"
+              onClick={clearCachesAndReload}
+              style={{
+                padding: "0.5rem 1rem",
+                backgroundColor: "#262626",
+                color: "#e5e5e5",
+                border: "1px solid #404040",
+                borderRadius: "0.375rem",
+                cursor: "pointer",
+                fontSize: "0.875rem",
+              }}
               data-testid="button-reload"
             >
               Refresh Page

@@ -1,6 +1,6 @@
-const CACHE_NAME = 'tradedeck-v1';
+const CACHE_VERSION = 2;
+const CACHE_NAME = 'tradedeck-v' + CACHE_VERSION;
 const STATIC_ASSETS = [
-  '/',
   '/manifest.json',
   '/favicon.png',
   '/icon-192.png',
@@ -29,39 +29,54 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  if (url.pathname.startsWith('/api/')) {
+  if (request.mode === 'navigate' || url.pathname === '/') {
     event.respondWith(
       fetch(request)
-        .then((response) => {
+        .catch(() => caches.match(request))
+        .then((response) => response || caches.match('/'))
+    );
+    return;
+  }
+
+  if (url.pathname.startsWith('/api/')) {
+    event.respondWith(
+      fetch(request).catch(() =>
+        caches.match(request).then((cached) =>
+          cached || new Response(JSON.stringify({ error: 'offline' }), {
+            status: 503,
+            headers: { 'Content-Type': 'application/json' }
+          })
+        )
+      )
+    );
+    return;
+  }
+
+  if (url.pathname.match(/\.[a-f0-9]{8,}\.(js|css)$/)) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((response) => {
           if (response.ok) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           }
           return response;
-        })
-        .catch(() =>
-          caches.match(request).then((cached) =>
-            cached || new Response(JSON.stringify({ error: 'offline' }), {
-              status: 503,
-              headers: { 'Content-Type': 'application/json' }
-            })
-          )
-        )
+        });
+      })
     );
     return;
   }
 
   event.respondWith(
-    caches.match(request).then((cached) => {
-      const fetchPromise = fetch(request).then((response) => {
+    fetch(request)
+      .then((response) => {
         if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }
         return response;
-      }).catch(() => cached);
-
-      return cached || fetchPromise;
-    })
+      })
+      .catch(() => caches.match(request))
   );
 });
