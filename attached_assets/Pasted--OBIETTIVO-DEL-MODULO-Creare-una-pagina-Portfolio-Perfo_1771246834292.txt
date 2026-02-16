@@ -1,0 +1,425 @@
+🎯 OBIETTIVO DEL MODULO
+
+Creare una pagina “Portfolio Performance” che:
+
+Tracci equity giornaliera mark-to-market
+
+Confronti performance con QQQ e SPY
+
+Calcoli alpha reale (Time-Weighted Return)
+
+Analizzi trade ad alto turnover
+
+Fornisca analytics professionali da hedge fund
+
+🧱 ARCHITETTURA LOGICA GENERALE
+
+Il sistema deve avere 4 layer:
+
+1️⃣ Data Input Layer
+2️⃣ Processing & Calculation Engine
+3️⃣ Analytics Layer
+4️⃣ Visualization Layer
+
+STEP 1 — DATABASE DESIGN (FONDAMENTALE)
+
+Devi strutturare bene il database prima di tutto.
+
+📂 Tabelle necessarie
+1. trades
+
+Contiene ogni trade singolo.
+
+Campi:
+
+id
+
+ticker
+
+direction (long/short)
+
+entry_date
+
+entry_price
+
+exit_date
+
+exit_price
+
+quantity
+
+fees
+
+setup_tag (es: breakout, pullback, earnings)
+
+notes
+
+🔎 Serve per:
+
+Calcolo P&L
+
+Win rate
+
+Expectancy
+
+Analisi setup
+
+2. positions_daily
+
+Serve per equity mark-to-market.
+
+Campi:
+
+date
+
+ticker
+
+quantity
+
+avg_cost
+
+market_price
+
+unrealized_pnl
+
+🔎 Serve per:
+
+Equity giornaliera
+
+Exposure %
+
+Drawdown
+
+Confronto benchmark
+
+3. portfolio_equity_daily
+
+Campi:
+
+date
+
+total_equity
+
+cash
+
+invested_capital
+
+realized_pnl
+
+unrealized_pnl
+
+🔎 Serve per:
+
+Equity curve
+
+Drawdown
+
+TWR
+
+4. benchmarks_daily
+
+Campi:
+
+date
+
+qqq_price
+
+spy_price
+
+qqq_total_return_index
+
+spy_total_return_index
+
+🔎 Serve per:
+
+Alpha
+
+Beta
+
+Confronto performance
+
+STEP 2 — CALCULATION ENGINE
+
+Questa è la parte che fa la differenza.
+
+🧮 1️⃣ Equity Calculation (Daily Mark-to-Market)
+
+Formula:
+
+Equity = Cash + Σ (quantity × market_price)
+
+Spiegazione:
+Anche se non chiudi trade, il sistema aggiorna la performance ogni giorno.
+
+Per swing trader è ESSENZIALE.
+
+🧮 2️⃣ Time-Weighted Return (TWR)
+
+Non usare solo IRR.
+
+Formula semplificata:
+
+Divide ogni periodo tra flussi di capitale e moltiplica i rendimenti sub-periodo.
+
+Perché?
+Perché confronti correttamente contro QQQ/SPY senza distorsioni da depositi o prelievi.
+
+🧮 3️⃣ Alpha vs Benchmark
+
+Alpha = Portfolio Return − Benchmark Return
+
+Calcolo su base:
+
+YTD
+
+Rolling 30 giorni
+
+Rolling 90 giorni
+
+Molto importante per capire se stai generando skill o solo beta.
+
+🧮 4️⃣ Beta
+
+Regressione tra:
+
+Rendimenti giornalieri portfolio
+
+Rendimenti giornalieri QQQ
+
+Serve per capire esposizione reale al tech.
+
+🧮 5️⃣ Drawdown
+
+Drawdown = (Peak − Current Equity) / Peak
+
+Calcolare:
+
+Max drawdown
+
+Current drawdown
+
+Duration drawdown
+
+Fondamentale per swing trader aggressivo.
+
+STEP 3 — ANALYTICS PANEL (COSA MOSTRARE E PERCHÉ)
+🟢 HEADER METRICS
+
+Mostrare:
+
+• Total Return
+
+Quanto hai fatto nel periodo.
+
+• Alpha vs QQQ / SPY
+
+Stai battendo il mercato?
+
+• Max Drawdown
+
+Quanto dolore massimo hai subito.
+
+• Win Rate
+
+% trade positivi.
+
+• Profit Factor
+
+Somma profitti / somma perdite.
+
+Se > 1.5 sei in zona buona.
+
+• Expectancy
+
+(Win% × Avg Win) − (Loss% × Avg Loss)
+
+Misura reale edge.
+
+• Average Holding Period
+
+Ti dice quanto sei realmente swing.
+
+• Turnover Ratio
+
+Valore totale trade / capitale medio.
+
+Serve per capire quanto sei attivo.
+
+STEP 4 — GRAFICO PRINCIPALE
+
+Linee:
+
+Equity curve
+
+QQQ normalizzato
+
+SPY normalizzato
+
+Tutto base 100 alla data iniziale.
+
+Opzioni:
+
+Toggle benchmark
+
+Toggle rolling alpha
+
+Toggle drawdown overlay
+
+STEP 5 — TRADE ANALYTICS
+
+Qui è il cuore per turnover alto.
+
+Mostrare:
+
+Distribuzione R-Multiples
+
+Capire se i tuoi trade vincenti sono abbastanza grandi.
+
+P&L per trade
+
+Vedi clustering perdite.
+
+Performance per:
+
+Setup
+
+Giorno settimana
+
+Settore
+
+Holding time bucket
+
+Ti permette di capire dove hai edge.
+
+STEP 6 — OPPORTUNITY COST ENGINE (ADVANCED)
+
+Per ogni trade chiuso:
+
+Calcola:
+
+Rendimento tuo
+
+Rendimento QQQ nello stesso periodo
+
+Rendimento SPY nello stesso periodo
+
+Alpha trade-specifica
+
+Questo ti dice se:
+Stai davvero aggiungendo valore.
+
+STEP 7 — CALENDAR HEATMAP
+
+Mostra:
+
+P&L giornaliero
+
+P&L mensile
+
+Confronto con benchmark
+
+Aiuta a vedere:
+
+Overtrading
+
+Periodi negativi ricorrenti
+
+Regime shifts
+
+STEP 8 — REGIME PANEL
+
+Integra:
+
+QQQ sopra/sotto 50DMA
+
+VIX livello
+
+Market breadth
+
+Trend filter
+
+Serve per capire:
+
+Il tuo edge funziona solo in bull market?
+
+STEP 9 — TRADE INPUT SYSTEM
+
+Deve avere:
+
+1️⃣ Manual Entry Form
+2️⃣ CSV Upload
+3️⃣ Auto-import (fase futura)
+
+Validazioni:
+
+No exit prima di entry
+
+No quantity negativa
+
+No overlapping position errate
+
+STEP 10 — ROADMAP SVILUPPO PER AGENTE REPLIT
+
+Puoi dargli questo ordine:
+
+FASE 1 – Base Engine
+
+Creare database schema
+
+Implementare equity daily calculation
+
+Implementare benchmark sync
+
+Creare grafico equity vs benchmark
+
+FASE 2 – Metrics Core
+
+Calcolare TWR
+
+Calcolare drawdown
+
+Calcolare win rate e profit factor
+
+Implementare header stats
+
+FASE 3 – Trade Analytics
+
+R-multiple distribution
+
+Trade performance breakdown
+
+Holding period analytics
+
+FASE 4 – Advanced
+
+Rolling alpha
+
+Beta calculation
+
+Opportunity cost engine
+
+Calendar heatmap
+
+FASE 5 – Regime Intelligence
+
+Regime detection logic
+
+Correlazione dinamica
+
+Exposure analysis
+
+🎯 Come integrarlo nella tua app generale
+
+Devi progettare il modulo come:
+
+/modules/performance-engine
+
+Separato dal resto.
+
+Così potrai:
+
+Offrirlo come feature premium
+
+Attivarlo solo per utenti attivi
+
+Scalare in SaaS
