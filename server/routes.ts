@@ -10,7 +10,7 @@ import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
 import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe, isUSMarketOpen, getFrozenBreadth } from "./api/breadth";
 import { getRSScore, getAllRSRatings } from "./api/rs";
-import { computeLeadersQualityBatch, getCachedLeadersQuality, getPersistedScoresForSymbols, isBatchComputeRunning, warmUpQualityCache } from "./api/quality";
+import { computeLeadersQualityBatch, getCachedLeadersQuality, getPersistedScoresForSymbols, isBatchComputeRunning, warmUpQualityCache, PER_SYMBOL_CACHE_PREFIX, PER_SYMBOL_TTL } from "./api/quality";
 import { sendAlert, clearFailures } from "./api/alerts";
 import { fetchEarningsCalendar, generateAiSummary, getEarningsDatesWithData } from "./api/earnings";
 import { getFirecrawlUsage } from "./api/transcripts";
@@ -1586,23 +1586,24 @@ export async function registerRoutes(
       }
 
       const merged = { ...cached };
-      if (Object.keys(merged).length < symbols.length) {
-        const { scores: persisted } = await getPersistedScoresForSymbols(symbols);
+      const missingFromCache = symbols.filter(s => !(s in merged));
+      if (missingFromCache.length > 0) {
+        const { scores: persisted } = await getPersistedScoresForSymbols(missingFromCache);
         for (const [sym, score] of Object.entries(persisted)) {
-          if (!(sym in merged)) merged[sym] = score;
+          merged[sym] = score;
+          setCache(`${PER_SYMBOL_CACHE_PREFIX}${sym}`, score, PER_SYMBOL_TTL);
         }
       }
 
-      const coverage = Object.keys(merged).length / symbols.length;
-      const hasGoodCoverage = coverage >= 0.8;
+      const stillMissing = symbols.filter(s => !(s in merged));
 
-      if (!complete && !isBatchComputeRunning()) {
-        computeLeadersQualityBatch(symbols).catch(err =>
+      if (stillMissing.length > 0 && !isBatchComputeRunning()) {
+        computeLeadersQualityBatch(stillMissing).catch(err =>
           console.error(`[leaders-quality] Background compute failed: ${err.message}`)
         );
       }
 
-      res.json({ scores: merged, ready: hasGoodCoverage });
+      res.json({ scores: merged, ready: stillMissing.length === 0 });
     } catch (err: any) {
       console.error(`[leaders-quality] Error: ${err.message}`);
       res.json({ scores: {}, ready: false });

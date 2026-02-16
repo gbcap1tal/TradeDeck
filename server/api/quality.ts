@@ -273,8 +273,8 @@ export async function computeQualityScore(sym: string): Promise<number> {
   }
 }
 
-const PER_SYMBOL_CACHE_PREFIX = 'quality_score_';
-const PER_SYMBOL_TTL = 86400;
+export const PER_SYMBOL_CACHE_PREFIX = 'quality_score_';
+export const PER_SYMBOL_TTL = 86400;
 
 let batchComputeInProgress = false;
 
