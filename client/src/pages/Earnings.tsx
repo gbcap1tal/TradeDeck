@@ -312,7 +312,7 @@ export default function Earnings() {
   return (
     <div className="min-h-screen bg-background" data-testid="page-earnings">
       <Navbar />
-      <div className="max-w-[1400px] mx-auto px-2 sm:px-6 py-3 sm:py-6">
+      <div className="w-full max-w-[1400px] mx-auto px-2 sm:px-6 py-3 sm:py-6 overflow-hidden">
         <div className="flex items-center justify-between mb-3 sm:mb-6 px-1 sm:px-0">
           <div>
             <h1 className="text-base sm:text-xl font-semibold text-white/90 tracking-tight" data-testid="text-earnings-title">

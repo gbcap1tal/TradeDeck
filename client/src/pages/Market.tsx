@@ -46,34 +46,66 @@ function BarChart({ items, title, isMegatrendMap, onClickItem }: {
           return (
             <div
               key={item.name}
-              className="flex items-center gap-1.5 sm:gap-3 py-1 cursor-pointer group hover:bg-white/[0.03] rounded-md px-1 sm:px-2 transition-colors"
+              className="py-1 cursor-pointer group hover:bg-white/[0.03] rounded-md px-1 sm:px-2 transition-colors"
               onClick={() => onClickItem(item)}
               data-testid={`row-perf-${item.name.replace(/\s+/g, '-')}`}
             >
-              <span className="text-[11px] text-white/20 font-mono w-5 shrink-0 text-right">{idx + 1}</span>
-              <span className={cn(
-                "text-[11px] sm:text-[12px] font-medium w-[100px] sm:w-[220px] shrink-0 truncate group-hover:text-white transition-colors",
-                isMegatrend ? "text-white" : "text-white/70"
-              )}>
-                {item.name}
-              </span>
-              <div className="flex-1 flex items-center gap-1.5 sm:gap-2 min-w-0">
-                <div className="flex-1 h-[16px] relative rounded-sm overflow-hidden bg-white/[0.02]">
-                  <div
-                    className="h-full rounded-sm transition-all duration-500"
-                    style={{
-                      width: `${barWidth}%`,
-                      backgroundColor: isPositive ? '#30d158' : '#ff453a',
-                      opacity: 0.7,
-                    }}
-                  />
-                </div>
+              <div className="hidden sm:flex items-center gap-3">
+                <span className="text-[11px] text-white/20 font-mono w-5 shrink-0 text-right">{idx + 1}</span>
                 <span className={cn(
-                  "text-[11px] sm:text-[12px] font-mono-nums font-semibold w-[48px] sm:w-[65px] text-right shrink-0",
-                  isPositive ? "text-[#30d158]" : "text-[#ff453a]"
+                  "text-[12px] font-medium w-[220px] shrink-0 truncate group-hover:text-white transition-colors",
+                  isMegatrend ? "text-white" : "text-white/70"
                 )}>
-                  {isPositive ? '+' : ''}{item.change.toFixed(1)}%
+                  {item.name}
                 </span>
+                <div className="flex-1 flex items-center gap-2 min-w-0">
+                  <div className="flex-1 h-[16px] relative rounded-sm overflow-hidden bg-white/[0.02]">
+                    <div
+                      className="h-full rounded-sm transition-all duration-500"
+                      style={{
+                        width: `${barWidth}%`,
+                        backgroundColor: isPositive ? '#30d158' : '#ff453a',
+                        opacity: 0.7,
+                      }}
+                    />
+                  </div>
+                  <span className={cn(
+                    "text-[12px] font-mono-nums font-semibold w-[65px] text-right shrink-0",
+                    isPositive ? "text-[#30d158]" : "text-[#ff453a]"
+                  )}>
+                    {isPositive ? '+' : ''}{item.change.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex sm:hidden flex-col gap-0.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-white/20 font-mono w-5 shrink-0 text-right">{idx + 1}</span>
+                  <span className={cn(
+                    "text-[11px] font-medium group-hover:text-white transition-colors break-words",
+                    isMegatrend ? "text-white" : "text-white/70"
+                  )}>
+                    {item.name}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 pl-[26px]">
+                  <div className="flex-1 h-[14px] relative rounded-sm overflow-hidden bg-white/[0.02]">
+                    <div
+                      className="h-full rounded-sm transition-all duration-500"
+                      style={{
+                        width: `${barWidth}%`,
+                        backgroundColor: isPositive ? '#30d158' : '#ff453a',
+                        opacity: 0.7,
+                      }}
+                    />
+                  </div>
+                  <span className={cn(
+                    "text-[11px] font-mono-nums font-semibold w-[48px] text-right shrink-0",
+                    isPositive ? "text-[#30d158]" : "text-[#ff453a]"
+                  )}>
+                    {isPositive ? '+' : ''}{item.change.toFixed(1)}%
+                  </span>
+                </div>
               </div>
             </div>
           );
@@ -267,7 +299,7 @@ export default function Market() {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       <main className="flex-1">
-        <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-8">
+        <div className="w-full max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-hidden">
           <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight text-white" data-testid="text-page-title">Megatrends</h1>
             <div className="flex items-center gap-3">

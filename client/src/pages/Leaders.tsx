@@ -177,7 +177,7 @@ export default function Leaders() {
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
       <Navbar />
-      <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-6">
+      <div className="w-full max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-6 overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
             <h1 className="text-[18px] sm:text-[22px] font-semibold text-white tracking-tight" data-testid="text-leaders-title">
@@ -193,7 +193,7 @@ export default function Leaders() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 mb-4">
-          <div className="relative flex-1 min-w-[180px] max-w-xs">
+          <div className="relative flex-1 min-w-0 max-w-xs">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/30 z-10" />
             <Input
               placeholder="Search ticker, name, industry..."

@@ -306,7 +306,7 @@ export default function News() {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       <main className="flex-1">
-        <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-8">
+        <div className="w-full max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-hidden">
 
           {/* Headlines That Matter - centered top section */}
           <div className="mb-8">
