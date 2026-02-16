@@ -1,9 +1,13 @@
 import { useRoute, Link, useLocation } from "wouter";
 import { Navbar } from "@/components/layout/Navbar";
 import { useSectorDetail } from "@/hooks/use-market";
+import { useStockHistory } from "@/hooks/use-stocks";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useRef, useEffect } from 'react';
+import { createChart, ColorType, CrosshairMode, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
+import type { IChartApi, CandlestickData, Time } from 'lightweight-charts';
 
 function getGridConfig(count: number): { cols: number; rows: number } {
   if (count <= 6) return { cols: 3, rows: 2 };
@@ -16,11 +20,108 @@ function getGridConfig(count: number): { cols: number; rows: number } {
   return { cols: 6, rows: Math.ceil(count / 6) };
 }
 
+function SectorETFChart({ data }: { data: any[] }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+
+  useEffect(() => {
+    if (!containerRef.current || !data?.length) return;
+
+    const chart = createChart(containerRef.current, {
+      layout: {
+        background: { type: ColorType.Solid, color: 'transparent' },
+        textColor: 'rgba(255,255,255,0.35)',
+        fontFamily: "'Inter', -apple-system, sans-serif",
+        fontSize: 11,
+      },
+      grid: {
+        vertLines: { color: 'rgba(255,255,255,0.03)' },
+        horzLines: { color: 'rgba(255,255,255,0.04)' },
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: { color: 'rgba(255,255,255,0.15)', width: 1, style: 2, labelBackgroundColor: 'rgba(30,30,30,0.95)' },
+        horzLine: { color: 'rgba(255,255,255,0.15)', width: 1, style: 2, labelBackgroundColor: 'rgba(30,30,30,0.95)' },
+      },
+      rightPriceScale: {
+        borderColor: 'rgba(255,255,255,0.06)',
+        scaleMargins: { top: 0.05, bottom: 0.2 },
+      },
+      timeScale: {
+        borderColor: 'rgba(255,255,255,0.06)',
+        timeVisible: false,
+      },
+      handleScroll: { vertTouchDrag: false },
+    });
+
+    chartRef.current = chart;
+
+    const toTime = (t: string): Time => t.split('T')[0] as Time;
+
+    const candleSeries = chart.addSeries(CandlestickSeries, {
+      upColor: '#26a641',
+      downColor: '#d44040',
+      borderDownColor: '#d44040',
+      borderUpColor: '#26a641',
+      wickDownColor: 'rgba(212,64,64,0.5)',
+      wickUpColor: 'rgba(38,166,65,0.5)',
+    });
+
+    const candleData: CandlestickData[] = data.map(d => ({
+      time: toTime(d.time),
+      open: d.open,
+      high: d.high,
+      low: d.low,
+      close: d.close,
+    }));
+    candleSeries.setData(candleData);
+
+    if (data[0]?.volume !== undefined) {
+      const volumeSeries = chart.addSeries(HistogramSeries, {
+        priceFormat: { type: 'volume' },
+        priceScaleId: 'volume',
+      });
+      chart.priceScale('volume').applyOptions({
+        scaleMargins: { top: 0.8, bottom: 0 },
+      });
+      volumeSeries.setData(data.map(d => ({
+        time: toTime(d.time),
+        value: d.volume || 0,
+        color: d.close >= d.open ? 'rgba(38,166,65,0.3)' : 'rgba(212,64,64,0.3)',
+      })));
+    }
+
+    chart.timeScale().fitContent();
+
+    const handleResize = () => {
+      if (containerRef.current && chartRef.current) {
+        chartRef.current.applyOptions({
+          width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight,
+        });
+      }
+    };
+    const ro = new ResizeObserver(handleResize);
+    ro.observe(containerRef.current);
+
+    return () => {
+      ro.disconnect();
+      chart.remove();
+      chartRef.current = null;
+    };
+  }, [data]);
+
+  return <div ref={containerRef} className="w-full h-full" data-testid="sector-etf-chart" />;
+}
+
 export default function SectorDetail() {
   const [, params] = useRoute("/sectors/:sectorName");
   const sectorName = params?.sectorName ? decodeURIComponent(params.sectorName) : "";
   const { data, isLoading } = useSectorDetail(sectorName);
   const [, setLocation] = useLocation();
+
+  const etfTicker = data?.sector?.ticker || '';
+  const { data: etfHistory, isLoading: chartLoading } = useStockHistory(etfTicker, 'D');
 
   const getHeatmapColor = (change: number) => {
     const intensity = Math.min(Math.abs(change) / 3, 1);
@@ -32,7 +133,7 @@ export default function SectorDetail() {
   const gridConfig = data ? getGridConfig(data.industries.length) : { cols: 5, rows: 2 };
 
   return (
-    <div className="min-h-screen lg:h-screen bg-background flex flex-col lg:overflow-hidden">
+    <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
       <main className="flex-1 flex flex-col min-h-0">
         <div className="max-w-[1600px] w-full mx-auto px-3 sm:px-6 py-3 flex flex-col flex-1 min-h-0">
@@ -77,27 +178,50 @@ export default function SectorDetail() {
               </div>
             </div>
           ) : data ? (
-            <div className="flex-1 min-h-0 flex flex-col">
+            <div className="flex-1 min-h-0 flex flex-col overflow-auto">
               <div className="flex items-baseline gap-3 mb-2">
                 <h1 className="text-2xl font-bold tracking-tight text-white" data-testid="text-sector-name">{data.sector.name}</h1>
                 <span className="text-sm text-white/30">{data.industries.length} industries</span>
               </div>
-              <div className="flex-1 min-h-0 overflow-auto lg:overflow-hidden">
+
+              {etfTicker && (
+                <div className="glass-card rounded-xl p-4 mb-4 flex-shrink-0" data-testid="card-sector-chart">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] text-white/30 uppercase tracking-wider font-medium">{etfTicker} Daily</span>
+                  </div>
+                  <div className="h-[220px] sm:h-[260px]">
+                    {chartLoading ? (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Loader2 className="w-5 h-5 animate-spin text-white/15" />
+                      </div>
+                    ) : etfHistory?.length > 0 ? (
+                      <SectorETFChart data={etfHistory} />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-white/20 text-sm">No chart data</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex-1 min-h-0">
                 <div
-                  className="sector-heatmap-grid grid gap-2 h-full"
+                  className="sector-heatmap-grid grid gap-2"
                   style={{
                     '--heatmap-cols': gridConfig.cols,
                     '--heatmap-rows': gridConfig.rows,
                   } as React.CSSProperties}
                   data-testid="grid-industry-heatmap"
                 >
-                  {data.industries.map((industry: any) => {
+                  {data.industries
+                    .slice()
+                    .sort((a: any, b: any) => (b.changePercent ?? 0) - (a.changePercent ?? 0))
+                    .map((industry: any) => {
                     const change = industry.changePercent ?? 0;
                     const bg = getHeatmapColor(change);
                     return (
                       <div
                         key={industry.name}
-                        className="rounded-lg p-3 cursor-pointer transition-colors duration-200 flex flex-col justify-between min-h-0 overflow-hidden"
+                        className="rounded-lg p-3 cursor-pointer transition-colors duration-200 flex flex-col justify-between min-h-[80px] overflow-hidden"
                         style={{ background: bg }}
                         onClick={() => setLocation(`/sectors/${encodeURIComponent(sectorName)}/industries/${encodeURIComponent(industry.name)}`)}
                         data-testid={`heatmap-industry-${industry.name.replace(/\s+/g, '-')}`}

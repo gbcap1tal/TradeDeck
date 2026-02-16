@@ -8,7 +8,7 @@ import * as fmp from "./api/fmp";
 import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
 import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying } from "./api/finviz";
-import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe, isUSMarketOpen, getFrozenBreadth } from "./api/breadth";
+import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe, isUSMarketOpen, getFrozenBreadth, getTrendStatus } from "./api/breadth";
 import { getRSScore, getAllRSRatings } from "./api/rs";
 import { computeLeadersQualityBatch, getCachedLeadersQuality, getPersistedScoresForSymbols, isBatchComputeRunning, warmUpQualityCache, PER_SYMBOL_CACHE_PREFIX, PER_SYMBOL_TTL } from "./api/quality";
 import { sendAlert, clearFailures } from "./api/alerts";
@@ -1306,11 +1306,23 @@ export async function registerRoutes(
     next();
   });
 
+  function enrichIndicesWithTrend(indices: any[]): any[] {
+    const breadth = getCached<any>('breadth_full_result') || getCached<any>('market_breadth');
+    const trendComponents = breadth?.tiers?.trend?.components;
+    if (!trendComponents) return indices;
+    const symbolMap: Record<string, string> = { 'SPY': 'SPY', 'QQQ': 'QQQ', 'IWM': 'IWM', 'MDY': 'MDY', 'TLT': 'TLT', 'VIX': 'VIX' };
+    return indices.map(idx => {
+      const label = symbolMap[idx.symbol];
+      const trend = label ? trendComponents[label]?.status : undefined;
+      return { ...idx, trend: trend || 'TS' };
+    });
+  }
+
   app.get('/api/market/indices', async (req, res) => {
     const cacheKey = 'market_indices';
     const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
     const cached = getCached<any>(cacheKey);
-    if (cached) return res.json(cached);
+    if (cached) return res.json(enrichIndicesWithTrend(cached));
 
     const stale = getStale<any>(cacheKey);
     if (stale) {
@@ -1318,14 +1330,14 @@ export async function registerRoutes(
         const data = await yahoo.getIndices();
         return (data && data.length > 0) ? data : stale;
       }, indicesTtl);
-      return res.json(stale);
+      return res.json(enrichIndicesWithTrend(stale));
     }
 
     try {
       const data = await yahoo.getIndices();
       if (data && data.length > 0) {
         setCache(cacheKey, data, indicesTtl);
-        return res.json(data);
+        return res.json(enrichIndicesWithTrend(data));
       }
     } catch (e: any) {
       console.error('Indices API error:', e.message);
@@ -1797,8 +1809,55 @@ export async function registerRoutes(
   app.get('/api/stocks/:symbol/history', async (req, res) => {
     const { symbol } = req.params;
     const range = req.query.range as string || '1M';
+    const withTrend = req.query.trend === '1';
     try {
       const data = await yahoo.getHistory(symbol.toUpperCase(), range);
+      if (withTrend && data && data.length >= 21) {
+        const closes = data.map((d: any) => d.close);
+        const ema5: number[] = [];
+        const ema9: number[] = [];
+        const sma21: number[] = [];
+        const m5 = 2 / 6, m9 = 2 / 10;
+
+        for (let i = 0; i < closes.length; i++) {
+          if (i < 5) {
+            const avg = closes.slice(0, i + 1).reduce((a: number, b: number) => a + b, 0) / (i + 1);
+            ema5.push(avg);
+          } else if (i === 5) {
+            const seed = closes.slice(0, 5).reduce((a: number, b: number) => a + b, 0) / 5;
+            ema5.push((closes[i] - seed) * m5 + seed);
+          } else {
+            ema5.push((closes[i] - ema5[i - 1]) * m5 + ema5[i - 1]);
+          }
+
+          if (i < 9) {
+            const avg = closes.slice(0, i + 1).reduce((a: number, b: number) => a + b, 0) / (i + 1);
+            ema9.push(avg);
+          } else if (i === 9) {
+            const seed = closes.slice(0, 9).reduce((a: number, b: number) => a + b, 0) / 9;
+            ema9.push((closes[i] - seed) * m9 + seed);
+          } else {
+            ema9.push((closes[i] - ema9[i - 1]) * m9 + ema9[i - 1]);
+          }
+
+          if (i >= 20) {
+            let sum = 0;
+            for (let j = i - 20; j <= i; j++) sum += closes[j];
+            sma21.push(sum / 21);
+          } else {
+            sma21.push(0);
+          }
+
+          if (i < 20) {
+            data[i].trend = 'TS';
+          } else {
+            const e5 = ema5[i], e9 = ema9[i], s21 = sma21[i];
+            if (e5 > e9 && e9 > s21) data[i].trend = 'T+';
+            else if (e5 < e9 && e9 < s21) data[i].trend = 'T-';
+            else data[i].trend = 'TS';
+          }
+        }
+      }
       return res.json(data);
     } catch (e: any) {
       console.error(`History error for ${symbol}:`, e.message);

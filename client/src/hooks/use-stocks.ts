@@ -32,6 +32,20 @@ export function useStockHistory(symbol: string, range: string = '1M') {
   });
 }
 
+export function useStockHistoryWithTrend(symbol: string, range: string = '1Y') {
+  return useQuery({
+    queryKey: ['/api/stocks', symbol, 'history-trend', range],
+    queryFn: async () => {
+      const res = await fetch(`/api/stocks/${symbol}/history?range=${range}&trend=1`, { credentials: "include" });
+      if (!res.ok) throw new Error(`History fetch failed: ${res.status}`);
+      return res.json();
+    },
+    enabled: !!symbol,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
+  });
+}
+
 export function useStockEarnings(symbol: string, view: 'quarterly' | 'annual' = 'quarterly') {
   return useQuery({
     queryKey: ['/api/stocks', symbol, 'earnings', view],
