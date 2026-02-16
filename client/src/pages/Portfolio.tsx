@@ -2,6 +2,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useState, useMemo, useEffect } from "react";
+import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +69,9 @@ interface Analytics {
   tradesBySetup: { setup: string; count: number; pnl: number; wins: number; winRate: number }[];
   tradesByDay: { day: string; count: number; pnl: number; wins: number; winRate: number }[];
   monthlyPnl: { month: string; pnl: number }[];
+  dailyPnl: { period: string; pnl: number }[];
+  weeklyPnl: { period: string; pnl: number }[];
+  yearlyPnl: { period: string; pnl: number }[];
 }
 
 interface HoldingDetail {
@@ -147,6 +151,7 @@ export default function Portfolio() {
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [showBenchmarks, setShowBenchmarks] = useState({ qqq: true, spy: true });
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const { data: trades = [], isLoading: tradesLoading } = useQuery<Trade[]>({
     queryKey: ['/api/portfolio/trades'],
@@ -357,33 +362,38 @@ function OverviewTab({ equityData, analytics, trades, config, showBenchmarks, se
     const openTrades = trades.filter(t => !t.exitDate);
     if (openTrades.length === 0) return [];
 
+    const lastPoint = equityData?.equity?.[equityData.equity.length - 1];
+    const lastEquity = lastPoint?.equity || startingCapital;
+    const cashFromEquity = lastPoint?.cash ?? startingCapital;
+
     const positionMap = new Map<string, number>();
     for (const t of openTrades) {
       const value = t.entryPrice * t.quantity;
       positionMap.set(t.ticker, (positionMap.get(t.ticker) || 0) + value);
     }
-
-    const lastEquity = equityData?.equity?.[equityData.equity.length - 1]?.equity || startingCapital;
-    const totalInvested = Array.from(positionMap.values()).reduce((s, v) => s + v, 0);
-    const cashValue = lastEquity - totalInvested;
+    const totalCostBasis = Array.from(positionMap.values()).reduce((s, v) => s + v, 0);
+    const investedPortion = lastEquity - cashFromEquity;
+    const totalPortfolio = cashFromEquity + (investedPortion > 0 ? investedPortion : totalCostBasis);
 
     const items: { name: string; value: number; pct: number; color: string }[] = [];
     let colorIdx = 0;
     const sortedPositions = Array.from(positionMap.entries()).sort((a, b) => b[1] - a[1]);
-    for (const [ticker, value] of sortedPositions) {
+    const scaleFactor = investedPortion > 0 ? investedPortion / totalCostBasis : 1;
+    for (const [ticker, costBasis] of sortedPositions) {
+      const displayValue = costBasis * scaleFactor;
       items.push({
         name: ticker,
-        value,
-        pct: (value / lastEquity) * 100,
+        value: displayValue,
+        pct: (displayValue / totalPortfolio) * 100,
         color: HOLDING_COLORS[colorIdx % HOLDING_COLORS.length],
       });
       colorIdx++;
     }
-    if (cashValue > 0) {
+    if (cashFromEquity > 0) {
       items.push({
         name: 'Cash',
-        value: cashValue,
-        pct: (cashValue / lastEquity) * 100,
+        value: cashFromEquity,
+        pct: (cashFromEquity / totalPortfolio) * 100,
         color: 'rgba(255,255,255,0.12)',
       });
     }
@@ -464,7 +474,7 @@ function OverviewTab({ equityData, analytics, trades, config, showBenchmarks, se
             <button
               onClick={() => setShowBenchmarks((p: any) => ({ ...p, spy: !p.spy }))}
               className={cn("text-[10px] px-2 py-0.5 rounded transition-colors",
-                showBenchmarks.spy ? "text-amber-400/70 bg-amber-500/8" : "text-white/15 hover:text-white/30"
+                showBenchmarks.spy ? "text-white/70 bg-white/8" : "text-white/15 hover:text-white/30"
               )}
               data-testid="toggle-spy"
             >
@@ -507,14 +517,14 @@ function OverviewTab({ equityData, analytics, trades, config, showBenchmarks, se
               <ReferenceLine y={0} stroke="rgba(255,255,255,0.06)" strokeDasharray="4 4" />
               <defs>
                 <linearGradient id="portfolioGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="rgba(255,255,255,0.06)" />
-                  <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+                  <stop offset="0%" stopColor="rgba(234,179,8,0.10)" />
+                  <stop offset="100%" stopColor="rgba(234,179,8,0)" />
                 </linearGradient>
               </defs>
               <Area
                 type="monotone"
                 dataKey="portfolio"
-                stroke="rgba(255,255,255,0.5)"
+                stroke="rgba(234,179,8,0.7)"
                 fill="url(#portfolioGradient)"
                 strokeWidth={1.5}
                 dot={false}
@@ -525,7 +535,7 @@ function OverviewTab({ equityData, analytics, trades, config, showBenchmarks, se
                 <Line type="monotone" dataKey="qqq" stroke="rgba(96,165,250,0.5)" strokeWidth={1.2} dot={false} name="qqq" connectNulls />
               )}
               {showBenchmarks.spy && (
-                <Line type="monotone" dataKey="spy" stroke="rgba(251,191,36,0.45)" strokeWidth={1.2} dot={false} name="spy" connectNulls />
+                <Line type="monotone" dataKey="spy" stroke="rgba(255,255,255,0.45)" strokeWidth={1.2} dot={false} name="spy" connectNulls />
               )}
             </ComposedChart>
           </ResponsiveContainer>
@@ -558,8 +568,16 @@ function OverviewTab({ equityData, analytics, trades, config, showBenchmarks, se
                       ))}
                     </Pie>
                     <Tooltip
-                      contentStyle={{ backgroundColor: 'rgba(12,12,12,0.95)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', backdropFilter: 'blur(16px)', padding: '6px 10px', fontSize: 11 }}
-                      formatter={(v: any, name: any) => [formatCurrency(v as number), name]}
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null;
+                        const d = payload[0].payload;
+                        return (
+                          <div style={{ backgroundColor: 'rgba(12,12,12,0.95)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', backdropFilter: 'blur(16px)', padding: '6px 10px', fontSize: 11 }}>
+                            <div style={{ color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>{d.name}</div>
+                            <div style={{ color: 'rgba(255,255,255,0.8)', fontWeight: 500 }}>{formatCurrency(d.value)} ({d.pct.toFixed(1)}%)</div>
+                          </div>
+                        );
+                      }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -598,10 +616,10 @@ function OverviewTab({ equityData, analytics, trades, config, showBenchmarks, se
                   </thead>
                   <tbody>
                     {holdingsDetail.map(h => (
-                      <tr key={h.ticker} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors" data-testid={`holding-row-${h.ticker}`}>
+                      <tr key={h.ticker} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors cursor-pointer" onClick={() => navigate(`/stocks/${h.ticker}`)} data-testid={`holding-row-${h.ticker}`}>
                         <td className="p-1.5">
                           <div>
-                            <span className="font-medium text-white">{h.ticker}</span>
+                            <span className="font-medium text-white hover:text-yellow-400/80 transition-colors">{h.ticker}</span>
                             <div className="text-[9px] text-white/20 truncate max-w-[120px] sm:max-w-[180px]">{h.name}</div>
                           </div>
                         </td>
@@ -908,22 +926,74 @@ function PartialCloseDialog({ trade, onClose }: { trade: Trade | null; onClose: 
   );
 }
 
+type PnlPeriod = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'ytd';
+
 function AnalyticsTab({ analytics, isLoading }: { analytics: Analytics | undefined; isLoading: boolean }) {
+  const [pnlPeriod, setPnlPeriod] = useState<PnlPeriod>('monthly');
+
   if (isLoading || !analytics) {
     return <div className={cn(glassPanel, "h-[400px] animate-pulse")} />;
   }
 
+  const pnlPeriods: { id: PnlPeriod; label: string }[] = [
+    { id: 'daily', label: 'Daily' },
+    { id: 'weekly', label: 'Weekly' },
+    { id: 'monthly', label: 'Monthly' },
+    { id: 'yearly', label: 'Yearly' },
+    { id: 'ytd', label: 'YTD' },
+  ];
+
+  function getPnlData() {
+    const now = new Date();
+    const ytdCutoff = `${now.getFullYear()}`;
+    switch (pnlPeriod) {
+      case 'daily':
+        return (analytics!.dailyPnl || []).map(d => ({ label: d.period, pnl: d.pnl }));
+      case 'weekly':
+        return (analytics!.weeklyPnl || []).map(d => ({ label: d.period, pnl: d.pnl }));
+      case 'monthly':
+        return analytics!.monthlyPnl.map(d => ({ label: d.month, pnl: d.pnl }));
+      case 'yearly':
+        return (analytics!.yearlyPnl || []).map(d => ({ label: d.period, pnl: d.pnl }));
+      case 'ytd':
+        return analytics!.monthlyPnl
+          .filter(d => d.month.startsWith(ytdCutoff))
+          .map(d => ({ label: d.month, pnl: d.pnl }));
+      default:
+        return [];
+    }
+  }
+
+  const pnlData = getPnlData();
+  const hasPnlData = pnlData.length > 0;
+
   return (
     <div className="space-y-3">
-      {analytics.monthlyPnl.length > 0 && (
-        <div className={cn(glassPanel, "p-3 sm:p-4")}>
-          <div className="text-[11px] font-medium text-white/25 uppercase tracking-wider mb-3">Monthly P&L</div>
-          <div className="h-[180px] sm:h-[220px]" data-testid="monthly-pnl-chart">
+      <div className={cn(glassPanel, "p-3 sm:p-4")}>
+        <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+          <div className="text-[11px] font-medium text-white/25 uppercase tracking-wider">P&L</div>
+          <div className="flex items-center gap-0.5 bg-white/[0.04] rounded p-0.5">
+            {pnlPeriods.map(p => (
+              <button
+                key={p.id}
+                onClick={() => setPnlPeriod(p.id)}
+                className={cn("px-2 py-0.5 text-[10px] font-medium rounded transition-colors",
+                  pnlPeriod === p.id ? "bg-white/10 text-white" : "text-white/20 hover:text-white/40"
+                )}
+                data-testid={`pnl-period-${p.id}`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {hasPnlData ? (
+          <div className="h-[180px] sm:h-[220px]" data-testid="pnl-chart">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={analytics.monthlyPnl} barCategoryGap="15%" margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
+              <BarChart data={pnlData} barCategoryGap="15%" margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
                 <XAxis
-                  dataKey="month"
+                  dataKey="label"
                   tick={{ fill: 'rgba(255,255,255,0.15)', fontSize: 10 }}
                   axisLine={{ stroke: 'rgba(255,255,255,0.04)' }}
                   tickLine={false}
@@ -942,15 +1012,17 @@ function AnalyticsTab({ analytics, isLoading }: { analytics: Analytics | undefin
                 />
                 <ReferenceLine y={0} stroke="rgba(255,255,255,0.06)" />
                 <Bar dataKey="pnl" radius={[2, 2, 0, 0]}>
-                  {analytics.monthlyPnl.map((entry: any, i: number) => (
+                  {pnlData.map((entry, i) => (
                     <Cell key={i} fill={entry.pnl >= 0 ? 'rgba(52,211,153,0.35)' : 'rgba(248,113,113,0.3)'} />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="h-[120px] flex items-center justify-center text-[11px] text-white/15">No P&L data for this period</div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className={cn(glassPanel, "p-3 sm:p-4")}>

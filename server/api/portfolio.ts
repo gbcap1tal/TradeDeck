@@ -353,7 +353,17 @@ export async function computeAnalytics(userId: string) {
 
   const setupMap = new Map<string, { count: number; pnl: number; wins: number }>();
   const dayMap = new Map<string, { count: number; pnl: number; wins: number }>();
+  const dailyPnlMap = new Map<string, number>();
+  const weeklyPnlMap = new Map<string, number>();
   const monthMap = new Map<string, number>();
+  const yearlyPnlMap = new Map<string, number>();
+
+  function getWeekKey(dateStr: string): string {
+    const d = new Date(dateStr);
+    const jan1 = new Date(d.getFullYear(), 0, 1);
+    const weekNum = Math.ceil(((d.getTime() - jan1.getTime()) / 86400000 + jan1.getDay() + 1) / 7);
+    return `${d.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+  }
 
   for (const tp of tradePnls) {
     const tag = tp.trade.setupTag || 'untagged';
@@ -370,9 +380,18 @@ export async function computeAnalytics(userId: string) {
     if (tp.pnl > 0) dayExisting.wins++;
     dayMap.set(dayName, dayExisting);
 
-    const month = tp.trade.exitDate!.substring(0, 7);
+    const exitDate = tp.trade.exitDate!;
+    dailyPnlMap.set(exitDate, (dailyPnlMap.get(exitDate) || 0) + tp.pnl);
+    const week = getWeekKey(exitDate);
+    weeklyPnlMap.set(week, (weeklyPnlMap.get(week) || 0) + tp.pnl);
+    const month = exitDate.substring(0, 7);
     monthMap.set(month, (monthMap.get(month) || 0) + tp.pnl);
+    const year = exitDate.substring(0, 4);
+    yearlyPnlMap.set(year, (yearlyPnlMap.get(year) || 0) + tp.pnl);
   }
+
+  const mapToSorted = (m: Map<string, number>) =>
+    Array.from(m.entries()).map(([key, pnl]) => ({ period: key, pnl: Math.round(pnl * 100) / 100 })).sort((a, b) => a.period.localeCompare(b.period));
 
   return {
     totalReturn: Math.round(totalPnl * 100) / 100,
@@ -403,6 +422,9 @@ export async function computeAnalytics(userId: string) {
     monthlyPnl: Array.from(monthMap.entries()).map(([month, pnl]) => ({
       month, pnl: Math.round(pnl * 100) / 100,
     })).sort((a, b) => a.month.localeCompare(b.month)),
+    dailyPnl: mapToSorted(dailyPnlMap),
+    weeklyPnl: mapToSorted(weeklyPnlMap),
+    yearlyPnl: mapToSorted(yearlyPnlMap),
   };
 }
 
