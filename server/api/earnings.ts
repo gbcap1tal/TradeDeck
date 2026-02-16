@@ -62,7 +62,15 @@ export interface EarningsCalendarItem {
   aiSummary: string | null;
 }
 
+function isWeekendDate(dateStr: string): boolean {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dow = new Date(y, m - 1, d).getDay();
+  return dow === 0 || dow === 6;
+}
+
 export async function fetchEarningsCalendar(dateStr: string, forceRefresh: boolean = false): Promise<EarningsCalendarItem[]> {
+  if (isWeekendDate(dateStr)) return [];
+
   const cacheKey = `earnings_cal_${dateStr}`;
   
   if (!forceRefresh) {
@@ -1122,7 +1130,7 @@ export async function getEarningsDatesWithData(year: number, month: number): Pro
     }
   }
 
-  const dates = Array.from(allDates).sort();
+  const dates = Array.from(allDates).filter(d => !isWeekendDate(d)).sort();
   if (dates.length > 0) {
     setCache(cacheKey, dates, 3600);
   }

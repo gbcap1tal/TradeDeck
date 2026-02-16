@@ -171,7 +171,8 @@ export default function Earnings() {
   const yesterdayStr = getPrevTradingDay(todayStr);
   const twoDaysAgoStr = getPrevTradingDay(yesterdayStr);
 
-  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const todayIsWeekend = isWeekend(etNow.year, etNow.month, etNow.day);
+  const [selectedDate, setSelectedDate] = useState(todayIsWeekend ? yesterdayStr : todayStr);
   const [currentYear, setCurrentYear] = useState(etNow.year);
   const [currentMonth, setCurrentMonth] = useState(etNow.month);
   const [modalItem, setModalItem] = useState<EarningsItem | null>(null);
@@ -180,6 +181,8 @@ export default function Earnings() {
   const [, setLocation] = useLocation();
 
   function isDateClickable(dateStr: string): boolean {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    if (isWeekend(y, m, d)) return false;
     if (dateStr >= todayStr) return true;
     if (dateStr >= twoDaysAgoStr) return true;
     return false;
