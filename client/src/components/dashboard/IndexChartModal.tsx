@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { createChart, ColorType, CrosshairMode, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
+import { createChart, ColorType, CrosshairMode, CandlestickSeries, HistogramSeries, LineSeries } from 'lightweight-charts';
 import type { IChartApi, CandlestickData, Time } from 'lightweight-charts';
 import { X, Loader2 } from 'lucide-react';
 import { useStockHistory, useStockHistoryWithTrend } from '@/hooks/use-stocks';
 import { cn } from '@/lib/utils';
 
 const TREND_COLORS = {
-  'T+': 'rgba(46, 184, 80, 0.25)',
-  'TS': 'rgba(107, 107, 107, 0.15)',
-  'T-': 'rgba(192, 80, 80, 0.25)',
+  'T+': 'rgba(46, 184, 80, 0.55)',
+  'TS': 'rgba(107, 107, 107, 0.3)',
+  'T-': 'rgba(192, 80, 80, 0.55)',
 };
 
 type ChartTimeframe = 'D' | 'W' | 'MO';
@@ -84,7 +84,7 @@ function IndexChart({ data, showTrend = true }: { data: any[]; showTrend?: boole
         priceScaleId: 'volume',
       });
       chart.priceScale('volume').applyOptions({
-        scaleMargins: { top: 0.78, bottom: 0.04 },
+        scaleMargins: { top: 0.78, bottom: showTrend ? 0.07 : 0.02 },
       });
       volumeSeries.setData(data.map(d => ({
         time: toTime(d.time),
@@ -94,16 +94,19 @@ function IndexChart({ data, showTrend = true }: { data: any[]; showTrend?: boole
     }
 
     if (showTrend && data[0]?.trend) {
-      const trendSeries = chart.addSeries(HistogramSeries, {
-        priceFormat: { type: 'volume' },
+      const trendSeries = chart.addSeries(LineSeries, {
         priceScaleId: 'trend',
+        lineWidth: 3,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
       });
       chart.priceScale('trend').applyOptions({
-        scaleMargins: { top: 0.93, bottom: 0 },
+        scaleMargins: { top: 0.96, bottom: 0.005 },
       });
       trendSeries.setData(data.map(d => ({
         time: toTime(d.time),
-        value: 1,
+        value: 0,
         color: TREND_COLORS[d.trend as keyof typeof TREND_COLORS] || TREND_COLORS['TS'],
       })));
     }
@@ -208,15 +211,15 @@ export function IndexChartModal({ index, onClose }: IndexChartModalProps) {
         {isDaily && (
           <div className="flex items-center gap-3 px-4 pb-1 flex-shrink-0">
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-1.5 rounded-sm" style={{ backgroundColor: 'rgba(46, 184, 80, 0.5)' }} />
+              <div className="w-4 h-[3px] rounded-full" style={{ backgroundColor: 'rgba(46, 184, 80, 0.55)' }} />
               <span className="text-[9px] text-white/30">T+</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-1.5 rounded-sm" style={{ backgroundColor: 'rgba(107, 107, 107, 0.35)' }} />
+              <div className="w-4 h-[3px] rounded-full" style={{ backgroundColor: 'rgba(107, 107, 107, 0.3)' }} />
               <span className="text-[9px] text-white/30">TS</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-1.5 rounded-sm" style={{ backgroundColor: 'rgba(192, 80, 80, 0.5)' }} />
+              <div className="w-4 h-[3px] rounded-full" style={{ backgroundColor: 'rgba(192, 80, 80, 0.55)' }} />
               <span className="text-[9px] text-white/30">T-</span>
             </div>
           </div>

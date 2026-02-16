@@ -614,15 +614,39 @@ function initBackgroundTasks() {
     console.log('[bg] Phase 1: Computing fast data (indices, sectors, rotation, breadth, industry RS)...');
     await Promise.allSettled([
       (async () => {
-        try {
-          const indices = await yahoo.getIndices();
-          const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
-          if (indices && indices.length > 0) {
-            setCache('market_indices', indices, indicesTtl);
-            console.log(`[bg] Indices pre-computed: ${indices.length} indices in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+        const fetchIndices = async (attempt: number) => {
+          try {
+            const indices = await yahoo.getIndices();
+            const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
+            if (indices && indices.length > 0) {
+              setCache('market_indices', indices, indicesTtl);
+              console.log(`[bg] Indices pre-computed: ${indices.length} indices in ${((Date.now() - bgStart) / 1000).toFixed(1)}s${attempt > 1 ? ` (attempt ${attempt})` : ''}`);
+              return true;
+            }
+            return false;
+          } catch (e: any) {
+            console.log(`[bg] Indices pre-compute error (attempt ${attempt}): ${e.message}`);
+            return false;
           }
-        } catch (e: any) {
-          console.log(`[bg] Indices pre-compute error: ${e.message}`);
+        };
+        const ok = await fetchIndices(1);
+        if (!ok) {
+          // Retry after 30s with fresh Yahoo auth
+          setTimeout(async () => {
+            console.log('[bg] Retrying indices fetch with fresh Yahoo auth...');
+            yahoo.clearYahooAuthCache();
+            await new Promise(r => setTimeout(r, 2000));
+            const ok2 = await fetchIndices(2);
+            if (!ok2) {
+              // Final retry after another 60s
+              setTimeout(async () => {
+                console.log('[bg] Final indices retry...');
+                yahoo.clearYahooAuthCache();
+                await new Promise(r => setTimeout(r, 3000));
+                await fetchIndices(3);
+              }, 60000);
+            }
+          }, 30000);
         }
       })(),
       (async () => {
@@ -1034,67 +1058,63 @@ function initBackgroundTasks() {
   }, 60000);
 
   // === SELF-HEALING WATCHDOG ===
-  // Checks every 5 minutes if market data is broken (0 stocks, missing breadth/indices)
-  // and automatically retries with fresh Yahoo auth
+  // Runs every 3 minutes, 24/7 (including weekends/after-hours).
+  // Checks core data (indices, breadth, sectors) and auto-heals by clearing Yahoo auth and retrying.
   let selfHealingInProgress = false;
   let lastSelfHealTime = 0;
   const SELF_HEAL_COOLDOWN = 10 * 60 * 1000; // 10 min cooldown between heal attempts
 
   setInterval(async () => {
     if (selfHealingInProgress || isFullRefreshRunning) return;
+    const uptime = process.uptime();
+    if (uptime < 120) return; // wait at least 2 min after startup
+
+    const indicesData = getCached<any[]>('market_indices');
+    const breadthData = getCached<any>('market_breadth');
+    const sectorsData = getCached<any[]>('sectors_data');
 
     const now = new Date();
     const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
     const day = et.getDay();
-    if (day === 0 || day === 6) return; // skip weekends
-
     const timeMinutes = et.getHours() * 60 + et.getMinutes();
-    if (timeMinutes < 540 || timeMinutes > 965) return; // only during market hours (9AM-4:05PM ET)
-
-    const breadthData = getCached<any>('market_breadth');
-    const sectorsData = getCached<any[]>('sectors_data');
+    const isDuringMarket = day >= 1 && day <= 5 && timeMinutes >= 540 && timeMinutes <= 965;
 
     let needsHeal = false;
     const reasons: string[] = [];
 
-    // Check 1: Breadth has 0 universe stocks
+    // Check 1: Indices missing or empty — CRITICAL, runs 24/7
+    if (!indicesData || indicesData.length === 0) {
+      needsHeal = true;
+      reasons.push('Indices cache empty');
+    }
+
+    // Check 2: Breadth issues (only during market hours for staleness)
     if (breadthData) {
       const universe = breadthData.universeSize ?? 0;
       if (universe === 0) {
         needsHeal = true;
-        reasons.push(`Breadth universe is 0 stocks`);
+        reasons.push('Breadth universe is 0 stocks');
       }
-      // Check 1b: Breadth data is stale (computed > 6 hours ago during market hours)
-      if (breadthData.lastComputedAt) {
+      if (isDuringMarket && breadthData.lastComputedAt) {
         const computedAge = Date.now() - new Date(breadthData.lastComputedAt).getTime();
         if (computedAge > 6 * 3600 * 1000) {
           needsHeal = true;
           reasons.push(`Breadth data stale (${Math.round(computedAge / 3600000)}h old)`);
         }
       }
+    } else if (uptime > 180) {
+      needsHeal = true;
+      reasons.push('No breadth data cached after 3+ min uptime');
     }
 
-    // Check 2: No breadth data at all (and server has been up > 5 min)
-    if (!breadthData) {
-      const uptime = process.uptime();
-      if (uptime > 300) {
-        needsHeal = true;
-        reasons.push('No breadth data cached after 5+ min uptime');
-      }
+    // Check 3: Sectors missing
+    if ((!sectorsData || sectorsData.length === 0) && uptime > 180) {
+      needsHeal = true;
+      reasons.push('No sectors data cached');
     }
 
-    // Check 3: No sectors data
-    if (!sectorsData || sectorsData.length === 0) {
-      const uptime = process.uptime();
-      if (uptime > 300) {
-        needsHeal = true;
-        reasons.push('No sectors data cached');
-      }
-    }
-
-    // Check 4: Indices health — test if Yahoo quotes work (indices rely on yf.quote)
-    // Clearing Yahoo auth cache fixes all Yahoo-dependent endpoints (indices, quotes, breadth)
-    if (!needsHeal && process.uptime() > 300) {
+    // Check 4: Proactive Yahoo health check (during market hours, if nothing else triggered)
+    if (!needsHeal && isDuringMarket && uptime > 300) {
       try {
         const testQuote = await yahoo.getQuote('SPY');
         if (!testQuote || testQuote.price === 0) {
@@ -1124,24 +1144,52 @@ function initBackgroundTasks() {
       // Step 2: Wait a moment for Yahoo rate limits to cool down
       await new Promise(r => setTimeout(r, 3000));
 
+      // Step 3: Retry indices (always — this is the most visible data)
+      if (!indicesData || indicesData.length === 0) {
+        try {
+          const indices = await yahoo.getIndices();
+          if (indices && indices.length > 0) {
+            const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
+            setCache('market_indices', indices, indicesTtl);
+            console.log(`[watchdog] Indices healed: ${indices.length} indices`);
+          } else {
+            console.log('[watchdog] Indices retry returned empty');
+            sendAlert('Self-Healing: Indices Still Empty', `Watchdog retried indices but Yahoo returned empty data.\n\nReasons: ${reasons.join(', ')}`, 'watchdog_indices');
+          }
+        } catch (err: any) {
+          console.error(`[watchdog] Indices retry error: ${err.message}`);
+          sendAlert('Self-Healing: Indices Retry Failed', `Watchdog indices retry threw an error.\n\nError: ${err.message}`, 'watchdog_indices');
+        }
+      }
+
+      // Step 4: Retry breadth
       try {
-        const breadth = await computeMarketBreadth(true);
-        const universe = breadth.universeSize ?? 0;
-        if (universe > 0) {
-          const ttl = isUSMarketOpen() ? CACHE_TTL.BREADTH : 43200;
-          setCache('market_breadth', breadth, ttl);
-          console.log(`[watchdog] Breadth healed: score=${breadth.overallScore}, universe=${universe} stocks`);
-          clearFailures('breadth_scan');
-        } else {
-          console.log(`[watchdog] Breadth retry still returned 0 stocks — Yahoo may be blocking`);
-          sendAlert('Self-Healing: Breadth Still Broken', `Watchdog attempted to heal breadth data but Yahoo screener still returned 0 stocks.\n\nReasons: ${reasons.join(', ')}`, 'watchdog_breadth');
+        if (!isUSMarketOpen()) {
+          const frozen = getFrozenBreadth();
+          if (frozen) {
+            setCache('market_breadth', frozen, 43200);
+            console.log(`[watchdog] Using frozen breadth: score=${frozen.overallScore}`);
+          }
+        }
+        if (!getCached<any>('market_breadth')) {
+          const breadth = await computeMarketBreadth(true);
+          const universe = breadth.universeSize ?? 0;
+          if (universe > 0) {
+            const ttl = isUSMarketOpen() ? CACHE_TTL.BREADTH : 43200;
+            setCache('market_breadth', breadth, ttl);
+            console.log(`[watchdog] Breadth healed: score=${breadth.overallScore}, universe=${universe} stocks`);
+            clearFailures('breadth_scan');
+          } else {
+            console.log('[watchdog] Breadth retry still returned 0 stocks');
+            sendAlert('Self-Healing: Breadth Still Broken', `Watchdog attempted to heal breadth but Yahoo screener returned 0 stocks.\n\nReasons: ${reasons.join(', ')}`, 'watchdog_breadth');
+          }
         }
       } catch (err: any) {
         console.error(`[watchdog] Breadth retry error: ${err.message}`);
         sendAlert('Self-Healing: Breadth Retry Failed', `Watchdog breadth retry threw an error.\n\nError: ${err.message}`, 'watchdog_breadth');
       }
 
-      // Step 4: Retry sectors if missing
+      // Step 5: Retry sectors if missing
       if (!sectorsData || sectorsData.length === 0) {
         try {
           const sectors = await computeSectorsData();
@@ -1158,7 +1206,7 @@ function initBackgroundTasks() {
     } finally {
       selfHealingInProgress = false;
     }
-  }, 5 * 60 * 1000); // every 5 minutes
+  }, 3 * 60 * 1000); // every 3 minutes
 
   let lastEarningsWatchdogRun = 0;
   const EARNINGS_WATCHDOG_COOLDOWN = 10 * 60 * 1000;
