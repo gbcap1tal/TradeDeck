@@ -218,9 +218,9 @@ export async function getHistory(symbol: string, range: string = '1M') {
     '3M': { period1: new Date(Date.now() - 95 * 86400000), interval: '1d' },
     '1Y': { period1: new Date(Date.now() - 370 * 86400000), interval: '1d' },
     '5Y': { period1: new Date(Date.now() - 1830 * 86400000), interval: '1wk' },
-    'D': { period1: new Date(Date.now() - 370 * 86400000), interval: '1d' },
-    'W': { period1: new Date(Date.now() - 730 * 86400000), interval: '1wk' },
-    'MO': { period1: new Date(Date.now() - 1830 * 86400000), interval: '1mo' },
+    'D': { period1: new Date(Date.now() - 730 * 86400000), interval: '1d' },
+    'W': { period1: new Date(Date.now() - 1830 * 86400000), interval: '1wk' },
+    'MO': { period1: new Date(Date.now() - 3650 * 86400000), interval: '1mo' },
   };
 
   const config = periodMap[range] || periodMap['1M'];
