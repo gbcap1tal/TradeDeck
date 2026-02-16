@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/layout/Navbar";
 import { useQuery } from "@tanstack/react-query";
-import { Newspaper, ArrowUp, AlertCircle, Search, X } from "lucide-react";
+import { Newspaper, Building2, AlertCircle, Search, X } from "lucide-react";
 import { useLocation } from "wouter";
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
@@ -311,7 +311,7 @@ export default function News() {
           {/* Headlines That Matter - centered top section */}
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
-              <Newspaper className="w-4 h-4 text-[#0a84ff]" />
+              <Newspaper className="w-4 h-4 text-white/40" />
               <div className="section-title" data-testid="text-digest-title">Headlines That Matter</div>
               {digest?.timestamp && (
                 <span className="text-[10px] text-white/25 font-mono ml-auto">
@@ -341,7 +341,7 @@ export default function News() {
                     <ul className="space-y-3">
                       {digest.bullets.map((bullet, i) => (
                         <li key={i} className="flex gap-3" data-testid={`text-digest-bullet-${i}`}>
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#0a84ff]/40 mt-2 flex-shrink-0" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-white/20 mt-2 flex-shrink-0" />
                           <span className="text-[13px] text-white/55 leading-relaxed">
                             {highlightTickers(bullet, goToStock, true)}
                           </span>
@@ -368,7 +368,7 @@ export default function News() {
           {/* Corporate Developments - full width below */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <ArrowUp className="w-4 h-4 text-[#30d158]" />
+              <Building2 className="w-4 h-4 text-[#c8a951]" />
               <div className="section-title" data-testid="text-premarket-title">Corporate Developments</div>
               {premarket?.updated && (
                 <span className="text-[10px] text-white/25 font-mono ml-auto" data-testid="text-premarket-updated">
