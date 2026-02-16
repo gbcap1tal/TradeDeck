@@ -5,9 +5,16 @@ import { useStockHistory } from "@/hooks/use-stocks";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ChevronRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { createChart, ColorType, CrosshairMode, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
 import type { IChartApi, CandlestickData, Time } from 'lightweight-charts';
+
+type ChartTimeframe = 'D' | 'W' | 'MO';
+const TIMEFRAMES: { value: ChartTimeframe; label: string }[] = [
+  { value: 'D', label: 'D' },
+  { value: 'W', label: 'W' },
+  { value: 'MO', label: 'M' },
+];
 
 
 function SectorETFChart({ data }: { data: any[] }) {
@@ -102,8 +109,9 @@ export default function SectorDetail() {
   const { data, isLoading } = useSectorDetail(sectorName);
   const [, setLocation] = useLocation();
 
+  const [chartTimeframe, setChartTimeframe] = useState<ChartTimeframe>('D');
   const etfTicker = data?.sector?.ticker || '';
-  const { data: etfHistory, isLoading: chartLoading } = useStockHistory(etfTicker, 'D');
+  const { data: etfHistory, isLoading: chartLoading } = useStockHistory(etfTicker, chartTimeframe);
 
   const getHeatmapColor = (change: number) => {
     const intensity = Math.min(Math.abs(change) / 3, 1);
@@ -167,7 +175,22 @@ export default function SectorDetail() {
               {etfTicker && (
                 <div className="glass-card rounded-xl p-4 mb-4 flex-shrink-0" data-testid="card-sector-chart">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] text-white/30 uppercase tracking-wider font-medium">{etfTicker} Daily</span>
+                    <span className="text-[11px] text-white/30 uppercase tracking-wider font-medium">{etfTicker} {chartTimeframe === 'D' ? 'Daily' : chartTimeframe === 'W' ? 'Weekly' : 'Monthly'}</span>
+                    <div className="flex items-center gap-0.5 rounded-md bg-white/[0.04] p-0.5" data-testid="switch-sector-timeframe">
+                      {TIMEFRAMES.map(tf => (
+                        <button
+                          key={tf.value}
+                          onClick={() => setChartTimeframe(tf.value)}
+                          className={cn(
+                            "px-2.5 py-1 text-[11px] font-semibold rounded transition-colors",
+                            chartTimeframe === tf.value ? 'bg-white/10 text-white/80' : 'text-white/20 hover:text-white/40'
+                          )}
+                          data-testid={`tab-sector-tf-${tf.value}`}
+                        >
+                          {tf.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div className="h-[280px] sm:h-[340px] lg:h-[380px]">
                     {chartLoading ? (

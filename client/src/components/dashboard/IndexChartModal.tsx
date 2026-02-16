@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createChart, ColorType, CrosshairMode, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
 import type { IChartApi, CandlestickData, Time } from 'lightweight-charts';
 import { X, Loader2 } from 'lucide-react';
-import { useStockHistoryWithTrend } from '@/hooks/use-stocks';
+import { useStockHistory, useStockHistoryWithTrend } from '@/hooks/use-stocks';
 import { cn } from '@/lib/utils';
 
 const TREND_COLORS = {
@@ -11,14 +11,14 @@ const TREND_COLORS = {
   'T-': 'rgba(192, 80, 80, 0.25)',
 };
 
-type ChartRange = '3M' | '1Y' | '5Y';
-const RANGES: { value: ChartRange; label: string }[] = [
-  { value: '3M', label: '3M' },
-  { value: '1Y', label: '1Y' },
-  { value: '5Y', label: '5Y' },
+type ChartTimeframe = 'D' | 'W' | 'MO';
+const TIMEFRAMES: { value: ChartTimeframe; label: string }[] = [
+  { value: 'D', label: 'D' },
+  { value: 'W', label: 'W' },
+  { value: 'MO', label: 'M' },
 ];
 
-function IndexChart({ data }: { data: any[] }) {
+function IndexChart({ data, showTrend = true }: { data: any[]; showTrend?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
@@ -47,7 +47,7 @@ function IndexChart({ data }: { data: any[] }) {
       },
       rightPriceScale: {
         borderColor: 'rgba(255,255,255,0.06)',
-        scaleMargins: { top: 0.05, bottom: 0.25 },
+        scaleMargins: { top: 0.05, bottom: showTrend ? 0.25 : 0.18 },
       },
       timeScale: {
         borderColor: 'rgba(255,255,255,0.06)',
@@ -93,18 +93,20 @@ function IndexChart({ data }: { data: any[] }) {
       })));
     }
 
-    const trendSeries = chart.addSeries(HistogramSeries, {
-      priceFormat: { type: 'volume' },
-      priceScaleId: 'trend',
-    });
-    chart.priceScale('trend').applyOptions({
-      scaleMargins: { top: 0.93, bottom: 0 },
-    });
-    trendSeries.setData(data.map(d => ({
-      time: toTime(d.time),
-      value: 1,
-      color: TREND_COLORS[d.trend as keyof typeof TREND_COLORS] || TREND_COLORS['TS'],
-    })));
+    if (showTrend && data[0]?.trend) {
+      const trendSeries = chart.addSeries(HistogramSeries, {
+        priceFormat: { type: 'volume' },
+        priceScaleId: 'trend',
+      });
+      chart.priceScale('trend').applyOptions({
+        scaleMargins: { top: 0.93, bottom: 0 },
+      });
+      trendSeries.setData(data.map(d => ({
+        time: toTime(d.time),
+        value: 1,
+        color: TREND_COLORS[d.trend as keyof typeof TREND_COLORS] || TREND_COLORS['TS'],
+      })));
+    }
 
     chart.timeScale().fitContent();
 
@@ -123,10 +125,14 @@ interface IndexChartModalProps {
 }
 
 export function IndexChartModal({ index, onClose }: IndexChartModalProps) {
-  const [range, setRange] = useState<ChartRange>('1Y');
+  const [timeframe, setTimeframe] = useState<ChartTimeframe>('D');
 
   const histSymbol = index.symbol === 'VIX' ? '^VIX' : index.symbol;
-  const { data: history, isLoading } = useStockHistoryWithTrend(histSymbol, range);
+  const isDaily = timeframe === 'D';
+  const { data: dailyTrend, isLoading: dailyLoading } = useStockHistoryWithTrend(histSymbol, 'D');
+  const { data: otherHistory, isLoading: otherLoading } = useStockHistory(isDaily ? '' : histSymbol, timeframe);
+  const history = isDaily ? dailyTrend : otherHistory;
+  const loading = isDaily ? dailyLoading : otherLoading;
 
   const isPositive = index.change >= 0;
   const priceColor = isPositive ? '#2eb850' : '#c05050';
@@ -175,17 +181,17 @@ export function IndexChartModal({ index, onClose }: IndexChartModalProps) {
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <div className="flex items-center gap-0.5 rounded-md bg-white/[0.04] p-0.5" data-testid="switch-modal-range">
-              {RANGES.map(r => (
+              {TIMEFRAMES.map(tf => (
                 <button
-                  key={r.value}
-                  onClick={() => setRange(r.value)}
+                  key={tf.value}
+                  onClick={() => setTimeframe(tf.value)}
                   className={cn(
                     "px-2.5 py-1 text-[11px] font-semibold rounded transition-colors",
-                    range === r.value ? 'bg-white/10 text-white/80' : 'text-white/20 hover:text-white/40'
+                    timeframe === tf.value ? 'bg-white/10 text-white/80' : 'text-white/20 hover:text-white/40'
                   )}
-                  data-testid={`tab-modal-range-${r.value}`}
+                  data-testid={`tab-modal-range-${tf.value}`}
                 >
-                  {r.label}
+                  {tf.label}
                 </button>
               ))}
             </div>
@@ -199,28 +205,30 @@ export function IndexChartModal({ index, onClose }: IndexChartModalProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 px-4 pb-1 flex-shrink-0">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-1.5 rounded-sm" style={{ backgroundColor: 'rgba(46, 184, 80, 0.5)' }} />
-            <span className="text-[9px] text-white/30">T+</span>
+        {isDaily && (
+          <div className="flex items-center gap-3 px-4 pb-1 flex-shrink-0">
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-1.5 rounded-sm" style={{ backgroundColor: 'rgba(46, 184, 80, 0.5)' }} />
+              <span className="text-[9px] text-white/30">T+</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-1.5 rounded-sm" style={{ backgroundColor: 'rgba(107, 107, 107, 0.35)' }} />
+              <span className="text-[9px] text-white/30">TS</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-1.5 rounded-sm" style={{ backgroundColor: 'rgba(192, 80, 80, 0.5)' }} />
+              <span className="text-[9px] text-white/30">T-</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-1.5 rounded-sm" style={{ backgroundColor: 'rgba(107, 107, 107, 0.35)' }} />
-            <span className="text-[9px] text-white/30">TS</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-1.5 rounded-sm" style={{ backgroundColor: 'rgba(192, 80, 80, 0.5)' }} />
-            <span className="text-[9px] text-white/30">T-</span>
-          </div>
-        </div>
+        )}
 
         <div className="flex-1 min-h-0 px-4 pb-4">
-          {isLoading ? (
+          {loading ? (
             <div className="w-full h-full flex items-center justify-center">
               <Loader2 className="w-5 h-5 animate-spin text-white/15" />
             </div>
           ) : history?.length > 0 ? (
-            <IndexChart data={history} />
+            <IndexChart data={history} showTrend={isDaily} />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-white/20 text-sm">
               No data available
