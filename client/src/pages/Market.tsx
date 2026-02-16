@@ -312,22 +312,24 @@ export default function Market() {
                   {showAdmin ? 'Hide Admin' : 'Manage Baskets'}
                 </button>
               )}
-              <div className="flex items-center gap-0.5 rounded-md bg-white/[0.04] p-0.5 flex-wrap" data-testid="switch-timeframe">
-                {(['D', 'W', 'M', '3M', '6M', 'Y', 'YTD'] as Timeframe[]).map(opt => (
-                  <button
-                    key={opt}
-                    onClick={() => setTf(opt)}
-                    className={cn(
-                      "px-2 sm:px-2.5 py-1 text-[10px] sm:text-[11px] font-semibold rounded transition-colors",
-                      tf === opt
-                        ? 'bg-white/10 text-white/80'
-                        : 'text-white/25 hover:text-white/40'
-                    )}
-                    data-testid={`button-tf-${opt}`}
-                  >
-                    {TF_LABELS[opt]}
-                  </button>
-                ))}
+              <div className="overflow-x-auto scrollbar-none">
+                <div className="flex items-center gap-0.5 rounded-md bg-white/[0.04] p-0.5 min-w-max" data-testid="switch-timeframe">
+                  {(['D', 'W', 'M', '3M', '6M', 'Y', 'YTD'] as Timeframe[]).map(opt => (
+                    <button
+                      key={opt}
+                      onClick={() => setTf(opt)}
+                      className={cn(
+                        "px-2 sm:px-2.5 py-1 text-[10px] sm:text-[11px] font-semibold rounded transition-colors",
+                        tf === opt
+                          ? 'bg-white/10 text-white/80'
+                          : 'text-white/25 hover:text-white/40'
+                      )}
+                      data-testid={`button-tf-${opt}`}
+                    >
+                      {TF_LABELS[opt]}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

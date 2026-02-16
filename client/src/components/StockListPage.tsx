@@ -113,31 +113,33 @@ export default function StockListPage({
                     <span className="text-[11px] text-white/30 whitespace-nowrap">{subtitle}</span>
                   </div>
 
-                  <div className="flex items-center gap-0 shrink-0 flex-wrap">
-                    {rs !== undefined && rs > 0 && (
-                      <div className="text-right mr-3 sm:mr-5" data-testid="text-rs-rating">
-                        <div className="text-[9px] uppercase tracking-wider text-white/25 mb-0.5">RS</div>
-                        <div className="text-[13px] font-mono-nums font-bold text-white">{rs}</div>
-                      </div>
-                    )}
-
-                    {mainStats.map((stat, i) => (
-                      <div key={i} className="text-right px-1.5 sm:px-2.5">
-                        <div className="text-[9px] uppercase tracking-wider text-white/25 mb-0.5">{stat.label}</div>
-                        <div className={cn("text-[12px] font-mono-nums", statColor(stat.value))} data-testid={stat.testId || `text-stat-${i}`}>
-                          {stat.value >= 0 ? '+' : ''}{stat.value.toFixed(2)}%
+                  <div className="w-full sm:w-auto overflow-x-auto scrollbar-none">
+                    <div className="flex items-center gap-0 shrink-0 min-w-max">
+                      {rs !== undefined && rs > 0 && (
+                        <div className="text-right mr-3 sm:mr-5" data-testid="text-rs-rating">
+                          <div className="text-[9px] uppercase tracking-wider text-white/25 mb-0.5">RS</div>
+                          <div className="text-[13px] font-mono-nums font-bold text-white">{rs}</div>
                         </div>
-                      </div>
-                    ))}
+                      )}
 
-                    {ytdStat && (
-                      <div className="text-right pl-2 sm:pl-4 ml-1.5 sm:ml-2 border-l border-white/10">
-                        <div className="text-[9px] uppercase tracking-wider text-white/25 mb-0.5">{ytdStat.label}</div>
-                        <div className={cn("text-[13px] font-mono-nums font-medium", statColor(ytdStat.value))} data-testid={ytdStat.testId || 'text-stat-ytd'}>
-                          {ytdStat.value >= 0 ? '+' : ''}{ytdStat.value.toFixed(2)}%
+                      {mainStats.map((stat, i) => (
+                        <div key={i} className="text-right px-1.5 sm:px-2.5">
+                          <div className="text-[9px] uppercase tracking-wider text-white/25 mb-0.5">{stat.label}</div>
+                          <div className={cn("text-[12px] font-mono-nums", statColor(stat.value))} data-testid={stat.testId || `text-stat-${i}`}>
+                            {stat.value >= 0 ? '+' : ''}{stat.value.toFixed(2)}%
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      ))}
+
+                      {ytdStat && (
+                        <div className="text-right pl-2 sm:pl-4 ml-1.5 sm:ml-2 border-l border-white/10">
+                          <div className="text-[9px] uppercase tracking-wider text-white/25 mb-0.5">{ytdStat.label}</div>
+                          <div className={cn("text-[13px] font-mono-nums font-medium", statColor(ytdStat.value))} data-testid={ytdStat.testId || 'text-stat-ytd'}>
+                            {ytdStat.value >= 0 ? '+' : ''}{ytdStat.value.toFixed(2)}%
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
