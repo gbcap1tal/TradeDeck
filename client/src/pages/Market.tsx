@@ -264,7 +264,7 @@ export default function Market() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col overflow-x-hidden">
       <Navbar />
       <main className="flex-1">
         <div className="max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-8">

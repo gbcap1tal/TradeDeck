@@ -310,7 +310,7 @@ export default function Earnings() {
   };
 
   return (
-    <div className="min-h-screen bg-background" data-testid="page-earnings">
+    <div className="min-h-screen bg-background overflow-x-hidden" data-testid="page-earnings">
       <Navbar />
       <div className="max-w-[1400px] mx-auto px-2 sm:px-6 py-3 sm:py-6">
         <div className="flex items-center justify-between mb-3 sm:mb-6 px-1 sm:px-0">
