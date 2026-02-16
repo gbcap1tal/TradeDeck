@@ -71,7 +71,13 @@ interface Analytics {
   monthlyPnl: { month: string; pnl: number }[];
 }
 
-const SETUP_TAGS = ['breakout', 'pullback', 'earnings', 'gap', 'momentum', 'reversal', 'swing', 'other'];
+interface SetupTag {
+  id: number;
+  name: string;
+  color: string | null;
+}
+
+const DEFAULT_SETUP_TAGS = ['breakout', 'pullback', 'earnings', 'gap', 'momentum', 'reversal', 'swing', 'other'];
 
 function formatCurrency(v: number) {
   const abs = Math.abs(v);
@@ -138,6 +144,10 @@ export default function Portfolio() {
 
   const { data: config } = useQuery<{ startingCapital: number; startDate: string | null }>({
     queryKey: ['/api/portfolio/config'],
+  });
+
+  const { data: setupTags = [] } = useQuery<SetupTag[]>({
+    queryKey: ['/api/portfolio/setup-tags'],
   });
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
@@ -207,9 +217,10 @@ export default function Portfolio() {
         open={showAddTrade}
         onClose={() => { setShowAddTrade(false); setEditingTrade(null); }}
         editTrade={editingTrade}
+        setupTags={setupTags}
       />
       <CsvUploadDialog open={showCsvUpload} onClose={() => setShowCsvUpload(false)} />
-      <ConfigDialog open={showConfig} onClose={() => setShowConfig(false)} currentConfig={config} />
+      <ConfigDialog open={showConfig} onClose={() => setShowConfig(false)} currentConfig={config} setupTags={setupTags} />
     </div>
   );
 }
@@ -623,8 +634,9 @@ function StatRow({ label, value, positive }: { label: string; value: string; pos
   );
 }
 
-function TradeDialog({ open, onClose, editTrade }: { open: boolean; onClose: () => void; editTrade: Trade | null }) {
+function TradeDialog({ open, onClose, editTrade, setupTags }: { open: boolean; onClose: () => void; editTrade: Trade | null; setupTags: SetupTag[] }) {
   const { toast } = useToast();
+  const tagNames = setupTags.length > 0 ? setupTags.map(t => t.name) : DEFAULT_SETUP_TAGS;
   const [form, setForm] = useState({
     ticker: '', direction: 'long', entryDate: '', entryPrice: '', exitDate: '', exitPrice: '',
     quantity: '', fees: '0', setupTag: '', notes: '',
@@ -736,11 +748,11 @@ function TradeDialog({ open, onClose, editTrade }: { open: boolean; onClose: () 
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-white/40 mb-1 block">Exit Date</label>
+              <label className="text-xs text-white/40 mb-1 block">Exit Date <span className="text-white/20">(optional)</span></label>
               <Input type="date" value={form.exitDate} onChange={e => setForm(f => ({ ...f, exitDate: e.target.value }))} data-testid="input-exit-date" />
             </div>
             <div>
-              <label className="text-xs text-white/40 mb-1 block">Exit Price</label>
+              <label className="text-xs text-white/40 mb-1 block">Exit Price <span className="text-white/20">(optional)</span></label>
               <Input type="number" step="0.01" value={form.exitPrice} onChange={e => setForm(f => ({ ...f, exitPrice: e.target.value }))} placeholder="0.00" data-testid="input-exit-price" />
             </div>
           </div>
@@ -755,11 +767,12 @@ function TradeDialog({ open, onClose, editTrade }: { open: boolean; onClose: () 
             </div>
           </div>
           <div>
-            <label className="text-xs text-white/40 mb-1 block">Setup Tag</label>
-            <Select value={form.setupTag} onValueChange={v => setForm(f => ({ ...f, setupTag: v }))}>
+            <label className="text-xs text-white/40 mb-1 block">Setup Tag <span className="text-white/20">(optional)</span></label>
+            <Select value={form.setupTag || "_none"} onValueChange={v => setForm(f => ({ ...f, setupTag: v === "_none" ? "" : v }))}>
               <SelectTrigger data-testid="select-setup"><SelectValue placeholder="Select setup..." /></SelectTrigger>
               <SelectContent>
-                {SETUP_TAGS.map(s => (
+                <SelectItem value="_none">None</SelectItem>
+                {tagNames.map(s => (
                   <SelectItem key={s} value={s}>{s}</SelectItem>
                 ))}
               </SelectContent>
@@ -839,10 +852,18 @@ function CsvUploadDialog({ open, onClose }: { open: boolean; onClose: () => void
   );
 }
 
-function ConfigDialog({ open, onClose, currentConfig }: { open: boolean; onClose: () => void; currentConfig: any }) {
+function ConfigDialog({ open, onClose, currentConfig, setupTags }: { open: boolean; onClose: () => void; currentConfig: any; setupTags: SetupTag[] }) {
   const { toast } = useToast();
   const [capital, setCapital] = useState(String(currentConfig?.startingCapital || 100000));
   const [startDate, setStartDate] = useState(currentConfig?.startDate || '');
+  const [newTagName, setNewTagName] = useState('');
+
+  useEffect(() => {
+    if (open && currentConfig) {
+      setCapital(String(currentConfig.startingCapital || 100000));
+      setStartDate(currentConfig.startDate || '');
+    }
+  }, [open, currentConfig]);
 
   const saveMutation = useMutation({
     mutationFn: (data: any) => apiRequest('POST', '/api/portfolio/config', data),
@@ -855,13 +876,31 @@ function ConfigDialog({ open, onClose, currentConfig }: { open: boolean; onClose
     },
   });
 
+  const addTagMutation = useMutation({
+    mutationFn: (name: string) => apiRequest('POST', '/api/portfolio/setup-tags', { name }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio/setup-tags'] });
+      setNewTagName('');
+      toast({ title: "Tag added" });
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteTagMutation = useMutation({
+    mutationFn: (id: number) => apiRequest('DELETE', `/api/portfolio/setup-tags/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio/setup-tags'] });
+      toast({ title: "Tag removed" });
+    },
+  });
+
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>Portfolio Settings</DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div>
             <label className="text-xs text-white/40 mb-1 block">Starting Capital ($)</label>
             <Input type="number" value={capital} onChange={e => setCapital(e.target.value)} data-testid="input-starting-capital" />
@@ -876,6 +915,52 @@ function ConfigDialog({ open, onClose, currentConfig }: { open: boolean; onClose
           })} disabled={saveMutation.isPending} data-testid="button-save-config">
             {saveMutation.isPending ? 'Saving...' : 'Save'}
           </Button>
+
+          <div className="border-t border-white/10 pt-4">
+            <label className="text-xs text-white/40 mb-2 block">Setup Tags</label>
+            <div className="space-y-1.5 mb-3">
+              {setupTags.length === 0 && (
+                <p className="text-xs text-white/20">No custom tags yet. Default tags will be used.</p>
+              )}
+              {setupTags.map(tag => (
+                <div key={tag.id} className="flex items-center justify-between gap-2 bg-white/5 rounded px-2 py-1" data-testid={`setup-tag-${tag.id}`}>
+                  <span className="text-xs text-white/70">{tag.name}</span>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => deleteTagMutation.mutate(tag.id)}
+                    data-testid={`button-delete-tag-${tag.id}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                value={newTagName}
+                onChange={e => setNewTagName(e.target.value)}
+                placeholder="New tag name..."
+                className="flex-1"
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && newTagName.trim()) {
+                    e.preventDefault();
+                    addTagMutation.mutate(newTagName.trim());
+                  }
+                }}
+                data-testid="input-new-tag"
+              />
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => newTagName.trim() && addTagMutation.mutate(newTagName.trim())}
+                disabled={!newTagName.trim() || addTagMutation.isPending}
+                data-testid="button-add-tag"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

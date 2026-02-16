@@ -168,6 +168,14 @@ export const portfolioConfig = pgTable("portfolio_config", {
   startDate: date("start_date"),
 });
 
+export const portfolioSetupTags = pgTable("portfolio_setup_tags", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  name: varchar("name", { length: 50 }).notNull(),
+  color: varchar("color", { length: 20 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // === RELATIONS ===
 
 export const watchlistsRelations = relations(watchlists, ({ one, many }) => ({
@@ -229,6 +237,10 @@ export type PortfolioEquityDay = typeof portfolioEquityDaily.$inferSelect;
 export type PortfolioBenchmarkDay = typeof portfolioBenchmarksDaily.$inferSelect;
 export type PortfolioConfigType = typeof portfolioConfig.$inferSelect;
 export type InsertPortfolioConfig = z.infer<typeof insertPortfolioConfigSchema>;
+
+export const insertPortfolioSetupTagSchema = createInsertSchema(portfolioSetupTags).omit({ id: true, createdAt: true });
+export type PortfolioSetupTag = typeof portfolioSetupTags.$inferSelect;
+export type InsertPortfolioSetupTag = z.infer<typeof insertPortfolioSetupTagSchema>;
 
 // Market Data Types (Non-database)
 export interface Quote {

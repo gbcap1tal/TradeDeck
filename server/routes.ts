@@ -3210,7 +3210,7 @@ Keep the entire response under 1000 characters. Be concise, direct, and useful f
   // === PORTFOLIO PERFORMANCE ROUTES ===
   const portfolio = await import('./api/portfolio');
 
-  app.get('/api/portfolio/trades', isAuthenticated, async (req, res) => {
+  app.get('/api/portfolio/trades', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const trades = await portfolio.listTrades(userId);
@@ -3220,7 +3220,7 @@ Keep the entire response under 1000 characters. Be concise, direct, and useful f
     }
   });
 
-  app.post('/api/portfolio/trades', isAuthenticated, async (req, res) => {
+  app.post('/api/portfolio/trades', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const trade = await portfolio.createTrade({ ...req.body, userId });
@@ -3230,7 +3230,7 @@ Keep the entire response under 1000 characters. Be concise, direct, and useful f
     }
   });
 
-  app.patch('/api/portfolio/trades/:id', isAuthenticated, async (req, res) => {
+  app.patch('/api/portfolio/trades/:id', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const trade = await portfolio.updateTrade(parseInt(req.params.id), userId, req.body);
@@ -3241,7 +3241,7 @@ Keep the entire response under 1000 characters. Be concise, direct, and useful f
     }
   });
 
-  app.delete('/api/portfolio/trades/:id', isAuthenticated, async (req, res) => {
+  app.delete('/api/portfolio/trades/:id', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const trade = await portfolio.deleteTrade(parseInt(req.params.id), userId);
@@ -3252,7 +3252,7 @@ Keep the entire response under 1000 characters. Be concise, direct, and useful f
     }
   });
 
-  app.delete('/api/portfolio/trades', isAuthenticated, async (req, res) => {
+  app.delete('/api/portfolio/trades', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       await portfolio.deleteAllTrades(userId);
@@ -3262,7 +3262,7 @@ Keep the entire response under 1000 characters. Be concise, direct, and useful f
     }
   });
 
-  app.post('/api/portfolio/trades/csv', isAuthenticated, async (req, res) => {
+  app.post('/api/portfolio/trades/csv', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { csv } = req.body;
@@ -3276,7 +3276,7 @@ Keep the entire response under 1000 characters. Be concise, direct, and useful f
     }
   });
 
-  app.get('/api/portfolio/equity', isAuthenticated, async (req, res) => {
+  app.get('/api/portfolio/equity', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const data = await portfolio.computeEquityCurve(userId);
@@ -3286,7 +3286,7 @@ Keep the entire response under 1000 characters. Be concise, direct, and useful f
     }
   });
 
-  app.get('/api/portfolio/analytics', isAuthenticated, async (req, res) => {
+  app.get('/api/portfolio/analytics', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const data = await portfolio.computeAnalytics(userId);
@@ -3296,7 +3296,7 @@ Keep the entire response under 1000 characters. Be concise, direct, and useful f
     }
   });
 
-  app.get('/api/portfolio/config', isAuthenticated, async (req, res) => {
+  app.get('/api/portfolio/config', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const config = await portfolio.getPortfolioConfig(userId);
@@ -3306,12 +3306,46 @@ Keep the entire response under 1000 characters. Be concise, direct, and useful f
     }
   });
 
-  app.post('/api/portfolio/config', isAuthenticated, async (req, res) => {
+  app.post('/api/portfolio/config', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { startingCapital, startDate } = req.body;
       const config = await portfolio.upsertPortfolioConfig(userId, startingCapital || 100000, startDate);
       res.json(config);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  // === PORTFOLIO SETUP TAGS ===
+  app.get('/api/portfolio/setup-tags', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const tags = await portfolio.listSetupTags(userId);
+      res.json(tags);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/portfolio/setup-tags', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { name, color } = req.body;
+      if (!name || typeof name !== 'string' || !name.trim()) return res.status(400).json({ message: 'Tag name required' });
+      if (name.trim().length > 50) return res.status(400).json({ message: 'Tag name too long (max 50 chars)' });
+      const tag = await portfolio.createSetupTag(userId, name.trim(), color);
+      res.json(tag);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  app.delete('/api/portfolio/setup-tags/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await portfolio.deleteSetupTag(parseInt(req.params.id), userId);
+      res.json({ ok: true });
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }

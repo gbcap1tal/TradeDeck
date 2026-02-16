@@ -1,7 +1,7 @@
 import { db } from "../db";
 import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
 import {
-  portfolioTrades, portfolioEquityDaily, portfolioBenchmarksDaily, portfolioConfig,
+  portfolioTrades, portfolioEquityDaily, portfolioBenchmarksDaily, portfolioConfig, portfolioSetupTags,
   type PortfolioTrade, type InsertPortfolioTrade, type PortfolioEquityDay,
 } from "@shared/schema";
 import { getHistory } from "./yahoo";
@@ -412,4 +412,24 @@ export function parseCSVTrades(csvContent: string, userId: string): InsertPortfo
   }
 
   return trades;
+}
+
+// === SETUP TAGS ===
+
+export async function listSetupTags(userId: string) {
+  return db.select().from(portfolioSetupTags)
+    .where(eq(portfolioSetupTags.userId, userId))
+    .orderBy(asc(portfolioSetupTags.name));
+}
+
+export async function createSetupTag(userId: string, name: string, color?: string) {
+  const [row] = await db.insert(portfolioSetupTags)
+    .values({ userId, name: name.trim(), color: color || null })
+    .returning();
+  return row;
+}
+
+export async function deleteSetupTag(id: number, userId: string) {
+  await db.delete(portfolioSetupTags)
+    .where(and(eq(portfolioSetupTags.id, id), eq(portfolioSetupTags.userId, userId)));
 }
