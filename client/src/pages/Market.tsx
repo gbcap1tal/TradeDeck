@@ -46,18 +46,18 @@ function BarChart({ items, title, isMegatrendMap, onClickItem }: {
           return (
             <div
               key={item.name}
-              className="flex items-center gap-3 py-1 cursor-pointer group hover:bg-white/[0.03] rounded-md px-2 transition-colors"
+              className="flex items-center gap-1.5 sm:gap-3 py-1 cursor-pointer group hover:bg-white/[0.03] rounded-md px-1 sm:px-2 transition-colors"
               onClick={() => onClickItem(item)}
               data-testid={`row-perf-${item.name.replace(/\s+/g, '-')}`}
             >
               <span className="text-[11px] text-white/20 font-mono w-5 shrink-0 text-right">{idx + 1}</span>
               <span className={cn(
-                "text-[12px] font-medium w-[120px] sm:w-[220px] shrink-0 truncate group-hover:text-white transition-colors",
+                "text-[11px] sm:text-[12px] font-medium w-[100px] sm:w-[220px] shrink-0 truncate group-hover:text-white transition-colors",
                 isMegatrend ? "text-white" : "text-white/70"
               )}>
                 {item.name}
               </span>
-              <div className="flex-1 flex items-center gap-2">
+              <div className="flex-1 flex items-center gap-1.5 sm:gap-2 min-w-0">
                 <div className="flex-1 h-[16px] relative rounded-sm overflow-hidden bg-white/[0.02]">
                   <div
                     className="h-full rounded-sm transition-all duration-500"
@@ -69,10 +69,10 @@ function BarChart({ items, title, isMegatrendMap, onClickItem }: {
                   />
                 </div>
                 <span className={cn(
-                  "text-[12px] font-mono-nums font-semibold w-[55px] sm:w-[65px] text-right shrink-0",
+                  "text-[11px] sm:text-[12px] font-mono-nums font-semibold w-[48px] sm:w-[65px] text-right shrink-0",
                   isPositive ? "text-[#30d158]" : "text-[#ff453a]"
                 )}>
-                  {isPositive ? '+' : ''}{item.change.toFixed(2)}%
+                  {isPositive ? '+' : ''}{item.change.toFixed(1)}%
                 </span>
               </div>
             </div>

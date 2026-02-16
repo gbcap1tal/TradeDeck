@@ -190,8 +190,8 @@ export function Navbar() {
   return (
     <>
       <nav className="glass sticky top-0 z-[999] h-14 w-full" data-testid="navbar">
-        <div className="max-w-[1400px] mx-auto h-full px-3 sm:px-6 flex items-center justify-between gap-3 sm:gap-6">
-          <div className="flex items-center gap-4 sm:gap-8">
+        <div className="max-w-[1400px] mx-auto h-full px-2 sm:px-6 flex items-center justify-between gap-2 sm:gap-6">
+          <div className="flex items-center gap-2 sm:gap-8 min-w-0 shrink-0">
             <Button
               variant="ghost"
               size="icon"
@@ -232,10 +232,10 @@ export function Navbar() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 flex-1 justify-end">
-            <div className="flex items-center gap-2 mr-1 sm:mr-2">
+          <div className="flex items-center gap-1.5 sm:gap-3 flex-1 justify-end min-w-0">
+            <div className="flex items-center gap-1.5 mr-0.5 sm:mr-2 shrink-0">
               <div className={cn(
-                "w-1.5 h-1.5 rounded-full",
+                "w-1.5 h-1.5 rounded-full shrink-0",
                 status?.isOpen ? "bg-[#30d158] animate-pulse" : "bg-[#ff453a]"
               )} />
               <span className="text-[11px] text-white/40 font-medium hidden sm:block">
@@ -280,7 +280,7 @@ export function Navbar() {
             </div>
 
             {user ? (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 shrink-0">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon" className="rounded-full min-w-[44px] min-h-[44px] bg-white/5 border border-white/10 text-white/60 hover:text-white">
@@ -350,8 +350,8 @@ export function Navbar() {
                 </Dialog>
               </div>
             ) : (
-              <a href="/api/login" data-testid="button-login">
-                <Button size="sm" variant="outline" className="min-h-[44px] text-[13px] text-white/70 font-medium">
+              <a href="/api/login" data-testid="button-login" className="shrink-0">
+                <Button size="sm" variant="outline" className="min-h-[44px] text-[13px] text-white/70 font-medium whitespace-nowrap">
                   Log In
                 </Button>
               </a>
