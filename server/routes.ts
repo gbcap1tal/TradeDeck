@@ -616,8 +616,9 @@ function initBackgroundTasks() {
       (async () => {
         try {
           const indices = await yahoo.getIndices();
+          const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
           if (indices && indices.length > 0) {
-            setCache('market_indices', indices, CACHE_TTL.INDICES);
+            setCache('market_indices', indices, indicesTtl);
             console.log(`[bg] Indices pre-computed: ${indices.length} indices in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
           }
         } catch (e: any) {
@@ -713,28 +714,32 @@ function initBackgroundTasks() {
       console.log(`[bg] YTD pre-warm error: ${err.message}`);
     }
 
-    try {
-      const qRatings = getAllRSRatings();
-      const qFinviz = getFinvizDataSync();
-      if (qFinviz) {
-        const qLookup: Record<string, number> = {};
-        for (const [_s, sd] of Object.entries(qFinviz)) {
-          for (const [_i, stocks] of Object.entries(sd.stocks)) {
-            for (const stock of stocks) qLookup[stock.symbol] = stock.marketCap;
+    if (isDuringMarket) {
+      try {
+        const qRatings = getAllRSRatings();
+        const qFinviz = getFinvizDataSync();
+        if (qFinviz) {
+          const qLookup: Record<string, number> = {};
+          for (const [_s, sd] of Object.entries(qFinviz)) {
+            for (const [_i, stocks] of Object.entries(sd.stocks)) {
+              for (const stock of stocks) qLookup[stock.symbol] = stock.marketCap;
+            }
+          }
+          const qSymbols: string[] = [];
+          for (const [sym, rs] of Object.entries(qRatings)) {
+            if (rs >= 80 && (qLookup[sym] || 0) >= 300) qSymbols.push(sym);
+          }
+          if (qSymbols.length > 0) {
+            console.log(`[bg] Pre-computing quality scores for ${qSymbols.length} leaders (RS>=80)...`);
+            const qScores = await computeLeadersQualityBatch(qSymbols);
+            console.log(`[bg] Quality scores pre-computed: ${Object.keys(qScores).length} stocks in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
           }
         }
-        const qSymbols: string[] = [];
-        for (const [sym, rs] of Object.entries(qRatings)) {
-          if (rs >= 80 && (qLookup[sym] || 0) >= 300) qSymbols.push(sym);
-        }
-        if (qSymbols.length > 0) {
-          console.log(`[bg] Pre-computing quality scores for ${qSymbols.length} leaders (RS>=80)...`);
-          const qScores = await computeLeadersQualityBatch(qSymbols);
-          console.log(`[bg] Quality scores pre-computed: ${Object.keys(qScores).length} stocks in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
-        }
+      } catch (err: any) {
+        console.log(`[bg] Quality pre-compute error: ${err.message}`);
       }
-    } catch (err: any) {
-      console.log(`[bg] Quality pre-compute error: ${err.message}`);
+    } else {
+      console.log(`[bg] Market closed — serving ${warmCount} quality scores from DB, skipping recomputation`);
     }
   }, 1000);
 
@@ -796,9 +801,10 @@ function initBackgroundTasks() {
         (async () => {
           try {
             const indices = await yahoo.getIndices();
+            const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
             if (indices && indices.length > 0) {
-              setCache('market_indices', indices, CACHE_TTL.INDICES);
-              console.log(`[scheduler] Indices refreshed: ${indices.length} indices`);
+              setCache('market_indices', indices, indicesTtl);
+              console.log(`[scheduler] Indices refreshed: ${indices.length} indices (ttl=${indicesTtl}s)`);
             }
           } catch (err: any) {
             console.log(`[scheduler] Indices refresh error: ${err.message}`);
@@ -845,27 +851,31 @@ function initBackgroundTasks() {
         sendAlert('Megatrend Performance Refresh Failed', `Megatrend performance computation failed during ${windowLabel} refresh.\n\nError: ${(err as any).message}`, 'megatrend_perf');
       }
 
-      try {
-        const qRatings = getAllRSRatings();
-        const qFinviz = getFinvizDataSync();
-        if (qFinviz) {
-          const qLookup: Record<string, number> = {};
-          for (const [_s, sd] of Object.entries(qFinviz)) {
-            for (const [_i, stocks] of Object.entries(sd.stocks)) {
-              for (const stock of stocks) qLookup[stock.symbol] = stock.marketCap;
+      if (isUSMarketOpen()) {
+        try {
+          const qRatings = getAllRSRatings();
+          const qFinviz = getFinvizDataSync();
+          if (qFinviz) {
+            const qLookup: Record<string, number> = {};
+            for (const [_s, sd] of Object.entries(qFinviz)) {
+              for (const [_i, stocks] of Object.entries(sd.stocks)) {
+                for (const stock of stocks) qLookup[stock.symbol] = stock.marketCap;
+              }
+            }
+            const qSymbols: string[] = [];
+            for (const [sym, rs] of Object.entries(qRatings)) {
+              if (rs >= 80 && (qLookup[sym] || 0) >= 300) qSymbols.push(sym);
+            }
+            if (qSymbols.length > 0) {
+              const qScores = await computeLeadersQualityBatch(qSymbols);
+              console.log(`[scheduler] Quality scores refreshed: ${Object.keys(qScores).length} stocks`);
             }
           }
-          const qSymbols: string[] = [];
-          for (const [sym, rs] of Object.entries(qRatings)) {
-            if (rs >= 80 && (qLookup[sym] || 0) >= 300) qSymbols.push(sym);
-          }
-          if (qSymbols.length > 0) {
-            const qScores = await computeLeadersQualityBatch(qSymbols);
-            console.log(`[scheduler] Quality scores refreshed: ${Object.keys(qScores).length} stocks`);
-          }
+        } catch (err: any) {
+          console.log(`[scheduler] Quality refresh error: ${err.message}`);
         }
-      } catch (err: any) {
-        console.log(`[scheduler] Quality refresh error: ${err.message}`);
+      } else {
+        console.log(`[scheduler] Market closed — skipping quality score recomputation`);
       }
 
       try {
@@ -1270,24 +1280,26 @@ export async function registerRoutes(
   app.use('/api', (req, _res, next) => {
     if (!firstVisitRefreshTriggered) {
       firstVisitRefreshTriggered = true;
-      const ratings = getAllRSRatings();
-      const finvizData = getFinvizDataSync();
-      if (finvizData && Object.keys(ratings).length > 0) {
-        const stockLookup: Record<string, number> = {};
-        for (const [_s, sd] of Object.entries(finvizData)) {
-          for (const [_i, stocks] of Object.entries(sd.stocks)) {
-            for (const stock of stocks) stockLookup[stock.symbol] = stock.marketCap;
+      if (isUSMarketOpen()) {
+        const ratings = getAllRSRatings();
+        const finvizData = getFinvizDataSync();
+        if (finvizData && Object.keys(ratings).length > 0) {
+          const stockLookup: Record<string, number> = {};
+          for (const [_s, sd] of Object.entries(finvizData)) {
+            for (const [_i, stocks] of Object.entries(sd.stocks)) {
+              for (const stock of stocks) stockLookup[stock.symbol] = stock.marketCap;
+            }
           }
-        }
-        const qSymbols: string[] = [];
-        for (const [sym, rs] of Object.entries(ratings)) {
-          if (rs >= 80 && (stockLookup[sym] || 0) >= 300) qSymbols.push(sym);
-        }
-        if (qSymbols.length > 0 && !isBatchComputeRunning()) {
-          console.log(`[warm-up] First API request — triggering background quality refresh for ${qSymbols.length} leaders`);
-          computeLeadersQualityBatch(qSymbols).catch(err =>
-            console.error(`[warm-up] Quality refresh failed: ${err.message}`)
-          );
+          const qSymbols: string[] = [];
+          for (const [sym, rs] of Object.entries(ratings)) {
+            if (rs >= 80 && (stockLookup[sym] || 0) >= 300) qSymbols.push(sym);
+          }
+          if (qSymbols.length > 0 && !isBatchComputeRunning()) {
+            console.log(`[warm-up] First API request — triggering background quality refresh for ${qSymbols.length} leaders`);
+            computeLeadersQualityBatch(qSymbols).catch(err =>
+              console.error(`[warm-up] Quality refresh failed: ${err.message}`)
+            );
+          }
         }
       }
     }
@@ -1296,6 +1308,7 @@ export async function registerRoutes(
 
   app.get('/api/market/indices', async (req, res) => {
     const cacheKey = 'market_indices';
+    const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
     const cached = getCached<any>(cacheKey);
     if (cached) return res.json(cached);
 
@@ -1304,14 +1317,14 @@ export async function registerRoutes(
       backgroundRefresh(cacheKey, async () => {
         const data = await yahoo.getIndices();
         return (data && data.length > 0) ? data : stale;
-      }, CACHE_TTL.INDICES);
+      }, indicesTtl);
       return res.json(stale);
     }
 
     try {
       const data = await yahoo.getIndices();
       if (data && data.length > 0) {
-        setCache(cacheKey, data, CACHE_TTL.INDICES);
+        setCache(cacheKey, data, indicesTtl);
         return res.json(data);
       }
     } catch (e: any) {
