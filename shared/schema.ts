@@ -125,6 +125,49 @@ export const megatrends = pgTable("megatrends", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// === PORTFOLIO PERFORMANCE MODULE ===
+
+export const portfolioTrades = pgTable("portfolio_trades", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  ticker: varchar("ticker", { length: 20 }).notNull(),
+  direction: varchar("direction", { length: 10 }).notNull(),
+  entryDate: date("entry_date").notNull(),
+  entryPrice: doublePrecision("entry_price").notNull(),
+  exitDate: date("exit_date"),
+  exitPrice: doublePrecision("exit_price"),
+  quantity: doublePrecision("quantity").notNull(),
+  fees: doublePrecision("fees").default(0),
+  setupTag: varchar("setup_tag", { length: 50 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const portfolioEquityDaily = pgTable("portfolio_equity_daily", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  date: date("date").notNull(),
+  totalEquity: doublePrecision("total_equity").notNull(),
+  cash: doublePrecision("cash").notNull(),
+  investedCapital: doublePrecision("invested_capital").notNull(),
+  realizedPnl: doublePrecision("realized_pnl").notNull(),
+  unrealizedPnl: doublePrecision("unrealized_pnl").notNull(),
+});
+
+export const portfolioBenchmarksDaily = pgTable("portfolio_benchmarks_daily", {
+  id: serial("id").primaryKey(),
+  date: date("date").notNull(),
+  qqqPrice: doublePrecision("qqq_price"),
+  spyPrice: doublePrecision("spy_price"),
+});
+
+export const portfolioConfig = pgTable("portfolio_config", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  startingCapital: doublePrecision("starting_capital").notNull().default(100000),
+  startDate: date("start_date"),
+});
+
 // === RELATIONS ===
 
 export const watchlistsRelations = relations(watchlists, ({ one, many }) => ({
@@ -175,6 +218,17 @@ export const insertEarningsCalendarSchema = createInsertSchema(earningsCalendar)
 export type InsertEarningsReport = z.infer<typeof insertEarningsReportSchema>;
 export type InsertEpScore = z.infer<typeof insertEpScoreSchema>;
 export type InsertEarningsCalendar = z.infer<typeof insertEarningsCalendarSchema>;
+
+// Portfolio types
+export const insertPortfolioTradeSchema = createInsertSchema(portfolioTrades).omit({ id: true, createdAt: true });
+export const insertPortfolioConfigSchema = createInsertSchema(portfolioConfig).omit({ id: true });
+
+export type PortfolioTrade = typeof portfolioTrades.$inferSelect;
+export type InsertPortfolioTrade = z.infer<typeof insertPortfolioTradeSchema>;
+export type PortfolioEquityDay = typeof portfolioEquityDaily.$inferSelect;
+export type PortfolioBenchmarkDay = typeof portfolioBenchmarksDaily.$inferSelect;
+export type PortfolioConfigType = typeof portfolioConfig.$inferSelect;
+export type InsertPortfolioConfig = z.infer<typeof insertPortfolioConfigSchema>;
 
 // Market Data Types (Non-database)
 export interface Quote {
