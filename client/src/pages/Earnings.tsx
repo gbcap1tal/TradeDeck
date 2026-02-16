@@ -446,11 +446,8 @@ export default function Earnings() {
                       <span className="text-[10px] text-white/25">{section.items.length}</span>
                     </div>
                   </div>
-                  <div className="hidden sm:block w-full max-w-full overflow-x-auto">
+                  <div className="w-full max-w-full overflow-x-auto">
                     <EarningsTable items={section.items} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
-                  </div>
-                  <div className="sm:hidden">
-                    <EarningsMobileList items={section.items} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
                   </div>
                 </div>
               ))}
@@ -650,7 +647,7 @@ function EarningsTable({ items, onTickerClick, onDetailsClick }: {
   const hp = { currentKey: sortKey, currentDir: sortDir, onSort: handleSort };
 
   return (
-    <table className="w-full" data-testid="table-earnings">
+    <table className="w-full min-w-[640px]" data-testid="table-earnings">
       <thead>
         <tr className="border-b border-white/[0.06]">
           <SortHeader label="Company" sortKey="ticker" align="left" {...hp} />

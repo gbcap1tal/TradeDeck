@@ -145,7 +145,7 @@ export default function StockListPage({
               </div>
 
               <div className="glass-card rounded-xl overflow-hidden">
-                <div className="hidden md:flex items-center px-4 py-2 text-[10px] text-white/25 font-medium uppercase tracking-wider border-b border-white/5">
+                <div className="flex items-center px-4 py-2 text-[10px] text-white/25 font-medium uppercase tracking-wider border-b border-white/5">
                   <div className="flex-[2.5] min-w-0">Stock</div>
                   <div className="flex-1 text-right">Price</div>
                   <div className="flex-1 text-right cursor-pointer select-none" onClick={() => handleSort('changePercent')} data-testid="button-sort-change">
@@ -179,10 +179,10 @@ export default function StockListPage({
                       <div className={cn("flex-1 text-right font-mono-nums text-[13px]", dailyChg.color)}>
                         {dailyChg.text}
                       </div>
-                      <div className="hidden md:block flex-1 text-right font-mono-nums text-[12px] text-white/30">
+                      <div className="flex-1 text-right font-mono-nums text-[12px] text-white/30">
                         {formatMktCap(stock.marketCap)}
                       </div>
-                      <div className={cn("hidden md:block flex-1 text-right font-mono-nums text-[13px]", ytdChg.color)}>
+                      <div className={cn("flex-1 text-right font-mono-nums text-[13px]", ytdChg.color)}>
                         {ytdChg.text}
                       </div>
                     </div>

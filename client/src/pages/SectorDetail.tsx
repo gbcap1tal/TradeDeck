@@ -161,15 +161,15 @@ export default function SectorDetail() {
                 </Button>
               </Link>
               <div className="flex items-center gap-2 text-[13px] text-white/40">
-                <Link href="/" className="hover:text-white/70 transition-colors hidden sm:inline" data-testid="breadcrumb-home">Dashboard</Link>
-                <ChevronRight className="w-3 h-3 hidden sm:inline" />
+                <Link href="/" className="hover:text-white/70 transition-colors" data-testid="breadcrumb-home">Dashboard</Link>
+                <ChevronRight className="w-3 h-3" />
                 <span className="text-white/80" data-testid="breadcrumb-sector">{sectorName}</span>
               </div>
             </div>
 
             {data && (
               <div className="flex items-center gap-3 sm:gap-6">
-                <div className="text-right hidden sm:block">
+                <div className="text-right">
                   <div className="label-text mb-0.5">Sector ETF</div>
                   <div className="text-sm font-mono-nums text-white/60">{data.sector.ticker}</div>
                 </div>

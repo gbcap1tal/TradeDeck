@@ -326,7 +326,7 @@ export default function Leaders() {
         ) : (
           <div className="glass-card rounded-xl overflow-hidden">
             <div className="w-full max-w-full overflow-x-auto">
-              <table className="w-full" data-testid="table-leaders">
+              <table className="w-full min-w-[720px]" data-testid="table-leaders">
                 <thead>
                   <tr className="border-b border-white/[0.06]">
                     <th
@@ -344,18 +344,18 @@ export default function Leaders() {
                     >
                       Ticker<SortIcon field="symbol" />
                     </th>
-                    <th className="text-left px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold hidden md:table-cell" data-testid="th-name">
+                    <th className="text-left px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold" data-testid="th-name">
                       Name
                     </th>
                     <th
-                      className="text-left px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold hidden lg:table-cell cursor-pointer select-none"
+                      className="text-left px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold cursor-pointer select-none"
                       onClick={() => handleSort('sector')}
                       data-testid="th-sector"
                     >
                       Sector<SortIcon field="sector" />
                     </th>
                     <th
-                      className="text-left px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold hidden sm:table-cell cursor-pointer select-none"
+                      className="text-left px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold cursor-pointer select-none"
                       onClick={() => handleSort('industry')}
                       data-testid="th-industry"
                     >
@@ -383,7 +383,7 @@ export default function Leaders() {
                       Chg%<SortIcon field="changePercent" />
                     </th>
                     <th
-                      className="text-right px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold hidden sm:table-cell cursor-pointer select-none"
+                      className="text-right px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold cursor-pointer select-none"
                       onClick={() => handleSort('marketCap')}
                       data-testid="th-mcap"
                     >
@@ -405,16 +405,16 @@ export default function Leaders() {
                           {stock.symbol}
                         </span>
                       </td>
-                      <td className="px-3 py-2 hidden md:table-cell">
-                        <span className="text-[12px] text-white/50 truncate max-w-[200px] block" data-testid={`text-name-${stock.symbol}`}>
+                      <td className="px-3 py-2">
+                        <span className="text-[12px] text-white/50 whitespace-nowrap" data-testid={`text-name-${stock.symbol}`}>
                           {stock.name}
                         </span>
                       </td>
-                      <td className="px-3 py-2 hidden lg:table-cell">
-                        <span className="text-[11px] text-white/40" data-testid={`text-sector-${stock.symbol}`}>{stock.sector}</span>
+                      <td className="px-3 py-2">
+                        <span className="text-[11px] text-white/40 whitespace-nowrap" data-testid={`text-sector-${stock.symbol}`}>{stock.sector}</span>
                       </td>
-                      <td className="px-3 py-2 hidden sm:table-cell">
-                        <span className="text-[11px] text-white/40 truncate max-w-[180px] block" data-testid={`text-industry-${stock.symbol}`}>{stock.industry}</span>
+                      <td className="px-3 py-2">
+                        <span className="text-[11px] text-white/40 whitespace-nowrap" data-testid={`text-industry-${stock.symbol}`}>{stock.industry}</span>
                       </td>
                       <td className="px-3 py-2 text-right">
                         <span className={cn(
@@ -441,8 +441,8 @@ export default function Leaders() {
                           {stock.changePercent > 0 ? '+' : ''}{stock.changePercent.toFixed(1)}%
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-right hidden sm:table-cell">
-                        <span className="text-[12px] text-white/50 tabular-nums" data-testid={`text-mcap-${stock.symbol}`}>{formatMcap(stock.marketCap)}</span>
+                      <td className="px-3 py-2 text-right">
+                        <span className="text-[12px] text-white/50 tabular-nums whitespace-nowrap" data-testid={`text-mcap-${stock.symbol}`}>{formatMcap(stock.marketCap)}</span>
                       </td>
                     </tr>
                   ))}

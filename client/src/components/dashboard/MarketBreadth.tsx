@@ -129,10 +129,10 @@ function SMABar({
           <span className="text-[10px] sm:text-[11px] font-mono-nums font-medium text-white/50">
             {abovePct.toFixed(1)}%
           </span>
-          <span className="text-[9px] sm:text-[10px] font-mono-nums text-white/15 hidden sm:inline">({aboveCount.toLocaleString()})</span>
+          <span className="text-[9px] sm:text-[10px] font-mono-nums text-white/15">({aboveCount.toLocaleString()})</span>
         </div>
         <div className="flex items-center gap-1 sm:gap-2 min-w-0">
-          <span className="text-[9px] sm:text-[10px] font-mono-nums text-white/15 hidden sm:inline">({belowCount.toLocaleString()})</span>
+          <span className="text-[9px] sm:text-[10px] font-mono-nums text-white/15">({belowCount.toLocaleString()})</span>
           <span className="text-[10px] sm:text-[11px] font-mono-nums font-medium text-white/50">
             {belowPct.toFixed(1)}%
           </span>

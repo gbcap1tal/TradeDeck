@@ -102,7 +102,7 @@ export function SectorPerformance() {
         <div className="grid px-2 pb-2" style={{ gridTemplateColumns: '1fr auto' }}>
           <div />
           <div className="flex items-center justify-end">
-            <div className="hidden sm:flex items-center justify-center mr-2">
+            <div className="flex items-center justify-center mr-2">
               {maHeaders.map(h => (
                 <span key={h.key} className="text-[8px] text-white/20 font-semibold w-[34px] text-center uppercase tracking-wide" title={h.title}>{h.label}</span>
               ))}
@@ -132,7 +132,7 @@ export function SectorPerformance() {
                   </div>
                 </div>
                 <div className="flex items-center justify-end">
-                  <div className="hidden sm:flex items-center justify-center mr-2">
+                  <div className="flex items-center justify-center mr-2">
                     {maHeaders.map(h => (
                       <span key={h.key} className="w-[34px] flex justify-center" data-testid={`ma-${h.key}-${ind.name.replace(/\s+/g, '-')}`}>
                         <MAArrow above={ma?.[h.key as keyof typeof ma] as boolean | undefined} />

@@ -596,22 +596,22 @@ function OverviewTab({ equityData, analytics, trades, config, showBenchmarks, se
               {holdingsDetailLoading ? (
                 <div className="h-[120px] animate-pulse bg-white/[0.02] rounded" />
               ) : holdingsDetail.length > 0 ? (
-                <table className="w-full text-[10px] sm:text-[11px]" data-testid="holdings-detail-table">
+                <table className="w-full text-[10px] sm:text-[11px] min-w-[800px]" data-testid="holdings-detail-table">
                   <thead>
                     <tr className="border-b border-white/[0.04] text-white/20">
                       <th className="text-left p-1.5 font-medium">Company</th>
-                      <th className="text-left p-1.5 font-medium hidden md:table-cell">Sector</th>
-                      <th className="text-left p-1.5 font-medium hidden lg:table-cell">Industry</th>
+                      <th className="text-left p-1.5 font-medium">Sector</th>
+                      <th className="text-left p-1.5 font-medium">Industry</th>
                       <th className="text-right p-1.5 font-medium">Gain %</th>
                       <th className="text-right p-1.5 font-medium">YTD %</th>
-                      <th className="text-right p-1.5 font-medium hidden sm:table-cell">Mkt Cap</th>
-                      <th className="text-center p-1.5 font-medium hidden sm:table-cell">Stage</th>
-                      <th className="text-center p-1.5 font-medium hidden md:table-cell">10e</th>
-                      <th className="text-center p-1.5 font-medium hidden md:table-cell">20e</th>
-                      <th className="text-center p-1.5 font-medium hidden lg:table-cell">50s</th>
-                      <th className="text-center p-1.5 font-medium hidden lg:table-cell">200s</th>
+                      <th className="text-right p-1.5 font-medium">Mkt Cap</th>
+                      <th className="text-center p-1.5 font-medium">Stage</th>
+                      <th className="text-center p-1.5 font-medium">10e</th>
+                      <th className="text-center p-1.5 font-medium">20e</th>
+                      <th className="text-center p-1.5 font-medium">50s</th>
+                      <th className="text-center p-1.5 font-medium">200s</th>
                       <th className="text-right p-1.5 font-medium">RS</th>
-                      <th className="text-right p-1.5 font-medium hidden sm:table-cell">QS</th>
+                      <th className="text-right p-1.5 font-medium">QS</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -623,16 +623,16 @@ function OverviewTab({ equityData, analytics, trades, config, showBenchmarks, se
                             <div className="text-[9px] text-white/20 truncate max-w-[120px] sm:max-w-[180px]">{h.name}</div>
                           </div>
                         </td>
-                        <td className="p-1.5 text-white/30 truncate max-w-[90px] hidden md:table-cell">{h.sector || '-'}</td>
-                        <td className="p-1.5 text-white/30 truncate max-w-[110px] hidden lg:table-cell">{h.industry || '-'}</td>
+                        <td className="p-1.5 text-white/30 whitespace-nowrap">{h.sector || '-'}</td>
+                        <td className="p-1.5 text-white/30 whitespace-nowrap">{h.industry || '-'}</td>
                         <td className={cn("p-1.5 text-right tabular-nums font-medium", h.gainPct >= 0 ? "text-emerald-400/80" : "text-red-400/80")}>
                           {formatPct(h.gainPct)}
                         </td>
                         <td className={cn("p-1.5 text-right tabular-nums font-medium", h.ytdPct >= 0 ? "text-emerald-400/70" : "text-red-400/70")}>
                           {formatPct(h.ytdPct)}
                         </td>
-                        <td className="p-1.5 text-right text-white/30 tabular-nums hidden sm:table-cell">{formatMarketCap(h.marketCap)}</td>
-                        <td className="p-1.5 text-center hidden sm:table-cell">
+                        <td className="p-1.5 text-right text-white/30 tabular-nums">{formatMarketCap(h.marketCap)}</td>
+                        <td className="p-1.5 text-center">
                           <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-medium",
                             h.weinsteinStage === 2 ? "bg-emerald-500/10 text-emerald-400/70" :
                             h.weinsteinStage === 4 ? "bg-red-500/10 text-red-400/70" :
@@ -642,16 +642,16 @@ function OverviewTab({ equityData, analytics, trades, config, showBenchmarks, se
                             S{h.weinsteinStage}
                           </span>
                         </td>
-                        <td className="p-1.5 text-center hidden md:table-cell"><MATick above={h.aboveEma10} /></td>
-                        <td className="p-1.5 text-center hidden md:table-cell"><MATick above={h.aboveEma20} /></td>
-                        <td className="p-1.5 text-center hidden lg:table-cell"><MATick above={h.above50sma} /></td>
-                        <td className="p-1.5 text-center hidden lg:table-cell"><MATick above={h.above200sma} /></td>
+                        <td className="p-1.5 text-center"><MATick above={h.aboveEma10} /></td>
+                        <td className="p-1.5 text-center"><MATick above={h.aboveEma20} /></td>
+                        <td className="p-1.5 text-center"><MATick above={h.above50sma} /></td>
+                        <td className="p-1.5 text-center"><MATick above={h.above200sma} /></td>
                         <td className={cn("p-1.5 text-right tabular-nums font-medium",
                           h.rsRating >= 80 ? "text-emerald-400/80" : h.rsRating >= 50 ? "text-white/50" : "text-red-400/70"
                         )}>
                           {h.rsRating || '-'}
                         </td>
-                        <td className={cn("p-1.5 text-right tabular-nums hidden sm:table-cell",
+                        <td className={cn("p-1.5 text-right tabular-nums",
                           h.qualityScore !== null && h.qualityScore >= 7 ? "text-emerald-400/70" :
                           h.qualityScore !== null && h.qualityScore >= 4 ? "text-white/40" :
                           h.qualityScore !== null ? "text-red-400/60" : "text-white/15"
@@ -758,19 +758,19 @@ function TradesTab({ trades, isLoading, onEdit }: { trades: Trade[]; isLoading: 
 
       <div className={cn(glassPanel, "overflow-hidden")}>
         <div className="w-full max-w-full overflow-x-auto">
-          <table className="w-full text-[11px] sm:text-xs" data-testid="trades-table">
+          <table className="w-full text-[11px] sm:text-xs min-w-[700px]" data-testid="trades-table">
             <thead>
               <tr className="border-b border-white/[0.04] text-white/25">
                 <th className="text-left p-2 sm:p-2.5 font-medium">Ticker</th>
-                <th className="text-left p-2 sm:p-2.5 font-medium hidden sm:table-cell">Side</th>
+                <th className="text-left p-2 sm:p-2.5 font-medium">Side</th>
                 <th className="text-left p-2 sm:p-2.5 font-medium">Entry</th>
                 <th className="text-right p-2 sm:p-2.5 font-medium">Entry $</th>
-                <th className="text-left p-2 sm:p-2.5 font-medium hidden md:table-cell">Exit</th>
-                <th className="text-right p-2 sm:p-2.5 font-medium hidden md:table-cell">Exit $</th>
-                <th className="text-right p-2 sm:p-2.5 font-medium hidden lg:table-cell">Qty</th>
+                <th className="text-left p-2 sm:p-2.5 font-medium">Exit</th>
+                <th className="text-right p-2 sm:p-2.5 font-medium">Exit $</th>
+                <th className="text-right p-2 sm:p-2.5 font-medium">Qty</th>
                 <th className="text-right p-2 sm:p-2.5 font-medium">P&L %</th>
-                <th className="text-right p-2 sm:p-2.5 font-medium hidden sm:table-cell">P&L $</th>
-                <th className="text-left p-2 sm:p-2.5 font-medium hidden lg:table-cell">Setup</th>
+                <th className="text-right p-2 sm:p-2.5 font-medium">P&L $</th>
+                <th className="text-left p-2 sm:p-2.5 font-medium">Setup</th>
                 <th className="text-right p-2 sm:p-2.5 font-medium w-[80px]"></th>
               </tr>
             </thead>
@@ -789,17 +789,10 @@ function TradesTab({ trades, isLoading, onEdit }: { trades: Trade[]; isLoading: 
                 return (
                   <tr key={t.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors" data-testid={`row-trade-${t.id}`}>
                     <td className="p-2 sm:p-2.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-medium text-white">{t.ticker}</span>
-                        <span className={cn("text-[9px] px-1 py-0.5 rounded uppercase font-medium sm:hidden",
-                          t.direction === 'long' ? "bg-emerald-500/10 text-emerald-400/70" : "bg-red-500/10 text-red-400/70"
-                        )}>
-                          {t.direction[0]}
-                        </span>
-                      </div>
+                      <span className="font-medium text-white">{t.ticker}</span>
                     </td>
-                    <td className="p-2 sm:p-2.5 hidden sm:table-cell">
-                      <span className={cn("text-[10px] px-1.5 py-0.5 rounded uppercase font-medium",
+                    <td className="p-2 sm:p-2.5">
+                      <span className={cn("text-[10px] px-1.5 py-0.5 rounded uppercase font-medium whitespace-nowrap",
                         t.direction === 'long' ? "bg-emerald-500/8 text-emerald-400/70" : "bg-red-500/8 text-red-400/70"
                       )}>
                         {t.direction}
@@ -807,20 +800,20 @@ function TradesTab({ trades, isLoading, onEdit }: { trades: Trade[]; isLoading: 
                     </td>
                     <td className="p-2 sm:p-2.5 text-white/40 tabular-nums">{t.entryDate}</td>
                     <td className="p-2 sm:p-2.5 text-right tabular-nums text-white/60">${t.entryPrice.toFixed(2)}</td>
-                    <td className="p-2 sm:p-2.5 text-white/40 tabular-nums hidden md:table-cell">{t.exitDate || '-'}</td>
-                    <td className="p-2 sm:p-2.5 text-right tabular-nums text-white/60 hidden md:table-cell">{t.exitPrice ? `$${t.exitPrice.toFixed(2)}` : '-'}</td>
-                    <td className="p-2 sm:p-2.5 text-right tabular-nums text-white/40 hidden lg:table-cell">{t.quantity}</td>
+                    <td className="p-2 sm:p-2.5 text-white/40 tabular-nums">{t.exitDate || '-'}</td>
+                    <td className="p-2 sm:p-2.5 text-right tabular-nums text-white/60">{t.exitPrice ? `$${t.exitPrice.toFixed(2)}` : '-'}</td>
+                    <td className="p-2 sm:p-2.5 text-right tabular-nums text-white/40">{t.quantity}</td>
                     <td className={cn("p-2 sm:p-2.5 text-right tabular-nums font-medium",
                       !t.exitDate ? "text-white/25" : pct >= 0 ? "text-emerald-400/90" : "text-red-400/90"
                     )}>
                       {t.exitDate ? formatPct(pct) : 'open'}
                     </td>
-                    <td className={cn("p-2 sm:p-2.5 text-right tabular-nums hidden sm:table-cell",
+                    <td className={cn("p-2 sm:p-2.5 text-right tabular-nums",
                       !t.exitDate ? "text-white/25" : pnl >= 0 ? "text-emerald-400/70" : "text-red-400/70"
                     )}>
                       {t.exitDate ? formatCurrency(pnl) : '-'}
                     </td>
-                    <td className="p-2 sm:p-2.5 text-white/25 hidden lg:table-cell">{t.setupTag || '-'}</td>
+                    <td className="p-2 sm:p-2.5 text-white/25">{t.setupTag || '-'}</td>
                     <td className="p-2 sm:p-2.5 text-right">
                       <div className="flex items-center justify-end gap-0.5">
                         {!t.exitDate && (

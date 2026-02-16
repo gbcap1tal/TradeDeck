@@ -50,16 +50,16 @@ function BarChart({ items, title, isMegatrendMap, onClickItem }: {
               onClick={() => onClickItem(item)}
               data-testid={`row-perf-${item.name.replace(/\s+/g, '-')}`}
             >
-              <div className="hidden sm:flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <span className="text-[11px] text-white/20 font-mono w-5 shrink-0 text-right">{idx + 1}</span>
                 <span className={cn(
-                  "text-[12px] font-medium w-[220px] shrink-0 truncate group-hover:text-white transition-colors",
+                  "text-[11px] sm:text-[12px] font-medium w-[140px] sm:w-[220px] shrink-0 truncate group-hover:text-white transition-colors",
                   isMegatrend ? "text-white" : "text-white/70"
                 )}>
                   {item.name}
                 </span>
                 <div className="flex-1 flex items-center gap-2 min-w-0">
-                  <div className="flex-1 h-[16px] relative rounded-sm overflow-hidden bg-white/[0.02]">
+                  <div className="flex-1 h-[14px] sm:h-[16px] relative rounded-sm overflow-hidden bg-white/[0.02]">
                     <div
                       className="h-full rounded-sm transition-all duration-500"
                       style={{
@@ -70,37 +70,7 @@ function BarChart({ items, title, isMegatrendMap, onClickItem }: {
                     />
                   </div>
                   <span className={cn(
-                    "text-[12px] font-mono-nums font-semibold w-[65px] text-right shrink-0",
-                    isPositive ? "text-[#30d158]" : "text-[#ff453a]"
-                  )}>
-                    {isPositive ? '+' : ''}{item.change.toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex sm:hidden flex-col gap-0.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] text-white/20 font-mono w-5 shrink-0 text-right">{idx + 1}</span>
-                  <span className={cn(
-                    "text-[11px] font-medium group-hover:text-white transition-colors break-words",
-                    isMegatrend ? "text-white" : "text-white/70"
-                  )}>
-                    {item.name}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 pl-[26px]">
-                  <div className="flex-1 h-[14px] relative rounded-sm overflow-hidden bg-white/[0.02]">
-                    <div
-                      className="h-full rounded-sm transition-all duration-500"
-                      style={{
-                        width: `${barWidth}%`,
-                        backgroundColor: isPositive ? '#30d158' : '#ff453a',
-                        opacity: 0.7,
-                      }}
-                    />
-                  </div>
-                  <span className={cn(
-                    "text-[11px] font-mono-nums font-semibold w-[48px] text-right shrink-0",
+                    "text-[11px] sm:text-[12px] font-mono-nums font-semibold w-[48px] sm:w-[65px] text-right shrink-0",
                     isPositive ? "text-[#30d158]" : "text-[#ff453a]"
                   )}>
                     {isPositive ? '+' : ''}{item.change.toFixed(1)}%

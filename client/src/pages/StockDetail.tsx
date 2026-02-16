@@ -949,18 +949,18 @@ export default function StockDetail() {
             <>
               <div className="flex items-center justify-between gap-2 sm:gap-3 flex-shrink-0 flex-wrap" data-testid="stock-header">
                 <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
-                  <div className="flex items-center gap-1.5 text-[11px] text-white/30 flex-shrink-0 hidden sm:flex">
+                  <div className="flex items-center gap-1.5 text-[11px] text-white/30 flex-shrink-0">
                     <Link href="/" className="hover:text-white/50 transition-colors" data-testid="link-breadcrumb-home">Home</Link>
                     <ChevronRight className="w-3 h-3" />
                     {quote.sector && (
                       <>
-                        <Link href={`/sectors/${encodeURIComponent(quote.sector)}`} className="hover:text-white/50 transition-colors truncate max-w-[100px]">{quote.sector}</Link>
+                        <Link href={`/sectors/${encodeURIComponent(quote.sector)}`} className="hover:text-white/50 transition-colors whitespace-nowrap">{quote.sector}</Link>
                         <ChevronRight className="w-3 h-3" />
                       </>
                     )}
                   </div>
                   <h1 className="text-lg font-bold tracking-tight text-white flex-shrink-0" data-testid="text-stock-symbol">{quote.symbol}</h1>
-                  <span className="text-[12px] text-white/30 truncate hidden sm:block">{quote.name}</span>
+                  <span className="text-[12px] text-white/30 whitespace-nowrap">{quote.name}</span>
                   <Button
                     size="icon"
                     variant="ghost"
