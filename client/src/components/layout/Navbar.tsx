@@ -216,7 +216,7 @@ export function Navbar() {
 
   return (
     <>
-      <nav className="glass sticky top-0 z-[999] h-14 w-full overflow-x-hidden" data-testid="navbar">
+      <nav className="glass sticky top-0 z-[999] h-14 w-full" data-testid="navbar">
         <div className="max-w-[1400px] mx-auto h-full px-2 sm:px-6 flex items-center justify-between gap-2 sm:gap-6">
           <div className="flex items-center gap-2 sm:gap-8 min-w-0 shrink-0">
             <Button
