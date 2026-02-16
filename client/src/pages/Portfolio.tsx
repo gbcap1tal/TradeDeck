@@ -293,6 +293,15 @@ function OverviewTab({ equityData, analytics, config, showBenchmarks, setShowBen
 
   const startingCapital = config?.startingCapital || equityData?.startingCapital || 100000;
 
+  const filteredMonthlyPnl = useMemo(() => {
+    if (!analytics?.monthlyPnl) return [];
+    if (range === 'ALL') return analytics.monthlyPnl;
+    const firstChartDate = chartData[0]?.date;
+    if (!firstChartDate) return analytics.monthlyPnl;
+    const cutoffMonth = firstChartDate.substring(0, 7);
+    return analytics.monthlyPnl.filter((m: any) => m.month >= cutoffMonth);
+  }, [analytics, range, chartData]);
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -320,15 +329,6 @@ function OverviewTab({ equityData, analytics, config, showBenchmarks, setShowBen
       if (dd < rangeMaxDD) rangeMaxDD = dd;
     }
   }
-
-  const filteredMonthlyPnl = useMemo(() => {
-    if (!analytics?.monthlyPnl) return [];
-    if (range === 'ALL') return analytics.monthlyPnl;
-    const firstChartDate = chartData[0]?.date;
-    if (!firstChartDate) return analytics.monthlyPnl;
-    const cutoffMonth = firstChartDate.substring(0, 7);
-    return analytics.monthlyPnl.filter((m: any) => m.month >= cutoffMonth);
-  }, [analytics, range, chartData]);
 
   return (
     <div className="space-y-3">
