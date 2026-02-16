@@ -1,7 +1,7 @@
 import { useRoute, Link, useLocation } from "wouter";
 import { Navbar } from "@/components/layout/Navbar";
 import { useSectorDetail } from "@/hooks/use-market";
-import { useStockHistory } from "@/hooks/use-stocks";
+import { useStockHistory, useStockHistoryWithTrend } from "@/hooks/use-stocks";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ChevronRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,13 @@ const TIMEFRAMES: { value: ChartTimeframe; label: string }[] = [
 ];
 
 
-function SectorETFChart({ data }: { data: any[] }) {
+const TREND_COLORS = {
+  'T+': 'rgba(46, 184, 80, 0.5)',
+  'TS': 'rgba(107, 107, 107, 0.35)',
+  'T-': 'rgba(192, 80, 80, 0.5)',
+};
+
+function SectorETFChart({ data, showTrend = false }: { data: any[]; showTrend?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
 
@@ -46,7 +52,7 @@ function SectorETFChart({ data }: { data: any[] }) {
       },
       rightPriceScale: {
         borderColor: 'rgba(255,255,255,0.06)',
-        scaleMargins: { top: 0.05, bottom: 0.2 },
+        scaleMargins: { top: 0.05, bottom: showTrend ? 0.25 : 0.2 },
       },
       timeScale: {
         borderColor: 'rgba(255,255,255,0.06)',
@@ -92,13 +98,28 @@ function SectorETFChart({ data }: { data: any[] }) {
       })));
     }
 
+    if (showTrend && data[0]?.trend) {
+      const trendSeries = chart.addSeries(HistogramSeries, {
+        priceFormat: { type: 'volume' },
+        priceScaleId: 'trend',
+      });
+      chart.priceScale('trend').applyOptions({
+        scaleMargins: { top: 0.93, bottom: 0 },
+      });
+      trendSeries.setData(data.map(d => ({
+        time: toTime(d.time),
+        value: 1,
+        color: TREND_COLORS[d.trend as keyof typeof TREND_COLORS] || TREND_COLORS['TS'],
+      })));
+    }
+
     chart.timeScale().fitContent();
 
     return () => {
       chart.remove();
       chartRef.current = null;
     };
-  }, [data]);
+  }, [data, showTrend]);
 
   return <div ref={containerRef} className="w-full h-full" data-testid="sector-etf-chart" />;
 }
@@ -111,7 +132,11 @@ export default function SectorDetail() {
 
   const [chartTimeframe, setChartTimeframe] = useState<ChartTimeframe>('D');
   const etfTicker = data?.sector?.ticker || '';
-  const { data: etfHistory, isLoading: chartLoading } = useStockHistory(etfTicker, chartTimeframe);
+  const isDaily = chartTimeframe === 'D';
+  const { data: dailyTrend, isLoading: dailyLoading } = useStockHistoryWithTrend(etfTicker, 'D');
+  const { data: otherHistory, isLoading: otherLoading } = useStockHistory(isDaily ? '' : etfTicker, chartTimeframe);
+  const etfHistory = isDaily ? dailyTrend : otherHistory;
+  const chartLoading = isDaily ? dailyLoading : otherLoading;
 
   const getHeatmapColor = (change: number) => {
     const intensity = Math.min(Math.abs(change) / 3, 1);
@@ -192,13 +217,29 @@ export default function SectorDetail() {
                       ))}
                     </div>
                   </div>
+                  {isDaily && (
+                    <div className="flex items-center gap-3 mb-1">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-3 h-1.5 rounded-sm" style={{ backgroundColor: 'rgba(46, 184, 80, 0.5)' }} />
+                        <span className="text-[9px] text-white/30">T+</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-3 h-1.5 rounded-sm" style={{ backgroundColor: 'rgba(107, 107, 107, 0.35)' }} />
+                        <span className="text-[9px] text-white/30">TS</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-3 h-1.5 rounded-sm" style={{ backgroundColor: 'rgba(192, 80, 80, 0.5)' }} />
+                        <span className="text-[9px] text-white/30">T-</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="h-[280px] sm:h-[340px] lg:h-[380px]">
                     {chartLoading ? (
                       <div className="w-full h-full flex items-center justify-center">
                         <Loader2 className="w-5 h-5 animate-spin text-white/15" />
                       </div>
                     ) : etfHistory?.length > 0 ? (
-                      <SectorETFChart data={etfHistory} />
+                      <SectorETFChart data={etfHistory} showTrend={isDaily} />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center text-white/20 text-sm">No chart data</div>
                     )}

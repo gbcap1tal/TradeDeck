@@ -114,7 +114,7 @@ function IndexChart({ data, showTrend = true }: { data: any[]; showTrend?: boole
       chart.remove();
       chartRef.current = null;
     };
-  }, [data]);
+  }, [data, showTrend]);
 
   return <div ref={containerRef} className="w-full h-full" data-testid="index-chart-container" />;
 }
