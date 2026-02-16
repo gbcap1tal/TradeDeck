@@ -151,7 +151,6 @@ export default function Portfolio() {
   const [editingTrade, setEditingTrade] = useState<Trade | null>(null);
   const [showBenchmarks, setShowBenchmarks] = useState({ qqq: true, spy: true });
   const { toast } = useToast();
-  const [, navigate] = useLocation();
 
   const { data: trades = [], isLoading: tradesLoading } = useQuery<Trade[]>({
     queryKey: ['/api/portfolio/trades'],
@@ -294,6 +293,7 @@ function OverviewTab({ equityData, analytics, trades, config, showBenchmarks, se
   setShowBenchmarks: (v: any) => void;
   isLoading: boolean;
 }) {
+  const [, navigate] = useLocation();
   const hasOpenTrades = trades.some(t => !t.exitDate);
   const { data: holdingsDetail = [], isLoading: holdingsDetailLoading } = useQuery<HoldingDetail[]>({
     queryKey: ['/api/portfolio/holdings-detail'],

@@ -194,19 +194,43 @@ export async function computeEquityCurve(userId: string) {
 
   if (tradingDays.length === 0) return { equity: [], benchmarks: [], trades };
 
-  const benchmarkPrices = await fetchBenchmarkPrices(earliest);
+  const uniqueTickers = Array.from(new Set(trades.map(t => t.ticker)));
+
+  const [benchmarkPrices, ...tickerHistories] = await Promise.all([
+    fetchBenchmarkPrices(earliest),
+    ...uniqueTickers.map(ticker => getHistory(ticker, 'D').then(hist => ({ ticker, hist }))),
+  ]);
+
+  const tickerPriceMap = new Map<string, Map<string, number>>();
+  for (const { ticker, hist } of tickerHistories) {
+    const dayMap = new Map<string, number>();
+    for (const d of (hist || [])) {
+      if (d.time && d.close) dayMap.set(d.time, d.close);
+    }
+    tickerPriceMap.set(ticker, dayMap);
+  }
+
+  function getPriceForDay(ticker: string, day: string, fallback: number): number {
+    const dayMap = tickerPriceMap.get(ticker);
+    if (!dayMap) return fallback;
+    const exact = dayMap.get(day);
+    if (exact !== undefined) return exact;
+    let bestDate = '';
+    let bestPrice = fallback;
+    for (const [d, p] of Array.from(dayMap.entries())) {
+      if (d <= day && d > bestDate) {
+        bestDate = d;
+        bestPrice = p;
+      }
+    }
+    return bestPrice;
+  }
 
   let cash = startingCapital;
   let realizedPnl = 0;
   const openPositions: Map<number, PortfolioTrade> = new Map();
 
   const equityCurve: { date: string; equity: number; cash: number; realizedPnl: number; unrealizedPnl: number }[] = [];
-
-  const latestPrices = new Map<string, number>();
-  for (const t of trades) {
-    latestPrices.set(t.ticker, t.entryPrice);
-    if (t.exitPrice) latestPrices.set(t.ticker, t.exitPrice);
-  }
 
   for (const day of tradingDays) {
     for (const t of trades) {
@@ -216,11 +240,6 @@ export async function computeEquityCurve(userId: string) {
         openPositions.set(t.id, t);
       }
       if (t.exitDate === day && openPositions.has(t.id)) {
-        const proceeds = (t.exitPrice || 0) * t.quantity - (t.fees || 0);
-        const cost = t.entryPrice * t.quantity;
-        const pnl = t.direction === 'long'
-          ? proceeds - cost
-          : cost - proceeds + 2 * cost - 2 * (t.exitPrice || 0) * t.quantity;
         const tradePnl = t.direction === 'long'
           ? ((t.exitPrice || 0) - t.entryPrice) * t.quantity - (t.fees || 0) * 2
           : (t.entryPrice - (t.exitPrice || 0)) * t.quantity - (t.fees || 0) * 2;
@@ -231,21 +250,17 @@ export async function computeEquityCurve(userId: string) {
     }
 
     let unrealizedPnl = 0;
+    let investedValue = 0;
     for (const [, pos] of Array.from(openPositions.entries())) {
-      const currentPrice = latestPrices.get(pos.ticker) || pos.entryPrice;
-      const benchDay = benchmarkPrices.get(day);
+      const currentPrice = getPriceForDay(pos.ticker, day, pos.entryPrice);
       if (pos.direction === 'long') {
         unrealizedPnl += (currentPrice - pos.entryPrice) * pos.quantity;
+        investedValue += currentPrice * pos.quantity;
       } else {
         unrealizedPnl += (pos.entryPrice - currentPrice) * pos.quantity;
+        investedValue += pos.entryPrice * pos.quantity;
       }
     }
-
-    const posArray = Array.from(openPositions.values());
-    const investedValue = posArray.reduce((sum, pos) => {
-      const price = latestPrices.get(pos.ticker) || pos.entryPrice;
-      return sum + price * pos.quantity;
-    }, 0);
 
     const totalEquity = cash + investedValue;
 
