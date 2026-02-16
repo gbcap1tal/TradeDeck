@@ -3,16 +3,12 @@ import { scrapeFinvizBreadth } from './finviz';
 import { getCached, setCache } from './cache';
 import * as fs from 'fs';
 import * as path from 'path';
+import { isNYSEMarketOpen } from './fmp';
 
 const BREADTH_PERSIST_PATH = path.join(process.cwd(), '.breadth-cache.json');
 
 export function isUSMarketOpen(): boolean {
-  const now = new Date();
-  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const day = et.getDay();
-  if (day === 0 || day === 6) return false;
-  const timeMinutes = et.getHours() * 60 + et.getMinutes();
-  return timeMinutes >= 570 && timeMinutes <= 960;
+  return isNYSEMarketOpen();
 }
 
 export function isExtendedMarketHours(): boolean {

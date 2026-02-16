@@ -1,7 +1,24 @@
 import { getCached, setCache, CACHE_TTL } from './cache';
 
 const FMP_STABLE = 'https://financialmodelingprep.com/stable';
-const _FMP_V3 = 'https://financialmodelingprep.com/api/v3';
+const FMP_V3 = 'https://financialmodelingprep.com/api/v3';
+
+async function fmpV3Request(endpoint: string, params: Record<string, string> = {}): Promise<any> {
+  const apiKey = process.env.FMP_KEY;
+  if (!apiKey) return null;
+
+  const url = new URL(`${FMP_V3}/${endpoint}`);
+  url.searchParams.set('apikey', apiKey);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+
+  try {
+    const resp = await fetch(url.toString(), { signal: AbortSignal.timeout(8000) });
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch {
+    return null;
+  }
+}
 
 async function fmpStableRequest(endpoint: string, params: Record<string, string> = {}): Promise<any> {
   const apiKey = process.env.FMP_KEY;
@@ -187,4 +204,30 @@ export async function getSectorPerformance() {
 
   setCache(key, data, CACHE_TTL.SECTORS);
   return data;
+}
+
+const NYSE_HOLIDAYS: Set<string> = new Set([
+  '2025-01-01','2025-01-20','2025-02-17','2025-04-18','2025-05-26','2025-06-19','2025-07-04','2025-09-01','2025-11-27','2025-12-25',
+  '2026-01-01','2026-01-19','2026-02-16','2026-04-03','2026-05-25','2026-06-19','2026-07-03','2026-09-07','2026-11-26','2026-12-25',
+  '2027-01-01','2027-01-18','2027-02-15','2027-03-26','2027-05-31','2027-06-18','2027-07-05','2027-09-06','2027-11-25','2027-12-24',
+]);
+
+const NYSE_EARLY_CLOSE: Set<string> = new Set([
+  '2025-07-03','2025-11-28','2025-12-24',
+  '2026-11-27','2026-12-24',
+  '2027-11-26',
+]);
+
+export function isNYSEMarketOpen(): boolean {
+  const now = new Date();
+  const et = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const day = et.getDay();
+  if (day === 0 || day === 6) return false;
+
+  const dateStr = `${et.getFullYear()}-${String(et.getMonth() + 1).padStart(2, '0')}-${String(et.getDate()).padStart(2, '0')}`;
+  if (NYSE_HOLIDAYS.has(dateStr)) return false;
+
+  const timeMinutes = et.getHours() * 60 + et.getMinutes();
+  const closeTime = NYSE_EARLY_CLOSE.has(dateStr) ? 780 : 960;
+  return timeMinutes >= 570 && timeMinutes <= closeTime;
 }

@@ -1500,14 +1500,7 @@ export async function registerRoutes(
   });
 
   app.get('/api/market/status', (req, res) => {
-    const now = new Date();
-    const hour = now.getUTCHours();
-    const minute = now.getUTCMinutes();
-    const day = now.getUTCDay();
-    const totalMinutes = hour * 60 + minute;
-    const isWeekday = day >= 1 && day <= 5;
-    const isOpen = isWeekday && totalMinutes >= 14 * 60 + 30 && totalMinutes < 21 * 60;
-    res.json({ isOpen });
+    res.json({ isOpen: isUSMarketOpen() });
   });
 
   // === EARNINGS API ROUTES ===
