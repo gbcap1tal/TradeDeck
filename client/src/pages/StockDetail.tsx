@@ -936,7 +936,7 @@ export default function StockDetail() {
   if (!symbol) return null;
 
   return (
-    <div className="min-h-screen lg:h-screen bg-background flex flex-col lg:overflow-hidden overflow-x-hidden">
+    <div className="min-h-screen lg:h-screen bg-background flex flex-col lg:overflow-hidden">
       <Navbar />
       <main className="flex-1 min-h-0 flex flex-col">
         <div className="max-w-[1440px] w-full mx-auto px-3 sm:px-4 py-2 flex-1 min-h-0 flex flex-col gap-2">

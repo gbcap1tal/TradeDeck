@@ -185,7 +185,7 @@ export default function Portfolio() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] overflow-x-hidden">
+    <div className="min-h-screen bg-[#0a0a0a]">
       <Navbar />
       <div className="max-w-[1400px] mx-auto px-3 sm:px-4 py-3 sm:py-4 space-y-3 sm:space-y-4">
         <div className="flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
