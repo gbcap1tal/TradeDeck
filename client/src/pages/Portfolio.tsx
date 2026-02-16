@@ -14,7 +14,7 @@ import {
   ReferenceLine, Area, ComposedChart, PieChart, Pie
 } from "recharts";
 import {
-  Plus, Upload, Trash2, BarChart3, Settings, X, Pencil, Download, Scissors
+  Plus, Upload, Trash2, BarChart3, Settings, X, Pencil, Download, Scissors, Check, Minus
 } from "lucide-react";
 
 type Tab = 'overview' | 'trades' | 'analytics';
@@ -70,6 +70,27 @@ interface Analytics {
   monthlyPnl: { month: string; pnl: number }[];
 }
 
+interface HoldingDetail {
+  ticker: string;
+  name: string;
+  sector: string;
+  industry: string;
+  quantity: number;
+  avgEntry: number;
+  currentPrice: number;
+  marketValue: number;
+  gainPct: number;
+  ytdPct: number;
+  marketCap: number;
+  weinsteinStage: number;
+  aboveEma10: boolean;
+  aboveEma20: boolean;
+  above50sma: boolean;
+  above200sma: boolean;
+  rsRating: number;
+  qualityScore: number | null;
+}
+
 interface SetupTag {
   id: number;
   name: string;
@@ -100,6 +121,20 @@ function formatCurrency(v: number) {
 
 function formatPct(v: number) {
   return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
+}
+
+function formatMarketCap(v: number) {
+  if (!v) return '-';
+  if (v >= 1e12) return `$${(v / 1e12).toFixed(1)}T`;
+  if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
+  if (v >= 1e6) return `$${(v / 1e6).toFixed(0)}M`;
+  return `$${(v / 1e3).toFixed(0)}K`;
+}
+
+function MATick({ above }: { above: boolean }) {
+  return above
+    ? <Check className="w-3 h-3 text-emerald-400/70 mx-auto" />
+    : <Minus className="w-3 h-3 text-white/10 mx-auto" />;
 }
 
 const glassPanel = "bg-white/[0.03] backdrop-blur-sm border border-white/[0.04] rounded-lg";
@@ -254,6 +289,12 @@ function OverviewTab({ equityData, analytics, trades, config, showBenchmarks, se
   setShowBenchmarks: (v: any) => void;
   isLoading: boolean;
 }) {
+  const hasOpenTrades = trades.some(t => !t.exitDate);
+  const { data: holdingsDetail = [], isLoading: holdingsDetailLoading } = useQuery<HoldingDetail[]>({
+    queryKey: ['/api/portfolio/holdings-detail'],
+    enabled: hasOpenTrades,
+    staleTime: 60000,
+  });
   const [range, setRange] = useState<TimeRange>('ALL');
   const ranges: TimeRange[] = ['1W', '1M', '3M', '6M', 'YTD', '1Y', 'ALL'];
 
@@ -294,13 +335,18 @@ function OverviewTab({ equityData, analytics, trades, config, showBenchmarks, se
   const pctChartData = useMemo(() => {
     if (chartData.length === 0) return [];
     const baseEquity = chartData[0]?.equity || 1;
-    const baseQqq = chartData[0]?.qqq || null;
-    const baseSpy = chartData[0]?.spy || null;
+    let baseQqq: number | null = null;
+    let baseSpy: number | null = null;
+    for (const d of chartData) {
+      if (baseQqq === null && d.qqq != null) baseQqq = d.qqq;
+      if (baseSpy === null && d.spy != null) baseSpy = d.spy;
+      if (baseQqq !== null && baseSpy !== null) break;
+    }
     return chartData.map((d: any) => ({
       date: d.date,
       portfolio: ((d.equity - baseEquity) / baseEquity) * 100,
-      qqq: baseQqq && d.qqq ? ((d.qqq - baseQqq) / baseQqq) * 100 : null,
-      spy: baseSpy && d.spy ? ((d.spy - baseSpy) / baseSpy) * 100 : null,
+      qqq: baseQqq != null && d.qqq != null ? ((d.qqq - baseQqq) / baseQqq) * 100 : null,
+      spy: baseSpy != null && d.spy != null ? ((d.spy - baseSpy) / baseSpy) * 100 : null,
     }));
   }, [chartData]);
 
@@ -357,8 +403,12 @@ function OverviewTab({ equityData, analytics, trades, config, showBenchmarks, se
   const rangeEnd = chartData[chartData.length - 1]?.equity || startingCapital;
   const periodReturn = rangeEnd - rangeStart;
   const periodReturnPct = (periodReturn / rangeStart) * 100;
-  const rangeStartQqq = chartData[0]?.qqq;
-  const rangeEndQqq = chartData[chartData.length - 1]?.qqq;
+  let rangeStartQqq: number | null = null;
+  let rangeEndQqq: number | null = null;
+  for (const d of chartData) {
+    if (rangeStartQqq === null && d.qqq != null) rangeStartQqq = d.qqq;
+    if (d.qqq != null) rangeEndQqq = d.qqq;
+  }
   const qqqReturn = rangeEndQqq && rangeStartQqq ? ((rangeEndQqq - rangeStartQqq) / rangeStartQqq) * 100 : 0;
   const alphaVsQqq = periodReturnPct - qqqReturn;
 
@@ -469,12 +519,13 @@ function OverviewTab({ equityData, analytics, trades, config, showBenchmarks, se
                 strokeWidth={1.5}
                 dot={false}
                 name="portfolio"
+                connectNulls
               />
               {showBenchmarks.qqq && (
-                <Line type="monotone" dataKey="qqq" stroke="rgba(96,165,250,0.5)" strokeWidth={1.2} dot={false} name="qqq" />
+                <Line type="monotone" dataKey="qqq" stroke="rgba(96,165,250,0.5)" strokeWidth={1.2} dot={false} name="qqq" connectNulls />
               )}
               {showBenchmarks.spy && (
-                <Line type="monotone" dataKey="spy" stroke="rgba(251,191,36,0.45)" strokeWidth={1.2} dot={false} name="spy" />
+                <Line type="monotone" dataKey="spy" stroke="rgba(251,191,36,0.45)" strokeWidth={1.2} dot={false} name="spy" connectNulls />
               )}
             </ComposedChart>
           </ResponsiveContainer>
@@ -483,48 +534,119 @@ function OverviewTab({ equityData, analytics, trades, config, showBenchmarks, se
 
       {holdings.length > 0 && (
         <div className={cn(glassPanel, "p-3 sm:p-4")}>
-          <div className="text-[11px] font-medium text-white/25 uppercase tracking-wider mb-3" data-testid="text-holdings-title">Portfolio Holdings</div>
-          <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-            <div className="w-[160px] h-[160px] sm:w-[180px] sm:h-[180px] flex-shrink-0" data-testid="holdings-chart">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={holdings}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius="55%"
-                    outerRadius="85%"
-                    strokeWidth={0}
-                    paddingAngle={2}
-                  >
-                    {holdings.map((h, i) => (
-                      <Cell key={i} fill={h.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: 'rgba(12,12,12,0.95)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', backdropFilter: 'blur(16px)', padding: '6px 10px', fontSize: 11 }}
-                    formatter={(v: any, name: any) => [formatCurrency(v as number), name]}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex-1 w-full">
-              <div className="grid grid-cols-1 gap-1">
+          <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+            <div className="text-[11px] font-medium text-white/25 uppercase tracking-wider" data-testid="text-holdings-title">Portfolio Holdings</div>
+          </div>
+          <div className="flex flex-col lg:flex-row gap-4 lg:gap-5">
+            <div className="flex flex-row lg:flex-col items-center gap-3 lg:gap-2 flex-shrink-0">
+              <div className="w-[140px] h-[140px] sm:w-[160px] sm:h-[160px]" data-testid="holdings-chart">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={holdings}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius="55%"
+                      outerRadius="85%"
+                      strokeWidth={0}
+                      paddingAngle={2}
+                    >
+                      {holdings.map((h, i) => (
+                        <Cell key={i} fill={h.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ backgroundColor: 'rgba(12,12,12,0.95)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', backdropFilter: 'blur(16px)', padding: '6px 10px', fontSize: 11 }}
+                      formatter={(v: any, name: any) => [formatCurrency(v as number), name]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex flex-col gap-0.5">
                 {holdings.map((h, i) => (
-                  <div key={i} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-white/[0.02] transition-colors" data-testid={`holding-${h.name}`}>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: h.color }} />
-                      <span className="text-[12px] font-medium text-white/70">{h.name}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[11px] text-white/30 tabular-nums">{formatCurrency(h.value)}</span>
-                      <span className="text-[12px] font-medium text-white/50 tabular-nums w-[48px] text-right">{h.pct.toFixed(1)}%</span>
-                    </div>
+                  <div key={i} className="flex items-center gap-1.5 px-1">
+                    <div className="w-2 h-2 rounded-sm flex-shrink-0" style={{ backgroundColor: h.color }} />
+                    <span className="text-[10px] text-white/40">{h.name}</span>
+                    <span className="text-[10px] text-white/25 tabular-nums">{h.pct.toFixed(0)}%</span>
                   </div>
                 ))}
               </div>
+            </div>
+            <div className="flex-1 overflow-x-auto">
+              {holdingsDetailLoading ? (
+                <div className="h-[120px] animate-pulse bg-white/[0.02] rounded" />
+              ) : holdingsDetail.length > 0 ? (
+                <table className="w-full text-[10px] sm:text-[11px]" data-testid="holdings-detail-table">
+                  <thead>
+                    <tr className="border-b border-white/[0.04] text-white/20">
+                      <th className="text-left p-1.5 font-medium">Company</th>
+                      <th className="text-left p-1.5 font-medium hidden md:table-cell">Sector</th>
+                      <th className="text-left p-1.5 font-medium hidden lg:table-cell">Industry</th>
+                      <th className="text-right p-1.5 font-medium">Gain %</th>
+                      <th className="text-right p-1.5 font-medium">YTD %</th>
+                      <th className="text-right p-1.5 font-medium hidden sm:table-cell">Mkt Cap</th>
+                      <th className="text-center p-1.5 font-medium hidden sm:table-cell">Stage</th>
+                      <th className="text-center p-1.5 font-medium hidden md:table-cell">10e</th>
+                      <th className="text-center p-1.5 font-medium hidden md:table-cell">20e</th>
+                      <th className="text-center p-1.5 font-medium hidden lg:table-cell">50s</th>
+                      <th className="text-center p-1.5 font-medium hidden lg:table-cell">200s</th>
+                      <th className="text-right p-1.5 font-medium">RS</th>
+                      <th className="text-right p-1.5 font-medium hidden sm:table-cell">QS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {holdingsDetail.map(h => (
+                      <tr key={h.ticker} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors" data-testid={`holding-row-${h.ticker}`}>
+                        <td className="p-1.5">
+                          <div>
+                            <span className="font-medium text-white">{h.ticker}</span>
+                            <div className="text-[9px] text-white/20 truncate max-w-[120px] sm:max-w-[180px]">{h.name}</div>
+                          </div>
+                        </td>
+                        <td className="p-1.5 text-white/30 truncate max-w-[90px] hidden md:table-cell">{h.sector || '-'}</td>
+                        <td className="p-1.5 text-white/30 truncate max-w-[110px] hidden lg:table-cell">{h.industry || '-'}</td>
+                        <td className={cn("p-1.5 text-right tabular-nums font-medium", h.gainPct >= 0 ? "text-emerald-400/80" : "text-red-400/80")}>
+                          {formatPct(h.gainPct)}
+                        </td>
+                        <td className={cn("p-1.5 text-right tabular-nums font-medium", h.ytdPct >= 0 ? "text-emerald-400/70" : "text-red-400/70")}>
+                          {formatPct(h.ytdPct)}
+                        </td>
+                        <td className="p-1.5 text-right text-white/30 tabular-nums hidden sm:table-cell">{formatMarketCap(h.marketCap)}</td>
+                        <td className="p-1.5 text-center hidden sm:table-cell">
+                          <span className={cn("text-[10px] px-1.5 py-0.5 rounded font-medium",
+                            h.weinsteinStage === 2 ? "bg-emerald-500/10 text-emerald-400/70" :
+                            h.weinsteinStage === 4 ? "bg-red-500/10 text-red-400/70" :
+                            h.weinsteinStage === 1 ? "bg-blue-500/10 text-blue-400/60" :
+                            "bg-amber-500/10 text-amber-400/60"
+                          )}>
+                            S{h.weinsteinStage}
+                          </span>
+                        </td>
+                        <td className="p-1.5 text-center hidden md:table-cell"><MATick above={h.aboveEma10} /></td>
+                        <td className="p-1.5 text-center hidden md:table-cell"><MATick above={h.aboveEma20} /></td>
+                        <td className="p-1.5 text-center hidden lg:table-cell"><MATick above={h.above50sma} /></td>
+                        <td className="p-1.5 text-center hidden lg:table-cell"><MATick above={h.above200sma} /></td>
+                        <td className={cn("p-1.5 text-right tabular-nums font-medium",
+                          h.rsRating >= 80 ? "text-emerald-400/80" : h.rsRating >= 50 ? "text-white/50" : "text-red-400/70"
+                        )}>
+                          {h.rsRating || '-'}
+                        </td>
+                        <td className={cn("p-1.5 text-right tabular-nums hidden sm:table-cell",
+                          h.qualityScore !== null && h.qualityScore >= 7 ? "text-emerald-400/70" :
+                          h.qualityScore !== null && h.qualityScore >= 4 ? "text-white/40" :
+                          h.qualityScore !== null ? "text-red-400/60" : "text-white/15"
+                        )}>
+                          {h.qualityScore !== null ? h.qualityScore.toFixed(1) : '-'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="text-[11px] text-white/15 text-center py-6">No detailed data available</div>
+              )}
             </div>
           </div>
         </div>

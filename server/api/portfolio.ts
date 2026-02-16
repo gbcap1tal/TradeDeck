@@ -471,3 +471,100 @@ export async function deleteSetupTag(id: number, userId: string) {
   await db.delete(portfolioSetupTags)
     .where(and(eq(portfolioSetupTags.id, id), eq(portfolioSetupTags.userId, userId)));
 }
+
+export async function getHoldingsDetail(userId: string) {
+  const { getQuote, getWeinsteinStage, getEMAIndicators, getYearStartPrices } = await import('./yahoo');
+  const { getRSRating } = await import('./rs');
+  const { getCachedScoreForSymbol, computeQualityScore } = await import('./quality');
+  const { searchStocks } = await import('./finviz');
+
+  const trades = await db.select().from(portfolioTrades)
+    .where(eq(portfolioTrades.userId, userId))
+    .orderBy(asc(portfolioTrades.entryDate));
+
+  const openTrades = trades.filter(t => !t.exitDate);
+  if (openTrades.length === 0) return [];
+
+  const tickerMap = new Map<string, { totalQty: number; totalCost: number }>();
+  for (const t of openTrades) {
+    const existing = tickerMap.get(t.ticker) || { totalQty: 0, totalCost: 0 };
+    existing.totalQty += t.quantity;
+    existing.totalCost += t.entryPrice * t.quantity;
+    tickerMap.set(t.ticker, existing);
+  }
+
+  const tickers = Array.from(tickerMap.keys());
+
+  const [quotes, yearStartPrices] = await Promise.all([
+    Promise.all(tickers.map(async (sym) => {
+      try { return await getQuote(sym); } catch { return null; }
+    })),
+    getYearStartPrices(tickers),
+  ]);
+
+  const results = await Promise.all(tickers.map(async (ticker, i) => {
+    const quote = quotes[i];
+    const pos = tickerMap.get(ticker)!;
+    const avgEntry = pos.totalCost / pos.totalQty;
+    const currentPrice = quote?.price || avgEntry;
+    const marketValue = currentPrice * pos.totalQty;
+
+    const finvizMatch = searchStocks(ticker, 1);
+    const sector = quote?.sector || finvizMatch[0]?.sector || '';
+    const industry = quote?.industry || finvizMatch[0]?.industry || '';
+
+    const yearStart = yearStartPrices.get(ticker);
+    const ytdPct = yearStart ? ((currentPrice - yearStart) / yearStart) * 100 : 0;
+
+    const gainPct = ((currentPrice - avgEntry) / avgEntry) * 100;
+
+    let weinstein = 0;
+    let aboveEma10 = false;
+    let aboveEma20 = false;
+    let above50sma = false;
+    let above200sma = false;
+
+    try {
+      const [ws, ema] = await Promise.all([
+        getWeinsteinStage(ticker),
+        getEMAIndicators(ticker),
+      ]);
+      weinstein = ws;
+      aboveEma10 = ema.aboveEma10;
+      aboveEma20 = ema.aboveEma20;
+      above50sma = quote?.fiftyDayAverage ? currentPrice > quote.fiftyDayAverage : false;
+      above200sma = quote?.twoHundredDayAverage ? currentPrice > quote.twoHundredDayAverage : false;
+    } catch {}
+
+    const rs = getRSRating(ticker);
+    const quality = getCachedScoreForSymbol(ticker);
+
+    let qualityScore = quality;
+    if (qualityScore === undefined) {
+      try { qualityScore = await computeQualityScore(ticker); } catch { qualityScore = undefined; }
+    }
+
+    return {
+      ticker,
+      name: quote?.name || finvizMatch[0]?.name || ticker,
+      sector,
+      industry,
+      quantity: pos.totalQty,
+      avgEntry,
+      currentPrice,
+      marketValue,
+      gainPct,
+      ytdPct,
+      marketCap: quote?.marketCap || 0,
+      weinsteinStage: weinstein,
+      aboveEma10,
+      aboveEma20,
+      above50sma,
+      above200sma,
+      rsRating: rs,
+      qualityScore: qualityScore ?? null,
+    };
+  }));
+
+  return results.sort((a, b) => b.marketValue - a.marketValue);
+}

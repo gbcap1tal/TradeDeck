@@ -3357,6 +3357,16 @@ Keep the entire response under 1000 characters. Be concise, direct, and useful f
     }
   });
 
+  app.get('/api/portfolio/holdings-detail', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const data = await portfolio.getHoldingsDetail(userId);
+      res.json(data);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.delete('/api/portfolio/setup-tags/:id', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
