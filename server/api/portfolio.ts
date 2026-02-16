@@ -106,10 +106,10 @@ async function fetchBenchmarkPrices(startDate: string): Promise<Map<string, { qq
     for (const d of (qqqHist || [])) qqqMap.set(d.time, d.close);
     for (const d of (spyHist || [])) spyMap.set(d.time, d.close);
 
-    const allDates = new Set([...qqqMap.keys(), ...spyMap.keys()]);
+    const allDates = new Set([...Array.from(qqqMap.keys()), ...Array.from(spyMap.keys())]);
     const newRows: { date: string; qqqPrice: number | null; spyPrice: number | null }[] = [];
 
-    for (const date of allDates) {
+    for (const date of Array.from(allDates)) {
       if (date < startDate) continue;
       if (map.has(date)) continue;
       const qqq = qqqMap.get(date) || null;
@@ -193,7 +193,7 @@ export async function computeEquityCurve(userId: string) {
     }
 
     let unrealizedPnl = 0;
-    for (const [, pos] of openPositions) {
+    for (const [, pos] of Array.from(openPositions.entries())) {
       const currentPrice = latestPrices.get(pos.ticker) || pos.entryPrice;
       const benchDay = benchmarkPrices.get(day);
       if (pos.direction === 'long') {
@@ -203,7 +203,8 @@ export async function computeEquityCurve(userId: string) {
       }
     }
 
-    const investedValue = Array.from(openPositions.values()).reduce((sum, pos) => {
+    const posArray = Array.from(openPositions.values());
+    const investedValue = posArray.reduce((sum, pos) => {
       const price = latestPrices.get(pos.ticker) || pos.entryPrice;
       return sum + price * pos.quantity;
     }, 0);

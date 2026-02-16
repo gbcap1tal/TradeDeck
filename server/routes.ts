@@ -3207,5 +3207,115 @@ Keep the entire response under 1000 characters. Be concise, direct, and useful f
     }
   });
 
+  // === PORTFOLIO PERFORMANCE ROUTES ===
+  const portfolio = await import('./api/portfolio');
+
+  app.get('/api/portfolio/trades', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const trades = await portfolio.listTrades(userId);
+      res.json(trades);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/portfolio/trades', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const trade = await portfolio.createTrade({ ...req.body, userId });
+      res.json(trade);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  app.patch('/api/portfolio/trades/:id', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const trade = await portfolio.updateTrade(parseInt(req.params.id), userId, req.body);
+      if (!trade) return res.status(404).json({ message: 'Trade not found' });
+      res.json(trade);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  app.delete('/api/portfolio/trades/:id', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const trade = await portfolio.deleteTrade(parseInt(req.params.id), userId);
+      if (!trade) return res.status(404).json({ message: 'Trade not found' });
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  app.delete('/api/portfolio/trades', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await portfolio.deleteAllTrades(userId);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/portfolio/trades/csv', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { csv } = req.body;
+      if (!csv || typeof csv !== 'string') return res.status(400).json({ message: 'CSV content required' });
+      const parsed = portfolio.parseCSVTrades(csv, userId);
+      if (parsed.length === 0) return res.status(400).json({ message: 'No valid trades found in CSV' });
+      const trades = await portfolio.createTradesBatch(parsed);
+      res.json({ imported: trades.length, trades });
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
+  app.get('/api/portfolio/equity', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const data = await portfolio.computeEquityCurve(userId);
+      res.json(data);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get('/api/portfolio/analytics', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const data = await portfolio.computeAnalytics(userId);
+      res.json(data);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get('/api/portfolio/config', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const config = await portfolio.getPortfolioConfig(userId);
+      res.json(config || { startingCapital: 100000, startDate: null });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post('/api/portfolio/config', isAuthenticated, async (req, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { startingCapital, startDate } = req.body;
+      const config = await portfolio.upsertPortfolioConfig(userId, startingCapital || 100000, startDate);
+      res.json(config);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
   return httpServer;
 }

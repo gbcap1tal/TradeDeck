@@ -15,6 +15,7 @@ import MegatrendDetail from "@/pages/MegatrendDetail";
 import News from "@/pages/News";
 import Leaders from "@/pages/Leaders";
 import Earnings from "@/pages/Earnings";
+import Portfolio from "@/pages/Portfolio";
 import Payment from "@/pages/Payment";
 import PaymentSuccess from "@/pages/PaymentSuccess";
 import PaymentCancel from "@/pages/PaymentCancel";
@@ -85,6 +86,7 @@ function ProtectedMegatrendDetail() { return <PaymentGate><MegatrendDetail /></P
 function ProtectedNews() { return <PaymentGate><News /></PaymentGate>; }
 function ProtectedLeaders() { return <PaymentGate><Leaders /></PaymentGate>; }
 function ProtectedEarnings() { return <PaymentGate><Earnings /></PaymentGate>; }
+function ProtectedPortfolio() { return <PaymentGate><Portfolio /></PaymentGate>; }
 
 function Router() {
   return (
@@ -105,6 +107,7 @@ function Router() {
       <Route path="/leaders" component={ProtectedLeaders} />
       <Route path="/earnings" component={ProtectedEarnings} />
       <Route path="/news" component={ProtectedNews} />
+      <Route path="/portfolio" component={ProtectedPortfolio} />
       <Route component={NotFound} />
     </Switch>
   );

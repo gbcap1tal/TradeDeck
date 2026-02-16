@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Search, User, LogOut, Menu, X, BarChart3, Layers, Newspaper, Crown, CalendarDays, KeyRound, Shield } from "lucide-react";
+import { Search, User, LogOut, Menu, X, BarChart3, Layers, Newspaper, Crown, CalendarDays, KeyRound, Shield, Briefcase } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -185,6 +185,7 @@ export function Navbar() {
     { label: "Leaders", href: "/leaders", icon: Crown },
     { label: "Earnings", href: "/earnings", icon: CalendarDays },
     { label: "News", href: "/news", icon: Newspaper },
+    { label: "Portfolio", href: "/portfolio", icon: Briefcase },
   ];
 
   return (
