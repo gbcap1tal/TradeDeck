@@ -23,9 +23,13 @@ function IndexChart({ data }: { data: any[] }) {
   const chartRef = useRef<IChartApi | null>(null);
 
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || !data?.length) return;
 
-    const chart = createChart(containerRef.current, {
+    const container = containerRef.current;
+    const chart = createChart(container, {
+      width: container.clientWidth,
+      height: container.clientHeight,
+      autoSize: true,
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
         textColor: 'rgba(255,255,255,0.35)',
@@ -43,7 +47,7 @@ function IndexChart({ data }: { data: any[] }) {
       },
       rightPriceScale: {
         borderColor: 'rgba(255,255,255,0.06)',
-        scaleMargins: { top: 0.05, bottom: 0.28 },
+        scaleMargins: { top: 0.05, bottom: 0.25 },
       },
       timeScale: {
         borderColor: 'rgba(255,255,255,0.06)',
@@ -94,7 +98,7 @@ function IndexChart({ data }: { data: any[] }) {
       priceScaleId: 'trend',
     });
     chart.priceScale('trend').applyOptions({
-      scaleMargins: { top: 0.92, bottom: 0 },
+      scaleMargins: { top: 0.93, bottom: 0 },
     });
     trendSeries.setData(data.map(d => ({
       time: toTime(d.time),
@@ -104,19 +108,7 @@ function IndexChart({ data }: { data: any[] }) {
 
     chart.timeScale().fitContent();
 
-    const handleResize = () => {
-      if (containerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight,
-        });
-      }
-    };
-    const ro = new ResizeObserver(handleResize);
-    ro.observe(containerRef.current);
-
     return () => {
-      ro.disconnect();
       chart.remove();
       chartRef.current = null;
     };
@@ -149,20 +141,21 @@ export function IndexChartModal({ index, onClose }: IndexChartModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4"
       onClick={onClose}
       data-testid="modal-index-chart-backdrop"
     >
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div
-        className="relative glass-card rounded-xl w-full max-w-[900px] max-h-[80vh] flex flex-col overflow-hidden"
+        className="relative glass-card w-full max-w-[900px] flex flex-col overflow-hidden rounded-t-xl sm:rounded-xl"
+        style={{ height: 'min(85vh, 560px)' }}
         onClick={(e) => e.stopPropagation()}
         data-testid="modal-index-chart"
       >
-        <div className="flex items-center justify-between p-4 pb-2 gap-2 flex-wrap">
+        <div className="flex items-center justify-between px-4 pt-4 pb-1 gap-2 flex-wrap flex-shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-lg font-bold text-white truncate" data-testid="text-modal-symbol">{index.symbol}</span>
                 <span className="text-sm text-white/30 truncate hidden sm:inline">{index.name}</span>
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md flex-shrink-0" style={{ background: `${trendColor}15` }}>
@@ -187,7 +180,7 @@ export function IndexChartModal({ index, onClose }: IndexChartModalProps) {
                   key={r.value}
                   onClick={() => setRange(r.value)}
                   className={cn(
-                    "px-2 py-0.5 text-[10px] font-semibold rounded transition-colors",
+                    "px-2.5 py-1 text-[11px] font-semibold rounded transition-colors",
                     range === r.value ? 'bg-white/10 text-white/80' : 'text-white/20 hover:text-white/40'
                   )}
                   data-testid={`tab-modal-range-${r.value}`}
@@ -206,7 +199,7 @@ export function IndexChartModal({ index, onClose }: IndexChartModalProps) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 px-4 pb-2">
+        <div className="flex items-center gap-3 px-4 pb-1 flex-shrink-0">
           <div className="flex items-center gap-1.5">
             <div className="w-3 h-1.5 rounded-sm" style={{ backgroundColor: 'rgba(46, 184, 80, 0.5)' }} />
             <span className="text-[9px] text-white/30">T+</span>
@@ -221,7 +214,7 @@ export function IndexChartModal({ index, onClose }: IndexChartModalProps) {
           </div>
         </div>
 
-        <div className="flex-1 min-h-0 px-4 pb-4" style={{ height: '420px' }}>
+        <div className="flex-1 min-h-0 px-4 pb-4">
           {isLoading ? (
             <div className="w-full h-full flex items-center justify-center">
               <Loader2 className="w-5 h-5 animate-spin text-white/15" />

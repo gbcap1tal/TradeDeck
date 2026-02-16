@@ -9,16 +9,6 @@ import { useRef, useEffect } from 'react';
 import { createChart, ColorType, CrosshairMode, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
 import type { IChartApi, CandlestickData, Time } from 'lightweight-charts';
 
-function getGridConfig(count: number): { cols: number; rows: number } {
-  if (count <= 6) return { cols: 3, rows: 2 };
-  if (count <= 8) return { cols: 4, rows: 2 };
-  if (count <= 10) return { cols: 5, rows: 2 };
-  if (count <= 12) return { cols: 4, rows: 3 };
-  if (count <= 15) return { cols: 5, rows: 3 };
-  if (count <= 20) return { cols: 5, rows: 4 };
-  if (count <= 25) return { cols: 5, rows: 5 };
-  return { cols: 6, rows: Math.ceil(count / 6) };
-}
 
 function SectorETFChart({ data }: { data: any[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -27,7 +17,11 @@ function SectorETFChart({ data }: { data: any[] }) {
   useEffect(() => {
     if (!containerRef.current || !data?.length) return;
 
-    const chart = createChart(containerRef.current, {
+    const container = containerRef.current;
+    const chart = createChart(container, {
+      width: container.clientWidth,
+      height: container.clientHeight,
+      autoSize: true,
       layout: {
         background: { type: ColorType.Solid, color: 'transparent' },
         textColor: 'rgba(255,255,255,0.35)',
@@ -93,19 +87,7 @@ function SectorETFChart({ data }: { data: any[] }) {
 
     chart.timeScale().fitContent();
 
-    const handleResize = () => {
-      if (containerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight,
-        });
-      }
-    };
-    const ro = new ResizeObserver(handleResize);
-    ro.observe(containerRef.current);
-
     return () => {
-      ro.disconnect();
       chart.remove();
       chartRef.current = null;
     };
@@ -129,8 +111,6 @@ export default function SectorDetail() {
       ? `rgba(48, 209, 88, ${0.1 + intensity * 0.45})`
       : `rgba(255, 69, 58, ${0.1 + intensity * 0.45})`;
   };
-
-  const gridConfig = data ? getGridConfig(data.industries.length) : { cols: 5, rows: 2 };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -189,7 +169,7 @@ export default function SectorDetail() {
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-[11px] text-white/30 uppercase tracking-wider font-medium">{etfTicker} Daily</span>
                   </div>
-                  <div className="h-[220px] sm:h-[260px]">
+                  <div className="h-[280px] sm:h-[340px] lg:h-[380px]">
                     {chartLoading ? (
                       <div className="w-full h-full flex items-center justify-center">
                         <Loader2 className="w-5 h-5 animate-spin text-white/15" />
@@ -203,13 +183,9 @@ export default function SectorDetail() {
                 </div>
               )}
 
-              <div className="flex-1 min-h-0">
+              <div className="flex-1 min-h-0 pb-4">
                 <div
-                  className="sector-heatmap-grid grid gap-2"
-                  style={{
-                    '--heatmap-cols': gridConfig.cols,
-                    '--heatmap-rows': gridConfig.rows,
-                  } as React.CSSProperties}
+                  className="grid gap-2 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
                   data-testid="grid-industry-heatmap"
                 >
                   {data.industries
