@@ -10,12 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, Cell,
-  ReferenceLine, Area, AreaChart, ComposedChart
+  Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, BarChart, Bar, Cell,
+  ReferenceLine, Area, ComposedChart
 } from "recharts";
 import {
-  Plus, Upload, Trash2, TrendingUp, TrendingDown, Target, Activity,
-  BarChart3, Calendar, Settings, ArrowUpRight, ArrowDownRight, X, Pencil, Download, Scissors
+  Plus, Upload, Trash2, BarChart3, Settings, X, Pencil, Download, Scissors
 } from "lucide-react";
 
 type Tab = 'overview' | 'trades' | 'analytics';
@@ -90,28 +89,26 @@ function formatPct(v: number) {
   return `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
 }
 
-function MetricCard({ label, value, subValue, positive, icon: Icon }: {
+function MetricCard({ label, value, subValue, positive }: {
   label: string;
   value: string;
   subValue?: string;
   positive?: boolean | null;
-  icon?: any;
 }) {
   return (
-    <Card className="p-3 flex flex-col gap-1" data-testid={`metric-${label.toLowerCase().replace(/\s+/g, '-')}`}>
-      <div className="flex items-center gap-1.5 text-white/40 text-[11px] uppercase tracking-wider">
-        {Icon && <Icon className="w-3 h-3" />}
+    <div className="px-3 py-2.5 flex flex-col gap-0.5" data-testid={`metric-${label.toLowerCase().replace(/\s+/g, '-')}`}>
+      <div className="text-white/30 text-[10px] uppercase tracking-wider font-medium">
         {label}
       </div>
-      <div className={cn("text-lg font-semibold tabular-nums",
-        positive === true && "text-emerald-400",
-        positive === false && "text-red-400",
-        positive === null && "text-white"
+      <div className={cn("text-[13px] font-medium tabular-nums",
+        positive === true && "text-emerald-400/90",
+        positive === false && "text-red-400/90",
+        positive === null && "text-white/80"
       )}>
         {value}
       </div>
-      {subValue && <div className="text-[11px] text-white/30">{subValue}</div>}
-    </Card>
+      {subValue && <div className="text-[10px] text-white/25 tabular-nums">{subValue}</div>}
+    </div>
   );
 }
 
@@ -150,10 +147,10 @@ export default function Portfolio() {
     queryKey: ['/api/portfolio/setup-tags'],
   });
 
-  const tabs: { id: Tab; label: string; icon: any }[] = [
-    { id: 'overview', label: 'Overview', icon: BarChart3 },
-    { id: 'trades', label: 'Trades', icon: Activity },
-    { id: 'analytics', label: 'Analytics', icon: Target },
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'trades', label: 'Trades' },
+    { id: 'analytics', label: 'Analytics' },
   ];
 
   return (
@@ -163,18 +160,17 @@ export default function Portfolio() {
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold text-white" data-testid="text-page-title">Portfolio</h1>
-            <div className="flex items-center gap-1 bg-white/5 rounded-md p-0.5">
+            <div className="flex items-center gap-0.5 bg-white/[0.04] rounded-md p-0.5">
               {tabs.map(t => (
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
                   className={cn(
-                    "px-3 py-1.5 text-xs font-medium rounded transition-colors flex items-center gap-1.5",
-                    tab === t.id ? "bg-white/10 text-white" : "text-white/40 hover:text-white/60"
+                    "px-3 py-1.5 text-xs font-medium rounded transition-colors",
+                    tab === t.id ? "bg-white/10 text-white" : "text-white/35 hover:text-white/55"
                   )}
                   data-testid={`tab-${t.id}`}
                 >
-                  <t.icon className="w-3.5 h-3.5" />
                   {t.label}
                 </button>
               ))}
@@ -248,6 +244,8 @@ function EmptyState({ onAddTrade, onCsvUpload }: { onAddTrade: () => void; onCsv
   );
 }
 
+type TimeRange = '1W' | '1M' | '3M' | '6M' | 'YTD' | '1Y' | 'ALL';
+
 function OverviewTab({ equityData, analytics, config, showBenchmarks, setShowBenchmarks, isLoading }: {
   equityData: any;
   analytics: Analytics | undefined;
@@ -256,7 +254,10 @@ function OverviewTab({ equityData, analytics, config, showBenchmarks, setShowBen
   setShowBenchmarks: (v: any) => void;
   isLoading: boolean;
 }) {
-  const chartData = useMemo(() => {
+  const [range, setRange] = useState<TimeRange>('ALL');
+  const ranges: TimeRange[] = ['1W', '1M', '3M', '6M', 'YTD', '1Y', 'ALL'];
+
+  const allChartData = useMemo(() => {
     if (!equityData?.equity) return [];
     const benchMap = new Map<string, BenchmarkPoint>();
     for (const b of (equityData.benchmarks || [])) benchMap.set(b.date, b);
@@ -272,50 +273,101 @@ function OverviewTab({ equityData, analytics, config, showBenchmarks, setShowBen
     });
   }, [equityData]);
 
+  const chartData = useMemo(() => {
+    const lastDate = allChartData[allChartData.length - 1]?.date;
+    if (!lastDate || range === 'ALL') return allChartData;
+    const anchor = new Date(lastDate);
+    let cutoff: string;
+    switch (range) {
+      case '1W': anchor.setDate(anchor.getDate() - 7); cutoff = anchor.toISOString().split('T')[0]; break;
+      case '1M': anchor.setMonth(anchor.getMonth() - 1); cutoff = anchor.toISOString().split('T')[0]; break;
+      case '3M': anchor.setMonth(anchor.getMonth() - 3); cutoff = anchor.toISOString().split('T')[0]; break;
+      case '6M': anchor.setMonth(anchor.getMonth() - 6); cutoff = anchor.toISOString().split('T')[0]; break;
+      case 'YTD': cutoff = `${anchor.getFullYear()}-01-01`; break;
+      case '1Y': anchor.setFullYear(anchor.getFullYear() - 1); cutoff = anchor.toISOString().split('T')[0]; break;
+      default: return allChartData;
+    }
+    const filtered = allChartData.filter((d: any) => d.date >= cutoff);
+    return filtered.length > 1 ? filtered : allChartData;
+  }, [allChartData, range]);
+
   const startingCapital = config?.startingCapital || equityData?.startingCapital || 100000;
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-          {Array(8).fill(0).map((_, i) => (
-            <Card key={i} className="p-3 h-[72px] animate-pulse bg-white/5" />
-          ))}
-        </div>
-        <Card className="h-[400px] animate-pulse bg-white/5" />
+      <div className="space-y-3">
+        <div className="h-[52px] animate-pulse bg-white/[0.03] rounded-md" />
+        <div className="h-[380px] animate-pulse bg-white/[0.03] rounded-md" />
       </div>
     );
   }
 
-  const lastEquity = chartData[chartData.length - 1]?.equity || startingCapital;
-  const totalReturn = lastEquity - startingCapital;
-  const totalReturnPct = (totalReturn / startingCapital) * 100;
-  const lastQqq = chartData[chartData.length - 1]?.qqq;
-  const firstQqq = chartData[0]?.qqq;
-  const qqqReturn = lastQqq && firstQqq ? ((lastQqq - firstQqq) / firstQqq) * 100 : 0;
-  const alphaVsQqq = totalReturnPct - qqqReturn;
+  const rangeStart = chartData[0]?.equity || startingCapital;
+  const rangeEnd = chartData[chartData.length - 1]?.equity || startingCapital;
+  const periodReturn = rangeEnd - rangeStart;
+  const periodReturnPct = (periodReturn / rangeStart) * 100;
+  const rangeStartQqq = chartData[0]?.qqq;
+  const rangeEndQqq = chartData[chartData.length - 1]?.qqq;
+  const qqqReturn = rangeEndQqq && rangeStartQqq ? ((rangeEndQqq - rangeStartQqq) / rangeStartQqq) * 100 : 0;
+  const alphaVsQqq = periodReturnPct - qqqReturn;
+
+  let rangeMaxDD = 0;
+  if (chartData.length > 1) {
+    let peak = chartData[0]?.equity || 0;
+    for (const d of chartData) {
+      if (d.equity > peak) peak = d.equity;
+      const dd = ((d.equity - peak) / peak) * 100;
+      if (dd < rangeMaxDD) rangeMaxDD = dd;
+    }
+  }
+
+  const filteredMonthlyPnl = useMemo(() => {
+    if (!analytics?.monthlyPnl) return [];
+    if (range === 'ALL') return analytics.monthlyPnl;
+    const firstChartDate = chartData[0]?.date;
+    if (!firstChartDate) return analytics.monthlyPnl;
+    const cutoffMonth = firstChartDate.substring(0, 7);
+    return analytics.monthlyPnl.filter((m: any) => m.month >= cutoffMonth);
+  }, [analytics, range, chartData]);
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-        <MetricCard label="Total Return" value={formatCurrency(analytics?.totalReturn || totalReturn)} subValue={formatPct(analytics?.totalReturnPct || totalReturnPct)} positive={(analytics?.totalReturn || totalReturn) >= 0} icon={TrendingUp} />
-        <MetricCard label="Alpha vs QQQ" value={formatPct(alphaVsQqq)} positive={alphaVsQqq >= 0} icon={Target} />
-        <MetricCard label="Max Drawdown" value={`${(analytics?.maxDrawdown || 0).toFixed(1)}%`} positive={false} icon={TrendingDown} />
-        <MetricCard label="Win Rate" value={`${(analytics?.winRate || 0).toFixed(0)}%`} subValue={`${analytics?.totalWins || 0}W / ${analytics?.totalLosses || 0}L`} positive={null} icon={Activity} />
-        <MetricCard label="Profit Factor" value={(analytics?.profitFactor || 0).toFixed(2)} positive={(analytics?.profitFactor || 0) >= 1.5} icon={BarChart3} />
-        <MetricCard label="Expectancy" value={formatCurrency(analytics?.expectancy || 0)} positive={(analytics?.expectancy || 0) > 0} icon={Target} />
-        <MetricCard label="Avg Hold" value={`${(analytics?.avgHoldingDays || 0).toFixed(0)}d`} positive={null} icon={Calendar} />
-        <MetricCard label="Turnover" value={`${(analytics?.turnoverRatio || 0).toFixed(1)}x`} positive={null} icon={Activity} />
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="grid grid-cols-4 sm:grid-cols-8 gap-px bg-white/[0.04] rounded-md overflow-hidden flex-1">
+          <MetricCard label="Return" value={formatCurrency(periodReturn)} subValue={formatPct(periodReturnPct)} positive={periodReturn >= 0} />
+          <MetricCard label="Alpha" value={formatPct(alphaVsQqq)} positive={alphaVsQqq >= 0} />
+          <MetricCard label="Drawdown" value={`${rangeMaxDD.toFixed(1)}%`} positive={false} />
+          <MetricCard label="Win Rate" value={`${(analytics?.winRate || 0).toFixed(0)}%`} subValue={`${analytics?.totalWins || 0}W / ${analytics?.totalLosses || 0}L`} positive={null} />
+          <MetricCard label="Profit Factor" value={(analytics?.profitFactor || 0).toFixed(2)} positive={(analytics?.profitFactor || 0) >= 1.5} />
+          <MetricCard label="Expectancy" value={formatCurrency(analytics?.expectancy || 0)} positive={(analytics?.expectancy || 0) > 0} />
+          <MetricCard label="Avg Hold" value={`${(analytics?.avgHoldingDays || 0).toFixed(0)}d`} positive={null} />
+          <MetricCard label="Turnover" value={`${(analytics?.turnoverRatio || 0).toFixed(1)}x`} positive={null} />
+        </div>
       </div>
 
-      <Card className="p-4">
+      <div className="bg-white/[0.03] rounded-md p-4">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-sm font-medium text-white/40">Equity Curve</div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-0.5 bg-white/[0.04] rounded p-0.5">
+              {ranges.map(r => (
+                <button
+                  key={r}
+                  onClick={() => setRange(r)}
+                  className={cn("px-2 py-0.5 text-[10px] font-medium rounded transition-colors",
+                    range === r ? "bg-white/10 text-white" : "text-white/25 hover:text-white/45"
+                  )}
+                  data-testid={`range-${r}`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => setShowBenchmarks((p: any) => ({ ...p, qqq: !p.qqq }))}
               className={cn("text-[10px] px-2 py-0.5 rounded transition-colors",
-                showBenchmarks.qqq ? "text-blue-400/80 bg-blue-500/10" : "text-white/20 bg-white/[0.03]"
+                showBenchmarks.qqq ? "text-blue-400/70 bg-blue-500/8" : "text-white/20"
               )}
               data-testid="toggle-qqq"
             >
@@ -324,7 +376,7 @@ function OverviewTab({ equityData, analytics, config, showBenchmarks, setShowBen
             <button
               onClick={() => setShowBenchmarks((p: any) => ({ ...p, spy: !p.spy }))}
               className={cn("text-[10px] px-2 py-0.5 rounded transition-colors",
-                showBenchmarks.spy ? "text-amber-400/80 bg-amber-500/10" : "text-white/20 bg-white/[0.03]"
+                showBenchmarks.spy ? "text-amber-400/70 bg-amber-500/8" : "text-white/20"
               )}
               data-testid="toggle-spy"
             >
@@ -332,91 +384,93 @@ function OverviewTab({ equityData, analytics, config, showBenchmarks, setShowBen
             </button>
           </div>
         </div>
-        <div className="h-[350px]" data-testid="equity-chart">
+        <div className="h-[320px]" data-testid="equity-chart">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
               <XAxis
                 dataKey="date"
-                tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }}
+                tick={{ fill: 'rgba(255,255,255,0.18)', fontSize: 10 }}
                 tickFormatter={(v) => v.substring(5)}
                 interval="preserveStartEnd"
-                axisLine={{ stroke: 'rgba(255,255,255,0.05)' }}
+                axisLine={{ stroke: 'rgba(255,255,255,0.04)' }}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }}
+                tick={{ fill: 'rgba(255,255,255,0.18)', fontSize: 10 }}
                 tickFormatter={(v) => formatCurrency(v)}
                 domain={['auto', 'auto']}
                 axisLine={false}
                 tickLine={false}
+                width={65}
               />
               <Tooltip
-                contentStyle={{ backgroundColor: 'rgba(20,20,20,0.95)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', backdropFilter: 'blur(12px)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}
-                labelStyle={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}
+                contentStyle={{ backgroundColor: 'rgba(18,18,18,0.95)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', backdropFilter: 'blur(12px)', boxShadow: '0 4px 20px rgba(0,0,0,0.5)', padding: '8px 10px' }}
+                labelStyle={{ color: 'rgba(255,255,255,0.35)', fontSize: 10 }}
                 itemStyle={{ fontSize: 11, padding: '1px 0' }}
                 formatter={(v: any, name: any) => [formatCurrency(v as number), name === 'equity' ? 'Portfolio' : String(name).toUpperCase()]}
               />
-              <ReferenceLine y={startingCapital} stroke="rgba(255,255,255,0.06)" strokeDasharray="4 4" />
+              <ReferenceLine y={rangeStart} stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4" />
               <Area
                 type="monotone"
                 dataKey="equity"
-                stroke="rgba(255,255,255,0.6)"
+                stroke="rgba(255,255,255,0.5)"
                 fill="url(#equityGradient)"
                 strokeWidth={1.5}
                 dot={false}
               />
               <defs>
                 <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="rgba(255,255,255,0.08)" />
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.06)" />
                   <stop offset="100%" stopColor="rgba(255,255,255,0)" />
                 </linearGradient>
               </defs>
               {showBenchmarks.qqq && (
-                <Line type="monotone" dataKey="qqq" stroke="rgba(96,165,250,0.5)" strokeWidth={1} dot={false} strokeDasharray="4 3" />
+                <Line type="monotone" dataKey="qqq" stroke="rgba(96,165,250,0.45)" strokeWidth={1.2} dot={false} />
               )}
               {showBenchmarks.spy && (
-                <Line type="monotone" dataKey="spy" stroke="rgba(251,191,36,0.4)" strokeWidth={1} dot={false} strokeDasharray="4 3" />
+                <Line type="monotone" dataKey="spy" stroke="rgba(251,191,36,0.4)" strokeWidth={1.2} dot={false} />
               )}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
-      </Card>
+      </div>
 
-      {analytics && analytics.monthlyPnl.length > 0 && (
-        <Card className="p-4">
-          <div className="text-sm font-medium text-white/40 mb-3">Monthly P&L</div>
-          <div className="h-[180px]" data-testid="monthly-pnl-chart">
+      {filteredMonthlyPnl.length > 0 && (
+        <div className="bg-white/[0.03] rounded-md p-4">
+          <div className="text-[11px] font-medium text-white/30 uppercase tracking-wider mb-3">Monthly P&L</div>
+          <div className="h-[160px]" data-testid="monthly-pnl-chart">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={analytics.monthlyPnl} barCategoryGap="20%">
+              <BarChart data={filteredMonthlyPnl} barCategoryGap="20%">
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
                 <XAxis
                   dataKey="month"
-                  tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }}
-                  axisLine={{ stroke: 'rgba(255,255,255,0.05)' }}
+                  tick={{ fill: 'rgba(255,255,255,0.18)', fontSize: 10 }}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.04)' }}
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }}
+                  tick={{ fill: 'rgba(255,255,255,0.18)', fontSize: 10 }}
                   tickFormatter={(v) => formatCurrency(v)}
                   axisLine={false}
                   tickLine={false}
+                  width={65}
                 />
                 <Tooltip
-                  contentStyle={{ backgroundColor: 'rgba(20,20,20,0.95)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', backdropFilter: 'blur(12px)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}
-                  labelStyle={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}
+                  contentStyle={{ backgroundColor: 'rgba(18,18,18,0.95)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', backdropFilter: 'blur(12px)', boxShadow: '0 4px 20px rgba(0,0,0,0.5)', padding: '8px 10px' }}
+                  labelStyle={{ color: 'rgba(255,255,255,0.35)', fontSize: 10 }}
                   formatter={(v: any) => [formatCurrency(v as number), 'P&L']}
                 />
-                <ReferenceLine y={0} stroke="rgba(255,255,255,0.08)" />
+                <ReferenceLine y={0} stroke="rgba(255,255,255,0.06)" />
                 <Bar dataKey="pnl" radius={[2, 2, 0, 0]}>
-                  {analytics.monthlyPnl.map((entry, i) => (
-                    <Cell key={i} fill={entry.pnl >= 0 ? 'rgba(52,211,153,0.35)' : 'rgba(248,113,113,0.3)'} />
+                  {filteredMonthlyPnl.map((entry: any, i: number) => (
+                    <Cell key={i} fill={entry.pnl >= 0 ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.25)'} />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </Card>
+        </div>
       )}
     </div>
   );
