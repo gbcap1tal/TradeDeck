@@ -3241,6 +3241,22 @@ Keep the entire response under 1000 characters. Be concise, direct, and useful f
     }
   });
 
+  app.post('/api/portfolio/trades/:id/partial-close', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { quantity, exitDate, exitPrice, fees } = req.body;
+      if (!quantity || !exitDate || !exitPrice) return res.status(400).json({ message: 'quantity, exitDate, exitPrice required' });
+      const result = await portfolio.partialCloseTrade(
+        parseInt(req.params.id), userId,
+        parseFloat(quantity), exitDate, parseFloat(exitPrice), parseFloat(fees) || 0
+      );
+      if (!result) return res.status(404).json({ message: 'Trade not found' });
+      res.json(result);
+    } catch (err: any) {
+      res.status(400).json({ message: err.message });
+    }
+  });
+
   app.delete('/api/portfolio/trades/:id', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

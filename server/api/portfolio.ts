@@ -57,6 +57,44 @@ export async function deleteTrade(id: number, userId: string) {
   return row || null;
 }
 
+export async function partialCloseTrade(
+  id: number,
+  userId: string,
+  closeQty: number,
+  exitDate: string,
+  exitPrice: number,
+  fees?: number
+) {
+  const rows = await db.select().from(portfolioTrades)
+    .where(and(eq(portfolioTrades.id, id), eq(portfolioTrades.userId, userId)));
+  const trade = rows[0];
+  if (!trade) return null;
+  if (trade.exitDate) throw new Error('Trade is already closed');
+  if (closeQty <= 0 || closeQty >= trade.quantity) throw new Error('Partial quantity must be between 0 and total quantity');
+
+  const remainingQty = trade.quantity - closeQty;
+
+  const [closedLot] = await db.insert(portfolioTrades).values({
+    userId: trade.userId,
+    ticker: trade.ticker,
+    direction: trade.direction,
+    entryDate: trade.entryDate,
+    entryPrice: trade.entryPrice,
+    exitDate,
+    exitPrice,
+    quantity: closeQty,
+    fees: fees ?? 0,
+    setupTag: trade.setupTag,
+    notes: trade.notes ? `${trade.notes} (partial close)` : 'partial close',
+  }).returning();
+
+  await db.update(portfolioTrades)
+    .set({ quantity: remainingQty })
+    .where(eq(portfolioTrades.id, id));
+
+  return { closedLot, remainingQty };
+}
+
 export async function deleteAllTrades(userId: string) {
   await db.delete(portfolioTrades).where(eq(portfolioTrades.userId, userId));
   await db.delete(portfolioEquityDaily).where(eq(portfolioEquityDaily.userId, userId));

@@ -15,7 +15,7 @@ import {
 } from "recharts";
 import {
   Plus, Upload, Trash2, TrendingUp, TrendingDown, Target, Activity,
-  BarChart3, Calendar, Settings, ArrowUpRight, ArrowDownRight, X, Pencil, Download
+  BarChart3, Calendar, Settings, ArrowUpRight, ArrowDownRight, X, Pencil, Download, Scissors
 } from "lucide-react";
 
 type Tab = 'overview' | 'trades' | 'analytics';
@@ -310,12 +310,12 @@ function OverviewTab({ equityData, analytics, config, showBenchmarks, setShowBen
 
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <div className="text-sm font-medium text-white/60">Equity Curve</div>
+          <div className="text-sm font-medium text-white/40">Equity Curve</div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowBenchmarks((p: any) => ({ ...p, qqq: !p.qqq }))}
-              className={cn("text-[11px] px-2 py-0.5 rounded border transition-colors",
-                showBenchmarks.qqq ? "border-blue-500/50 text-blue-400 bg-blue-500/10" : "border-white/10 text-white/30"
+              className={cn("text-[10px] px-2 py-0.5 rounded transition-colors",
+                showBenchmarks.qqq ? "text-blue-400/80 bg-blue-500/10" : "text-white/20 bg-white/[0.03]"
               )}
               data-testid="toggle-qqq"
             >
@@ -323,8 +323,8 @@ function OverviewTab({ equityData, analytics, config, showBenchmarks, setShowBen
             </button>
             <button
               onClick={() => setShowBenchmarks((p: any) => ({ ...p, spy: !p.spy }))}
-              className={cn("text-[11px] px-2 py-0.5 rounded border transition-colors",
-                showBenchmarks.spy ? "border-amber-500/50 text-amber-400 bg-amber-500/10" : "border-white/10 text-white/30"
+              className={cn("text-[10px] px-2 py-0.5 rounded transition-colors",
+                showBenchmarks.spy ? "text-amber-400/80 bg-amber-500/10" : "text-white/20 bg-white/[0.03]"
               )}
               data-testid="toggle-spy"
             >
@@ -335,37 +335,48 @@ function OverviewTab({ equityData, analytics, config, showBenchmarks, setShowBen
         <div className="h-[350px]" data-testid="equity-chart">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
               <XAxis
                 dataKey="date"
-                tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }}
+                tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }}
                 tickFormatter={(v) => v.substring(5)}
                 interval="preserveStartEnd"
+                axisLine={{ stroke: 'rgba(255,255,255,0.05)' }}
+                tickLine={false}
               />
               <YAxis
-                tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }}
+                tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }}
                 tickFormatter={(v) => formatCurrency(v)}
                 domain={['auto', 'auto']}
+                axisLine={false}
+                tickLine={false}
               />
               <Tooltip
-                contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                labelStyle={{ color: 'rgba(255,255,255,0.5)', fontSize: 11 }}
+                contentStyle={{ backgroundColor: 'rgba(20,20,20,0.95)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', backdropFilter: 'blur(12px)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}
+                labelStyle={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}
+                itemStyle={{ fontSize: 11, padding: '1px 0' }}
                 formatter={(v: any, name: any) => [formatCurrency(v as number), name === 'equity' ? 'Portfolio' : String(name).toUpperCase()]}
               />
-              <ReferenceLine y={startingCapital} stroke="rgba(255,255,255,0.1)" strokeDasharray="3 3" />
+              <ReferenceLine y={startingCapital} stroke="rgba(255,255,255,0.06)" strokeDasharray="4 4" />
               <Area
                 type="monotone"
                 dataKey="equity"
-                stroke="#10b981"
-                fill="rgba(16,185,129,0.08)"
-                strokeWidth={2}
+                stroke="rgba(255,255,255,0.6)"
+                fill="url(#equityGradient)"
+                strokeWidth={1.5}
                 dot={false}
               />
+              <defs>
+                <linearGradient id="equityGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.08)" />
+                  <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+                </linearGradient>
+              </defs>
               {showBenchmarks.qqq && (
-                <Line type="monotone" dataKey="qqq" stroke="#3b82f6" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+                <Line type="monotone" dataKey="qqq" stroke="rgba(96,165,250,0.5)" strokeWidth={1} dot={false} strokeDasharray="4 3" />
               )}
               {showBenchmarks.spy && (
-                <Line type="monotone" dataKey="spy" stroke="#f59e0b" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+                <Line type="monotone" dataKey="spy" stroke="rgba(251,191,36,0.4)" strokeWidth={1} dot={false} strokeDasharray="4 3" />
               )}
             </ComposedChart>
           </ResponsiveContainer>
@@ -374,21 +385,32 @@ function OverviewTab({ equityData, analytics, config, showBenchmarks, setShowBen
 
       {analytics && analytics.monthlyPnl.length > 0 && (
         <Card className="p-4">
-          <div className="text-sm font-medium text-white/60 mb-3">Monthly P&L</div>
-          <div className="h-[200px]" data-testid="monthly-pnl-chart">
+          <div className="text-sm font-medium text-white/40 mb-3">Monthly P&L</div>
+          <div className="h-[180px]" data-testid="monthly-pnl-chart">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={analytics.monthlyPnl}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="month" tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} />
-                <YAxis tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} tickFormatter={(v) => formatCurrency(v)} />
+              <BarChart data={analytics.monthlyPnl} barCategoryGap="20%">
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
+                <XAxis
+                  dataKey="month"
+                  tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.05)' }}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fill: 'rgba(255,255,255,0.2)', fontSize: 10 }}
+                  tickFormatter={(v) => formatCurrency(v)}
+                  axisLine={false}
+                  tickLine={false}
+                />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                  contentStyle={{ backgroundColor: 'rgba(20,20,20,0.95)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', backdropFilter: 'blur(12px)', boxShadow: '0 8px 32px rgba(0,0,0,0.4)' }}
+                  labelStyle={{ color: 'rgba(255,255,255,0.4)', fontSize: 10 }}
                   formatter={(v: any) => [formatCurrency(v as number), 'P&L']}
                 />
-                <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" />
-                <Bar dataKey="pnl" radius={[3, 3, 0, 0]}>
+                <ReferenceLine y={0} stroke="rgba(255,255,255,0.08)" />
+                <Bar dataKey="pnl" radius={[2, 2, 0, 0]}>
                   {analytics.monthlyPnl.map((entry, i) => (
-                    <Cell key={i} fill={entry.pnl >= 0 ? 'rgba(16,185,129,0.7)' : 'rgba(239,68,68,0.7)'} />
+                    <Cell key={i} fill={entry.pnl >= 0 ? 'rgba(52,211,153,0.35)' : 'rgba(248,113,113,0.3)'} />
                   ))}
                 </Bar>
               </BarChart>
@@ -402,6 +424,7 @@ function OverviewTab({ equityData, analytics, config, showBenchmarks, setShowBen
 
 function TradesTab({ trades, isLoading, onEdit }: { trades: Trade[]; isLoading: boolean; onEdit: (t: Trade) => void }) {
   const [filter, setFilter] = useState<'all' | 'open' | 'closed'>('all');
+  const [partialTrade, setPartialTrade] = useState<Trade | null>(null);
   const { toast } = useToast();
 
   const deleteMutation = useMutation({
@@ -516,10 +539,15 @@ function TradesTab({ trades, isLoading, onEdit }: { trades: Trade[]; isLoading: 
                     <td className="p-2.5 text-white/30">{t.setupTag || '-'}</td>
                     <td className="p-2.5 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => onEdit(t)} data-testid={`button-edit-${t.id}`}>
+                        {!t.exitDate && (
+                          <Button size="icon" variant="ghost" onClick={() => setPartialTrade(t)} title="Partial close" data-testid={`button-partial-${t.id}`}>
+                            <Scissors className="w-3 h-3 text-amber-400/50" />
+                          </Button>
+                        )}
+                        <Button size="icon" variant="ghost" onClick={() => onEdit(t)} data-testid={`button-edit-${t.id}`}>
                           <Pencil className="w-3 h-3 text-white/30" />
                         </Button>
-                        <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => deleteMutation.mutate(t.id)} data-testid={`button-delete-${t.id}`}>
+                        <Button size="icon" variant="ghost" onClick={() => deleteMutation.mutate(t.id)} data-testid={`button-delete-${t.id}`}>
                           <Trash2 className="w-3 h-3 text-red-400/50" />
                         </Button>
                       </div>
@@ -534,7 +562,83 @@ function TradesTab({ trades, isLoading, onEdit }: { trades: Trade[]; isLoading: 
           </table>
         </div>
       </Card>
+
+      <PartialCloseDialog trade={partialTrade} onClose={() => setPartialTrade(null)} />
     </div>
+  );
+}
+
+function PartialCloseDialog({ trade, onClose }: { trade: Trade | null; onClose: () => void }) {
+  const { toast } = useToast();
+  const [qty, setQty] = useState('');
+  const [exitDate, setExitDate] = useState('');
+  const [exitPrice, setExitPrice] = useState('');
+  const [fees, setFees] = useState('0');
+
+  useEffect(() => {
+    if (trade) {
+      setQty('');
+      setExitDate('');
+      setExitPrice('');
+      setFees('0');
+    }
+  }, [trade]);
+
+  const mutation = useMutation({
+    mutationFn: (data: any) => apiRequest('POST', `/api/portfolio/trades/${trade!.id}/partial-close`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio/trades'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio/equity'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio/analytics'] });
+      toast({ title: "Partial close recorded" });
+      onClose();
+    },
+    onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
+  });
+
+  if (!trade) return null;
+
+  return (
+    <Dialog open={!!trade} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Partial Close - {trade.ticker}</DialogTitle>
+        </DialogHeader>
+        <div className="text-xs text-white/40 mb-1">
+          Open position: {trade.quantity} shares @ ${trade.entryPrice.toFixed(2)}
+        </div>
+        <form onSubmit={e => { e.preventDefault(); mutation.mutate({ quantity: qty, exitDate, exitPrice, fees }); }} className="space-y-3" data-testid="partial-close-form">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-white/40 mb-1 block">Shares to Close</label>
+              <Input type="number" step="0.01" value={qty} onChange={e => setQty(e.target.value)} placeholder={`Max ${trade.quantity}`} required data-testid="input-partial-qty" />
+            </div>
+            <div>
+              <label className="text-xs text-white/40 mb-1 block">Exit Price</label>
+              <Input type="number" step="0.01" value={exitPrice} onChange={e => setExitPrice(e.target.value)} placeholder="0.00" required data-testid="input-partial-exit-price" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-white/40 mb-1 block">Exit Date</label>
+              <Input type="date" value={exitDate} onChange={e => setExitDate(e.target.value)} required data-testid="input-partial-exit-date" />
+            </div>
+            <div>
+              <label className="text-xs text-white/40 mb-1 block">Fees</label>
+              <Input type="number" step="0.01" value={fees} onChange={e => setFees(e.target.value)} data-testid="input-partial-fees" />
+            </div>
+          </div>
+          {qty && exitPrice && (
+            <div className="text-xs text-white/30 p-2 bg-white/5 rounded">
+              Closing {qty} of {trade.quantity} shares. Remaining: {(trade.quantity - parseFloat(qty || '0')).toFixed(0)} shares still open.
+            </div>
+          )}
+          <Button type="submit" className="w-full" disabled={mutation.isPending} data-testid="button-confirm-partial">
+            {mutation.isPending ? 'Processing...' : 'Close Partial'}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
 
