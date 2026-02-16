@@ -38,31 +38,29 @@ export function MarketIndices() {
           return (
             <div
               key={index.symbol}
-              className="glass-card glass-card-hover rounded-xl p-4 cursor-pointer"
+              className="glass-card glass-card-hover rounded-xl p-4 cursor-pointer relative"
               data-testid={`card-index-${index.symbol}`}
               onClick={() => setSelectedIndex(index)}
             >
               <div className="flex items-center justify-between gap-1 mb-2">
                 <span className="text-[11px] text-white/40 font-medium truncate">{index.name}</span>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <div
-                    className="w-[6px] h-[6px] rounded-full flex-shrink-0"
-                    style={{ backgroundColor: trendColor, boxShadow: `0 0 4px ${trendColor}60` }}
-                    title={index.trend === 'T+' ? 'Uptrend' : index.trend === 'T-' ? 'Downtrend' : 'Sideways'}
-                    data-testid={`trend-light-${index.symbol}`}
-                  />
-                  <div className="p-1 rounded-md" style={{ background: `${color}1a` }}>
-                    {isPositive ? <ArrowUp className="w-3 h-3" style={{ color }} /> : <ArrowDown className="w-3 h-3" style={{ color }} />}
-                  </div>
+                <div className="p-1 rounded-md flex-shrink-0" style={{ background: `${color}1a` }}>
+                  {isPositive ? <ArrowUp className="w-3 h-3" style={{ color }} /> : <ArrowDown className="w-3 h-3" style={{ color }} />}
                 </div>
               </div>
               <div className="text-lg font-bold font-mono-nums tracking-tight text-white mb-1">
                 {index.symbol === 'VIX' ? '' : '$'}{index.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center justify-between gap-1">
                 <span className="text-xs font-mono-nums font-medium" style={{ color }}>
                   {isPositive ? "+" : ""}{index.changePercent.toFixed(2)}%
                 </span>
+                <div
+                  className="w-[6px] h-[6px] rounded-full flex-shrink-0"
+                  style={{ backgroundColor: trendColor, boxShadow: `0 0 5px ${trendColor}80` }}
+                  title={index.trend === 'T+' ? 'Uptrend' : index.trend === 'T-' ? 'Downtrend' : 'Sideways'}
+                  data-testid={`trend-light-${index.symbol}`}
+                />
               </div>
             </div>
           );
