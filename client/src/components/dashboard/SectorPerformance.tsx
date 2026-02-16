@@ -99,14 +99,14 @@ export function SectorPerformance() {
         <TimeframeSwitch value={tf} onChange={setTf} testId={switchId} />
       </div>
       <div>
-        <div className="grid px-2 pb-2" style={{ gridTemplateColumns: '5fr auto 3fr' }}>
+        <div className="grid px-2 pb-2" style={{ gridTemplateColumns: '1fr auto' }}>
           <div />
-          <div className="hidden sm:flex items-center justify-center">
-            {maHeaders.map(h => (
-              <span key={h.key} className="text-[8px] text-white/20 font-semibold w-[34px] text-center uppercase tracking-wide" title={h.title}>{h.label}</span>
-            ))}
-          </div>
           <div className="flex items-center justify-end">
+            <div className="hidden sm:flex items-center justify-center mr-2">
+              {maHeaders.map(h => (
+                <span key={h.key} className="text-[8px] text-white/20 font-semibold w-[34px] text-center uppercase tracking-wide" title={h.title}>{h.label}</span>
+              ))}
+            </div>
             <span className="text-[10px] text-white/25 uppercase tracking-wider font-semibold w-[56px] text-right">Chg%</span>
             <span className="w-[22px] shrink-0" />
           </div>
@@ -120,7 +120,7 @@ export function SectorPerformance() {
               <div
                 key={ind.name}
                 className="grid items-center py-[7px] px-2 rounded-lg cursor-pointer transition-colors hover:bg-white/[0.03] group"
-                style={{ gridTemplateColumns: '5fr auto 3fr' }}
+                style={{ gridTemplateColumns: '1fr auto' }}
                 onClick={() => setLocation(`/sectors/${encodeURIComponent(ind.sector)}/industries/${encodeURIComponent(ind.name)}`)}
                 data-testid={`row-industry-${ind.name.replace(/\s+/g, '-')}`}
               >
@@ -131,14 +131,14 @@ export function SectorPerformance() {
                     <div className="text-[10px] text-white/25 font-mono truncate leading-tight mt-0.5">{ind.sector}</div>
                   </div>
                 </div>
-                <div className="hidden sm:flex items-center justify-center">
-                  {maHeaders.map(h => (
-                    <span key={h.key} className="w-[34px] flex justify-center" data-testid={`ma-${h.key}-${ind.name.replace(/\s+/g, '-')}`}>
-                      <MAArrow above={ma?.[h.key as keyof typeof ma] as boolean | undefined} />
-                    </span>
-                  ))}
-                </div>
                 <div className="flex items-center justify-end">
+                  <div className="hidden sm:flex items-center justify-center mr-2">
+                    {maHeaders.map(h => (
+                      <span key={h.key} className="w-[34px] flex justify-center" data-testid={`ma-${h.key}-${ind.name.replace(/\s+/g, '-')}`}>
+                        <MAArrow above={ma?.[h.key as keyof typeof ma] as boolean | undefined} />
+                      </span>
+                    ))}
+                  </div>
                   <span
                     className="text-[13px] font-mono-nums font-semibold w-[56px] text-right"
                     style={{ color: isPositive ? '#2eb850' : '#c05050' }}

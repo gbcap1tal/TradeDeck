@@ -113,7 +113,7 @@ export default function StockListPage({
                     <span className="text-[11px] text-white/30 whitespace-nowrap">{subtitle}</span>
                   </div>
 
-                  <div className="flex items-center gap-0 shrink-0">
+                  <div className="flex items-center gap-0 shrink-0 flex-wrap">
                     {rs !== undefined && rs > 0 && (
                       <div className="text-right mr-3 sm:mr-5" data-testid="text-rs-rating">
                         <div className="text-[9px] uppercase tracking-wider text-white/25 mb-0.5">RS</div>

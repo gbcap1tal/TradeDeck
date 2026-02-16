@@ -302,7 +302,7 @@ export default function Market() {
         <div className="w-full max-w-[1400px] mx-auto px-3 sm:px-6 py-4 sm:py-8 overflow-hidden">
           <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight text-white" data-testid="text-page-title">Megatrends</h1>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               {isAdminUser && (
                 <button
                   onClick={() => setShowAdmin(!showAdmin)}
@@ -312,13 +312,13 @@ export default function Market() {
                   {showAdmin ? 'Hide Admin' : 'Manage Baskets'}
                 </button>
               )}
-              <div className="flex items-center gap-0.5 rounded-md bg-white/[0.04] p-0.5" data-testid="switch-timeframe">
+              <div className="flex items-center gap-0.5 rounded-md bg-white/[0.04] p-0.5 flex-wrap" data-testid="switch-timeframe">
                 {(['D', 'W', 'M', '3M', '6M', 'Y', 'YTD'] as Timeframe[]).map(opt => (
                   <button
                     key={opt}
                     onClick={() => setTf(opt)}
                     className={cn(
-                      "px-2.5 py-1 text-[11px] font-semibold rounded transition-colors",
+                      "px-2 sm:px-2.5 py-1 text-[10px] sm:text-[11px] font-semibold rounded transition-colors",
                       tf === opt
                         ? 'bg-white/10 text-white/80'
                         : 'text-white/25 hover:text-white/40'
