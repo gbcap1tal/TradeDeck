@@ -446,7 +446,7 @@ export default function Earnings() {
                       <span className="text-[10px] text-white/25">{section.items.length}</span>
                     </div>
                   </div>
-                  <div className="hidden sm:block overflow-x-auto">
+                  <div className="hidden sm:block w-full max-w-full overflow-x-auto">
                     <EarningsTable items={section.items} onTickerClick={(t) => setLocation(`/stocks/${t}`)} onDetailsClick={openModal} />
                   </div>
                   <div className="sm:hidden">
@@ -480,7 +480,8 @@ function MobileSortBar({ sortKey, sortDir, onSort }: { sortKey: SortKey; sortDir
     { key: 'epScore', label: 'EP' },
   ];
   return (
-    <div className="flex items-center gap-1 px-3 py-1.5 border-b border-white/[0.04] overflow-x-auto scrollbar-none" data-testid="mobile-sort-bar">
+    <div className="w-full max-w-full overflow-x-auto scrollbar-none" data-testid="mobile-sort-bar">
+      <div className="flex items-center gap-1 px-3 py-1.5 border-b border-white/[0.04] min-w-max">
       <span className="text-[9px] text-white/25 shrink-0 mr-0.5">Sort:</span>
       {options.map(o => (
         <button
@@ -498,6 +499,7 @@ function MobileSortBar({ sortKey, sortDir, onSort }: { sortKey: SortKey; sortDir
           {sortKey === o.key && (sortDir === 'desc' ? ' \u2193' : ' \u2191')}
         </button>
       ))}
+      </div>
     </div>
   );
 }

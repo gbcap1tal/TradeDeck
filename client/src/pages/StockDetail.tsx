@@ -774,7 +774,7 @@ function renderMarkdown(text: string) {
   const flushTable = () => {
     if (tableRows.length === 0) return;
     elements.push(
-      <div key={`table-${elements.length}`} className="overflow-x-auto my-2">
+      <div key={`table-${elements.length}`} className="w-full max-w-full overflow-x-auto my-2">
         <table className="w-full text-[11px] sm:text-[12px] border-collapse min-w-[280px]">
           <thead>
             <tr>

@@ -592,7 +592,7 @@ function OverviewTab({ equityData, analytics, trades, config, showBenchmarks, se
                 ))}
               </div>
             </div>
-            <div className="flex-1 overflow-x-auto">
+            <div className="flex-1 w-full max-w-full overflow-x-auto">
               {holdingsDetailLoading ? (
                 <div className="h-[120px] animate-pulse bg-white/[0.02] rounded" />
               ) : holdingsDetail.length > 0 ? (
@@ -757,7 +757,7 @@ function TradesTab({ trades, isLoading, onEdit }: { trades: Trade[]; isLoading: 
       </div>
 
       <div className={cn(glassPanel, "overflow-hidden")}>
-        <div className="overflow-x-auto">
+        <div className="w-full max-w-full overflow-x-auto">
           <table className="w-full text-[11px] sm:text-xs" data-testid="trades-table">
             <thead>
               <tr className="border-b border-white/[0.04] text-white/25">
@@ -1074,7 +1074,7 @@ function AnalyticsTab({ analytics, isLoading }: { analytics: Analytics | undefin
       {analytics.tradesBySetup.length > 0 && (
         <div className={cn(glassPanel, "p-3 sm:p-4")}>
           <div className="text-[11px] font-medium text-white/25 uppercase tracking-wider mb-3">Performance by Setup</div>
-          <div className="overflow-x-auto">
+          <div className="w-full max-w-full overflow-x-auto">
             <table className="w-full text-[11px] sm:text-xs" data-testid="setup-analytics-table">
               <thead>
                 <tr className="border-b border-white/[0.04] text-white/25">

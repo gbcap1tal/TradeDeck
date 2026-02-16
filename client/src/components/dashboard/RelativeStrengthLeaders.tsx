@@ -39,8 +39,10 @@ export function RelativeStrengthLeaders() {
     return (
       <div className="mb-8">
         <div className="section-title mb-4">RS Leaders</div>
-        <div className="flex gap-3 overflow-x-auto pb-2">
+        <div className="w-full max-w-full overflow-x-auto pb-2">
+          <div className="flex gap-3 min-w-max">
           {[1, 2, 3, 4, 5].map(i => <div key={i} className="glass-card rounded-xl min-w-[200px] h-[160px] shimmer flex-shrink-0" />)}
+          </div>
         </div>
       </div>
     );
@@ -53,7 +55,8 @@ export function RelativeStrengthLeaders() {
   return (
     <div className="mb-8">
       <div className="section-title mb-4" data-testid="text-rs-leaders-title">RS Leaders</div>
-      <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollSnapType: 'x mandatory' }}>
+      <div className="w-full max-w-full overflow-x-auto pb-2" style={{ scrollSnapType: 'x mandatory' }}>
+        <div className="flex gap-3 min-w-max">
         {topSectors.map((sector: any) => {
           const MomentumIcon = sector.rsMomentum > 1 ? ArrowUp : sector.rsMomentum < -1 ? ArrowDown : Minus;
           const momColor = sector.rsMomentum > 1 ? '#2eb850' : sector.rsMomentum < -1 ? '#c05050' : '#8e8e93';
@@ -96,6 +99,7 @@ export function RelativeStrengthLeaders() {
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );

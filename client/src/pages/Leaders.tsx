@@ -325,7 +325,7 @@ export default function Leaders() {
           </div>
         ) : (
           <div className="glass-card rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="w-full max-w-full overflow-x-auto">
               <table className="w-full" data-testid="table-leaders">
                 <thead>
                   <tr className="border-b border-white/[0.06]">
