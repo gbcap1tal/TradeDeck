@@ -190,7 +190,7 @@ export function Navbar() {
 
   return (
     <>
-      <nav className="glass sticky top-0 z-[999] h-14 w-full" data-testid="navbar">
+      <nav className="glass sticky top-0 z-[999] h-14 w-full overflow-x-hidden" data-testid="navbar">
         <div className="max-w-[1400px] mx-auto h-full px-2 sm:px-6 flex items-center justify-between gap-2 sm:gap-6">
           <div className="flex items-center gap-2 sm:gap-8 min-w-0 shrink-0">
             <Button
@@ -234,12 +234,12 @@ export function Navbar() {
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-3 flex-1 justify-end min-w-0">
-            <div className="flex items-center gap-1.5 mr-0.5 sm:mr-2 shrink-0">
+            <div className="flex items-center gap-1 sm:gap-1.5 mr-0.5 sm:mr-2 shrink-0">
               <div className={cn(
                 "w-1.5 h-1.5 rounded-full shrink-0",
                 status?.isOpen ? "bg-[#30d158] animate-pulse" : "bg-[#ff453a]"
               )} />
-              <span className="text-[11px] text-white/40 font-medium hidden sm:block">
+              <span className="text-[10px] sm:text-[11px] text-white/40 font-medium whitespace-nowrap">
                 {status?.isOpen ? 'Market Open' : 'Market Closed'}
               </span>
             </div>
