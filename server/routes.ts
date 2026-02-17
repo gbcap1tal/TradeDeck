@@ -614,14 +614,18 @@ function initBackgroundTasks() {
     console.log('[bg] Phase 1: Computing fast data (indices, sectors, rotation, breadth, industry RS)...');
     await Promise.allSettled([
       (async () => {
+        const MIN_INDICES = 4;
         const fetchIndices = async (attempt: number) => {
           try {
             const indices = await yahoo.getIndices();
             const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
-            if (indices && indices.length > 0) {
+            if (indices && indices.length >= MIN_INDICES) {
               setCache('market_indices', indices, indicesTtl);
               console.log(`[bg] Indices pre-computed: ${indices.length} indices in ${((Date.now() - bgStart) / 1000).toFixed(1)}s${attempt > 1 ? ` (attempt ${attempt})` : ''}`);
               return true;
+            }
+            if (indices && indices.length > 0) {
+              console.log(`[bg] Yahoo returned only ${indices.length} indices (need ${MIN_INDICES}+), treating as partial failure`);
             }
             return false;
           } catch (e: any) {
@@ -844,13 +848,13 @@ function initBackgroundTasks() {
           try {
             const indices = await yahoo.getIndices();
             const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
-            if (indices && indices.length > 0) {
+            if (indices && indices.length >= 4) {
               setCache('market_indices', indices, indicesTtl);
               console.log(`[scheduler] Indices refreshed: ${indices.length} indices (ttl=${indicesTtl}s)`);
             } else {
-              console.log('[scheduler] Yahoo indices empty, trying FMP backup...');
+              console.log(`[scheduler] Yahoo returned ${indices?.length || 0} indices (need 4+), trying FMP backup...`);
               const fmpData = await fmp.getIndicesFromFMP();
-              if (fmpData && fmpData.length > 0) {
+              if (fmpData && fmpData.length >= 4) {
                 setCache('market_indices', fmpData, indicesTtl);
                 console.log(`[scheduler] Indices from FMP backup: ${fmpData.length} indices`);
               }
@@ -1178,30 +1182,30 @@ function initBackgroundTasks() {
       await new Promise(r => setTimeout(r, 3000));
 
       // Step 3: Retry indices (always — this is the most visible data)
-      if (!indicesData || indicesData.length === 0) {
+      if (!indicesData || indicesData.length < 4) {
         try {
           const indices = await yahoo.getIndices();
-          if (indices && indices.length > 0) {
+          if (indices && indices.length >= 4) {
             const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
             setCache('market_indices', indices, indicesTtl);
             console.log(`[watchdog] Indices healed: ${indices.length} indices`);
           } else {
-            console.log('[watchdog] Yahoo indices empty, trying FMP backup...');
+            console.log(`[watchdog] Yahoo returned ${indices?.length || 0} indices (need 4+), trying FMP backup...`);
             const fmpData = await fmp.getIndicesFromFMP();
-            if (fmpData && fmpData.length > 0) {
+            if (fmpData && fmpData.length >= 4) {
               const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
               setCache('market_indices', fmpData, indicesTtl);
               console.log(`[watchdog] Indices healed via FMP: ${fmpData.length} indices`);
             } else {
-              console.log('[watchdog] Both Yahoo and FMP returned empty');
-              sendAlert('Self-Healing: Indices Still Empty', `Watchdog retried indices with both Yahoo and FMP but both returned empty.\n\nReasons: ${reasons.join(', ')}`, 'watchdog_indices');
+              console.log('[watchdog] Both Yahoo and FMP returned insufficient data');
+              sendAlert('Self-Healing: Indices Still Incomplete', `Watchdog retried indices with both Yahoo (${indices?.length || 0}) and FMP (${fmpData?.length || 0}) but neither returned enough data.\n\nReasons: ${reasons.join(', ')}`, 'watchdog_indices');
             }
           }
         } catch (err: any) {
           console.error(`[watchdog] Yahoo indices retry error: ${err.message}, trying FMP...`);
           try {
             const fmpData = await fmp.getIndicesFromFMP();
-            if (fmpData && fmpData.length > 0) {
+            if (fmpData && fmpData.length >= 4) {
               const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
               setCache('market_indices', fmpData, indicesTtl);
               console.log(`[watchdog] Indices healed via FMP: ${fmpData.length} indices`);
@@ -1428,20 +1432,25 @@ export async function registerRoutes(
     if (stale) {
       backgroundRefresh(cacheKey, async () => {
         let data = await yahoo.getIndices();
-        if (!data || data.length === 0) {
-          console.log('[indices] Yahoo empty during bg refresh, trying FMP backup...');
-          data = await fmp.getIndicesFromFMP() || stale;
+        if (!data || data.length < 4) {
+          console.log(`[indices] Yahoo returned ${data?.length || 0} during bg refresh, trying FMP backup...`);
+          const fmpData = await fmp.getIndicesFromFMP();
+          data = (fmpData && fmpData.length >= 4) ? fmpData : (data && data.length > 0 ? data : stale);
         }
         return (data && data.length > 0) ? data : stale;
       }, indicesTtl);
       return res.json(enrichIndicesWithTrend(stale));
     }
 
+    const MIN_VALID_INDICES = 4;
     try {
       let data = await yahoo.getIndices();
-      if (!data || data.length === 0) {
-        console.log('[indices] Yahoo empty on cold start, trying FMP backup...');
-        data = await fmp.getIndicesFromFMP();
+      if (!data || data.length < MIN_VALID_INDICES) {
+        console.log(`[indices] Yahoo returned ${data?.length || 0} indices (need ${MIN_VALID_INDICES}+), trying FMP backup...`);
+        const fmpData = await fmp.getIndicesFromFMP();
+        if (fmpData && fmpData.length >= MIN_VALID_INDICES) {
+          data = fmpData;
+        }
       }
       if (data && data.length > 0) {
         setCache(cacheKey, data, indicesTtl);
