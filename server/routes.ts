@@ -15,7 +15,7 @@ import { sendAlert, clearFailures } from "./api/alerts";
 import { fetchEarningsCalendar, generateAiSummary, getEarningsDatesWithData } from "./api/earnings";
 import { getFirecrawlUsage } from "./api/transcripts";
 import { calculateCompressionScore } from "./api/compression-score";
-import { computeCompressionForSymbol, getCachedCSS, computeCSSBatch, warmUpCSSCache, isCSSBatchRunning, persistSingleCSSToDB, CSS_CACHE_PREFIX, CSS_PER_SYMBOL_TTL } from "./api/compression-batch";
+import { computeCompressionForSymbol, getCachedCSS, computeCSSBatch, warmUpCSSCache, isCSSBatchRunning, persistSingleCSSToDB, getPersistedCSSForSymbols, CSS_CACHE_PREFIX, CSS_PER_SYMBOL_TTL } from "./api/compression-batch";
 import { scrapeFinvizDigest, scrapeBriefingPreMarket, getPersistedDigest, scrapeDigestRaw, saveDigestFromRaw } from "./api/news-scrapers";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripe/stripeClient";
 import { db } from "./db";
@@ -1767,32 +1767,37 @@ export async function registerRoutes(
       }
 
       const { scores: cachedQuality, complete: qualityComplete } = getCachedLeadersQuality(symbols);
-      const compressionScores: Record<string, number> = {};
-      let compressionComplete = true;
 
+      const compressionScores: Record<string, number> = {};
       for (const symbol of symbols) {
         const cCached = getCachedCSS(symbol);
         if (cCached) {
           compressionScores[symbol] = cCached.normalizedScore;
-        } else {
-          compressionComplete = false;
         }
       }
 
+      const missingCSSFromCache = symbols.filter(s => !(s in compressionScores));
+      if (missingCSSFromCache.length > 0) {
+        const persisted = await getPersistedCSSForSymbols(missingCSSFromCache);
+        for (const [sym, score] of Object.entries(persisted)) {
+          compressionScores[sym] = score;
+        }
+      }
+
+      const compressionComplete = symbols.every(s => s in compressionScores);
       const allReady = qualityComplete && compressionComplete;
 
-      if (!allReady) {
-        if (!isBatchComputeRunning()) {
-          const missingQuality = symbols.filter(s => !(s in cachedQuality));
-          if (missingQuality.length > 0) {
-            computeLeadersQualityBatch(missingQuality).catch(() => {});
-          }
+      if (!qualityComplete && !isBatchComputeRunning()) {
+        const missingQuality = symbols.filter(s => !(s in cachedQuality));
+        if (missingQuality.length > 0) {
+          computeLeadersQualityBatch(missingQuality).catch(() => {});
         }
-        if (!isCSSBatchRunning()) {
-          const missingCSS = symbols.filter(s => !(s in compressionScores));
-          if (missingCSS.length > 0) {
-            computeCSSBatch(missingCSS).catch(() => {});
-          }
+      }
+
+      if (!compressionComplete && !isCSSBatchRunning()) {
+        const missingCSS = symbols.filter(s => !(s in compressionScores));
+        if (missingCSS.length > 0) {
+          computeCSSBatch(missingCSS).catch(() => {});
         }
       }
 

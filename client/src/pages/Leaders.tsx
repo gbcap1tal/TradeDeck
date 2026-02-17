@@ -96,13 +96,14 @@ export default function Leaders() {
     },
     refetchInterval: (query) => {
       if (query.state.data?.ready) return false;
-      return 5000;
+      return 8000;
     },
   });
 
   const qualityScores = qualityData?.scores ?? {};
   const compressionScores = qualityData?.compression ?? {};
-  const scoresReady = qualityData?.ready ?? false;
+  const qualityReady = qualityData ? Object.keys(qualityData.scores).length > 0 : false;
+  const scoresReady = qualityReady;
 
   const leadersWithQuality = useMemo(() => {
     if (!data?.leaders) return [];

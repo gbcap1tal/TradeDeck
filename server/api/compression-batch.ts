@@ -206,3 +206,28 @@ export async function warmUpCSSCache(): Promise<number> {
   }
   return count;
 }
+
+export async function getPersistedCSSForSymbols(symbols: string[]): Promise<Record<string, number>> {
+  const scores: Record<string, number> = {};
+  try {
+    const rows = await db.select().from(compressionScoresCache);
+    const sevenDaysAgo = Date.now() - 7 * 24 * 3600 * 1000;
+    const lookup: Record<string, any> = {};
+    for (const row of rows) {
+      if (row.updatedAt && row.updatedAt.getTime() > sevenDaysAgo && row.data) {
+        try {
+          lookup[row.symbol] = JSON.parse(row.data);
+        } catch {}
+      }
+    }
+    for (const sym of symbols) {
+      if (sym in lookup && typeof lookup[sym]?.normalizedScore === 'number') {
+        scores[sym] = lookup[sym].normalizedScore;
+        setCache(`${CSS_CACHE_PREFIX}${sym}`, lookup[sym], CSS_PER_SYMBOL_TTL);
+      }
+    }
+  } catch (err: any) {
+    console.error(`[css] getPersistedCSSForSymbols error: ${err.message}`);
+  }
+  return scores;
+}
