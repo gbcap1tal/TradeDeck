@@ -31,7 +31,7 @@ Preferred communication style: Simple, everyday language.
     - **Finviz Scraper**: Fetches all US stocks (~9,600) with market cap data, categorizes by Finviz's sector/industry classification, and caches data. Used for sector/industry mapping, stock search, and cap-weighted performance calculations.
     - **Market Breadth**: Computes Market Quality Score and various breadth indicators (MA%, H/L, 4% movers) across ~7000 US stocks ($100M+ market cap) using Yahoo Finance screener API. Supports daily/weekly/monthly timeframes via history snapshots. Scheduled twice daily.
     - **Relative Strength (RS) Ratings**: A Python script computes true IBD-style RS ratings (1-99 percentile) for ~3,800+ stocks based on weighted momentum scores, saved to a file for server lookup.
-    - **Scheduler**: Refreshes core data (Finviz, sectors, breadth, megatrend performance) every 30 minutes during market hours, with precision timing: first refresh at 9:31 AM ET (1 min after open for immediate opening data) and final refresh at 4:01 PM ET (1 min after close to capture official closing auction prices). Breadth computation is fully atomic — all components fetched in parallel Promise.all for consistent point-in-time snapshots. Outside market hours, frozen snapshots are served with 12-hour TTL to prevent score drift.
+    - **Scheduler**: Refreshes core data every 30 minutes during market hours, with precision timing: first refresh at 9:31 AM ET (1 min after open) and final refresh at 4:01 PM ET (1 min after close). Dashboard data (indices, sectors, rotation, industry RS) completes in ~5s. Breadth and Finviz scrapes run independently without blocking dashboard updates. Outside market hours, frozen snapshots are served with 12-hour TTL.
     - **Overnight Digest Refresh**: Polls Finviz every 15 min from 4:00 AM to 10:00 AM ET for new daily digest. Stops once new content detected.
 - **Authentication**: Replit Auth (OpenID Connect) with PostgreSQL-backed session store.
 
@@ -44,7 +44,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Production Hardening
 - **Cache System**: `node-cache` with maxKeys (5000), 3-day TTL on stale cache, auto-timeout (120s) for stuck refresh keys, `finally` blocks to ensure cleanup.
-- **Background Scheduler**: Mutex lock (`isFullRefreshRunning`) prevents overlapping full data refreshes; `try/finally` guarantees flag release. Hourly scheduler, overnight digest polling.
+- **Background Scheduler**: Three independent refresh tasks with per-task mutex locks: `refreshDashboardData` (indices, sectors, rotation, industry RS — ~5s), `refreshBreadth` (breadth scan — ~15min), `refreshSlowData` (Finviz scrape, quality/CSS scores — ~25min). All dispatched in parallel so fast dashboard data is never blocked by slow tasks. Dynamic cache TTLs: 30min during market hours, 12h off-hours. Hourly scheduler, overnight digest polling.
 - **Self-Healing Watchdog**: Runs every 5 min during market hours; detects broken breadth data (0 universe stocks) or missing sectors/indices; clears Yahoo auth cache and retries with fresh credentials; 10-min cooldown between heal attempts; sends email alerts if healing fails.
 - **Env Var Validation**: Startup checks for required (`DATABASE_URL`, `SESSION_SECRET`) and optional (`FMP_KEY`, `ALPHA_VANTAGE_KEY`, `ADMIN_USER_ID`) environment variables.
 - **API Logging**: Truncated response bodies (200 chars max), only logs errors (4xx/5xx) and slow requests (>5s).

@@ -593,6 +593,14 @@ function backgroundRefresh(cacheKey: string, computeFn: () => Promise<any>, ttl:
   });
 }
 
+function sectorsTtl(): number {
+  return isUSMarketOpen() ? 1800 : 43200;
+}
+
+function industryPerfTtl(): number {
+  return isUSMarketOpen() ? 1800 : 43200;
+}
+
 let bgInitialized = false;
 function initBackgroundTasks() {
   if (bgInitialized) return;
@@ -617,8 +625,8 @@ function initBackgroundTasks() {
     const etMinutes = etNow.getHours() * 60 + etNow.getMinutes();
     const isDuringMarket = etDay >= 1 && etDay <= 5 && etMinutes >= 540 && etMinutes <= 965;
 
-    // Phase 1: Fast data — Yahoo (indices, sectors, rotation, breadth) + Finviz industry groups page (single request)
-    console.log('[bg] Phase 1: Computing fast data (indices, sectors, rotation, breadth, industry RS)...');
+    // Phase 1: Fast dashboard data (indices, sectors, rotation, industry RS) — ~5-10s
+    console.log('[bg] Phase 1: Computing fast dashboard data (indices, sectors, rotation, industry RS)...');
     await Promise.allSettled([
       (async () => {
         const MIN_INDICES = 4;
@@ -631,9 +639,6 @@ function initBackgroundTasks() {
               console.log(`[bg] Indices pre-computed: ${indices.length} indices in ${((Date.now() - bgStart) / 1000).toFixed(1)}s${attempt > 1 ? ` (attempt ${attempt})` : ''}`);
               return true;
             }
-            if (indices && indices.length > 0) {
-              console.log(`[bg] Yahoo returned only ${indices.length} indices (need ${MIN_INDICES}+), treating as partial failure`);
-            }
             return false;
           } catch (e: any) {
             console.log(`[bg] Indices pre-compute error (attempt ${attempt}): ${e.message}`);
@@ -642,37 +647,23 @@ function initBackgroundTasks() {
         };
         const ok = await fetchIndices(1);
         if (!ok) {
-          // Try FMP backup immediately
           console.log('[bg] Yahoo indices empty, trying FMP backup...');
           const fmpData = await fmp.getIndicesFromFMP();
           if (fmpData && fmpData.length > 0) {
-            const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
-            setCache('market_indices', fmpData, indicesTtl);
-            console.log(`[bg] Indices from FMP backup: ${fmpData.length} indices in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+            setCache('market_indices', fmpData, isUSMarketOpen() ? CACHE_TTL.INDICES : 43200);
+            console.log(`[bg] Indices from FMP backup: ${fmpData.length} indices`);
           } else {
-            // Retry Yahoo after 30s with fresh auth
             setTimeout(async () => {
-              console.log('[bg] Retrying indices fetch with fresh Yahoo auth...');
+              console.log('[bg] Retrying indices with fresh Yahoo auth...');
               yahoo.clearYahooAuthCache();
               await new Promise(r => setTimeout(r, 2000));
               const ok2 = await fetchIndices(2);
               if (!ok2) {
-                // Final retry after another 60s
-                setTimeout(async () => {
-                  console.log('[bg] Final indices retry...');
-                  yahoo.clearYahooAuthCache();
-                  await new Promise(r => setTimeout(r, 3000));
-                  const ok3 = await fetchIndices(3);
-                  if (!ok3) {
-                    // Last resort: FMP again
-                    const fmpRetry = await fmp.getIndicesFromFMP();
-                    if (fmpRetry && fmpRetry.length > 0) {
-                      const ttl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
-                      setCache('market_indices', fmpRetry, ttl);
-                      console.log(`[bg] Indices from FMP final backup: ${fmpRetry.length} indices`);
-                    }
-                  }
-                }, 60000);
+                const fmpRetry = await fmp.getIndicesFromFMP();
+                if (fmpRetry && fmpRetry.length > 0) {
+                  setCache('market_indices', fmpRetry, isUSMarketOpen() ? CACHE_TTL.INDICES : 43200);
+                  console.log(`[bg] Indices from FMP final backup: ${fmpRetry.length}`);
+                }
               }
             }, 30000);
           }
@@ -680,33 +671,26 @@ function initBackgroundTasks() {
       })(),
       (async () => {
         const sectors = await computeSectorsData();
-        setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
+        setCache('sectors_data', sectors, isDuringMarket ? 1800 : 43200);
         console.log(`[bg] Sectors computed: ${sectors.length} sectors in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
       })(),
       (async () => {
         const rotData = await computeRotationData();
-        setCache('rrg_rotation', rotData, CACHE_TTL.SECTORS);
+        setCache('rrg_rotation', rotData, isDuringMarket ? 1800 : 43200);
         console.log(`[bg] Rotation pre-computed: ${rotData.sectors?.length} sectors in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
-      })(),
-      (async () => {
-        const breadth = await computeMarketBreadth(true);
-        const ttl = isUSMarketOpen() ? CACHE_TTL.BREADTH : 43200;
-        setCache('market_breadth', breadth, ttl);
-        console.log(`[bg] Breadth atomic scan complete: score=${breadth.overallScore} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
-        clearFailures('breadth_scan');
       })(),
       (async () => {
         try {
           const rsData = await fetchIndustryRSFromFinviz(isDuringMarket);
           console.log(`[bg] Industry RS ratings loaded: ${rsData.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
           const perfData = await computeIndustryPerformance();
-          setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
+          setCache('industry_perf_all', perfData, isDuringMarket ? 1800 : 43200);
           console.log(`[bg] Industry performance computed: ${perfData.industries?.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
         } catch (e: any) {
           console.log(`[bg] Industry RS/perf error: ${e.message}`);
           const persisted = loadPersistedIndustryPerf();
           if (persisted) {
-            setCache('industry_perf_all', persisted, CACHE_TTL.INDUSTRY_PERF);
+            setCache('industry_perf_all', persisted, isDuringMarket ? 1800 : 43200);
             console.log(`[bg] Using persisted industry performance: ${persisted.industries?.length} industries`);
           }
         }
@@ -715,8 +699,30 @@ function initBackgroundTasks() {
 
     console.log(`[bg] Phase 1 complete in ${((Date.now() - bgStart) / 1000).toFixed(1)}s — dashboard data ready`);
 
-    // Phase 2: Slow Finviz full stock universe scrape + industry enrichment
-    console.log(`[bg] Phase 2: Loading Finviz stock universe... ${isDuringMarket ? '(market hours — force refresh)' : '(off hours — using cache)'}`);
+    // Phase 2: Breadth scan — runs independently, does NOT block Phase 3
+    console.log('[bg] Phase 2: Starting breadth scan (independent, non-blocking)...');
+    (async () => {
+      try {
+        if (!isUSMarketOpen()) {
+          const frozen = getFrozenBreadth();
+          if (frozen) {
+            setCache('market_breadth', frozen, 43200);
+            console.log(`[bg] Market closed — using frozen breadth: score=${frozen.overallScore}`);
+            return;
+          }
+        }
+        const breadth = await computeMarketBreadth(true);
+        const ttl = isUSMarketOpen() ? CACHE_TTL.BREADTH : 43200;
+        setCache('market_breadth', breadth, ttl);
+        console.log(`[bg] Breadth scan complete: score=${breadth.overallScore} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+        clearFailures('breadth_scan');
+      } catch (e: any) {
+        console.error(`[bg] Breadth error: ${e.message}`);
+      }
+    })();
+
+    // Phase 3: Slow Finviz full stock universe scrape + industry enrichment
+    console.log(`[bg] Phase 3: Loading Finviz stock universe... ${isDuringMarket ? '(market hours — force refresh)' : '(off hours — using cache)'}`);
     const finvizData = await getFinvizData(isDuringMarket);
     if (finvizData) {
       let totalStocks = 0;
@@ -730,18 +736,16 @@ function initBackgroundTasks() {
       console.log(`[bg] Finviz complete: ${Object.keys(finvizData).length} sectors, ${totalIndustries} industries, ${totalStocks} stocks in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
       clearFailures('finviz_scrape');
 
-      // Re-compute industry perf with cap-weighted daily changes from stock data
       const perfData = await computeIndustryPerformance();
-      setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
-      console.log(`[bg] Industry performance re-enriched with stock data: ${perfData.industries?.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+      setCache('industry_perf_all', perfData, isDuringMarket ? 1800 : 43200);
+      console.log(`[bg] Industry performance re-enriched with stock data: ${perfData.industries?.length} industries`);
     } else {
-      console.log('[bg] Finviz data not available yet, sectors will show without industries initially');
-      sendAlert('Finviz Scrape Failed on Startup', 'Finviz data could not be loaded during server boot. Industry performance will use persisted cache if available.', 'finviz_scrape');
+      console.log('[bg] Finviz data not available, sectors will show without industries initially');
+      sendAlert('Finviz Scrape Failed on Startup', 'Finviz data could not be loaded during server boot.', 'finviz_scrape');
     }
 
-    // Re-compute sectors with industry enrichment now that Finviz is ready
     const sectors = await computeSectorsData();
-    setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
+    setCache('sectors_data', sectors, isDuringMarket ? 1800 : 43200);
     console.log(`[bg] Sectors re-enriched with industry data: ${sectors.length} sectors in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
 
     try {
@@ -749,7 +753,6 @@ function initBackgroundTasks() {
       console.log(`[bg] Megatrend performance computed: ${mtPerf.size} baskets`);
     } catch (err: any) {
       console.log(`[bg] Megatrend performance error: ${err.message}`);
-      sendAlert('Megatrend Performance Failed on Startup', `Megatrend performance computation failed during server boot.\n\nError: ${err.message}`, 'megatrend_perf');
     }
 
     try {
@@ -785,35 +788,17 @@ function initBackgroundTasks() {
           if (qSymbols.length > 0) {
             console.log(`[bg] Pre-computing quality scores for ${qSymbols.length} leaders (RS>=80)...`);
             const qScores = await computeLeadersQualityBatch(qSymbols);
-            console.log(`[bg] Quality scores pre-computed: ${Object.keys(qScores).length} stocks in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+            console.log(`[bg] Quality scores pre-computed: ${Object.keys(qScores).length} stocks`);
           }
-        }
-      } catch (err: any) {
-        console.log(`[bg] Quality pre-compute error: ${err.message}`);
-      }
 
-      try {
-        const cssRatings = getAllRSRatings();
-        const cssFinviz = getFinvizDataSync();
-        if (cssFinviz) {
-          const cssLookup: Record<string, number> = {};
-          for (const [_s, sd] of Object.entries(cssFinviz)) {
-            for (const [_i, stocks] of Object.entries(sd.stocks)) {
-              for (const stock of stocks) cssLookup[stock.symbol] = stock.marketCap;
-            }
-          }
-          const cssSymbols: string[] = [];
-          for (const [sym, rs] of Object.entries(cssRatings)) {
-            if (rs >= 80 && (cssLookup[sym] || 0) >= 300) cssSymbols.push(sym);
-          }
-          if (cssSymbols.length > 0) {
-            console.log(`[bg] Pre-computing compression scores for ${cssSymbols.length} leaders (RS>=80)...`);
-            const cssScores = await computeCSSBatch(cssSymbols);
-            console.log(`[bg] Compression scores pre-computed: ${Object.keys(cssScores).length} stocks in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+          if (qSymbols.length > 0 && !isCSSBatchRunning()) {
+            console.log(`[bg] Pre-computing compression scores for ${qSymbols.length} leaders (RS>=80)...`);
+            const cssScores = await computeCSSBatch(qSymbols);
+            console.log(`[bg] Compression scores pre-computed: ${Object.keys(cssScores).length} stocks`);
           }
         }
       } catch (err: any) {
-        console.log(`[bg] CSS pre-compute error: ${err.message}`);
+        console.log(`[bg] Quality/CSS pre-compute error: ${err.message}`);
       }
     } else {
       console.log(`[bg] Market closed — serving ${warmCount} quality scores + ${cssWarmCount} CSS scores from DB, skipping recomputation`);
@@ -821,16 +806,134 @@ function initBackgroundTasks() {
   }, 1000);
 
   let lastScheduledWindow = '';
-  let isFullRefreshRunning = false;
+  let isDashboardRefreshRunning = false;
+  let isSlowRefreshRunning = false;
+  let isBreadthRefreshRunning = false;
 
-  async function runFullDataRefresh(windowLabel: string) {
-    if (isFullRefreshRunning) {
-      console.log(`[scheduler] Skipping ${windowLabel} — refresh already in progress`);
+  async function refreshDashboardData(label: string) {
+    if (isDashboardRefreshRunning) {
+      console.log(`[scheduler] Skipping dashboard refresh ${label} — already in progress`);
       return;
     }
-    isFullRefreshRunning = true;
+    isDashboardRefreshRunning = true;
     const start = Date.now();
-    console.log(`[scheduler] === Starting full data refresh: ${windowLabel} ===`);
+    console.log(`[scheduler] === Dashboard refresh: ${label} ===`);
+
+    try {
+      await Promise.allSettled([
+        (async () => {
+          try {
+            const indices = await yahoo.getIndices();
+            const ttl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
+            if (indices && indices.length >= 4) {
+              setCache('market_indices', indices, ttl);
+              console.log(`[scheduler] Indices refreshed: ${indices.length} in ${((Date.now() - start) / 1000).toFixed(1)}s`);
+            } else {
+              const fmpData = await fmp.getIndicesFromFMP();
+              if (fmpData && fmpData.length >= 4) {
+                setCache('market_indices', fmpData, ttl);
+                console.log(`[scheduler] Indices from FMP backup: ${fmpData.length}`);
+              }
+            }
+          } catch (err: any) {
+            console.log(`[scheduler] Indices error: ${err.message}, trying FMP...`);
+            try {
+              const fmpData = await fmp.getIndicesFromFMP();
+              if (fmpData && fmpData.length > 0) {
+                setCache('market_indices', fmpData, isUSMarketOpen() ? CACHE_TTL.INDICES : 43200);
+              }
+            } catch {}
+          }
+        })(),
+        (async () => {
+          try {
+            const sectors = await computeSectorsData();
+            setCache('sectors_data', sectors, sectorsTtl());
+            console.log(`[scheduler] Sectors refreshed: ${sectors.length} in ${((Date.now() - start) / 1000).toFixed(1)}s`);
+          } catch (err: any) {
+            console.error(`[scheduler] Sectors error: ${err.message}`);
+          }
+        })(),
+        (async () => {
+          try {
+            const rotData = await computeRotationData();
+            setCache('rrg_rotation', rotData, sectorsTtl());
+            console.log(`[scheduler] Rotation refreshed in ${((Date.now() - start) / 1000).toFixed(1)}s`);
+            clearFailures('rotation');
+          } catch (err: any) {
+            console.error(`[scheduler] Rotation error: ${err.message}`);
+            sendAlert('Rotation Data Refresh Failed', `RRG rotation failed during ${label}.\n\nError: ${err.message}`, 'rotation');
+          }
+        })(),
+        (async () => {
+          try {
+            const rsData = await fetchIndustryRSFromFinviz(isUSMarketOpen());
+            console.log(`[scheduler] Industry RS refreshed: ${rsData.length} industries in ${((Date.now() - start) / 1000).toFixed(1)}s`);
+            let perfData = await computeIndustryPerformance();
+            if (!perfData.fullyEnriched) {
+              const persisted = loadPersistedIndustryPerf();
+              if (persisted) {
+                perfData = persisted;
+                console.log(`[scheduler] Falling back to persisted industry performance`);
+              }
+            }
+            setCache('industry_perf_all', perfData, industryPerfTtl());
+            if (perfData.fullyEnriched) clearFailures('industry_perf');
+            console.log(`[scheduler] Industry performance refreshed: ${perfData.industries?.length} industries in ${((Date.now() - start) / 1000).toFixed(1)}s`);
+          } catch (e: any) {
+            console.log(`[scheduler] Industry RS/perf error: ${e.message}`);
+            const persisted = loadPersistedIndustryPerf();
+            if (persisted) setCache('industry_perf_all', persisted, industryPerfTtl());
+          }
+        })(),
+      ]);
+
+      console.log(`[scheduler] === Dashboard refresh complete: ${label} in ${((Date.now() - start) / 1000).toFixed(1)}s ===`);
+    } catch (outerErr: any) {
+      console.error(`[scheduler] Dashboard refresh error ${label}: ${outerErr.message}`);
+    } finally {
+      isDashboardRefreshRunning = false;
+    }
+  }
+
+  async function refreshBreadth(label: string) {
+    if (isBreadthRefreshRunning) {
+      console.log(`[scheduler] Skipping breadth refresh — already in progress`);
+      return;
+    }
+    isBreadthRefreshRunning = true;
+    const start = Date.now();
+
+    try {
+      if (!isUSMarketOpen()) {
+        const frozen = getFrozenBreadth();
+        if (frozen) {
+          setCache('market_breadth', frozen, 43200);
+          console.log(`[scheduler] Market closed — using frozen breadth: score=${frozen.overallScore}`);
+          return;
+        }
+      }
+      const breadth = await computeMarketBreadth(true);
+      const ttl = isUSMarketOpen() ? CACHE_TTL.BREADTH : 43200;
+      setCache('market_breadth', breadth, ttl);
+      console.log(`[scheduler] Breadth refreshed: score=${breadth.overallScore} in ${((Date.now() - start) / 1000).toFixed(1)}s`);
+      clearFailures('breadth_scan');
+    } catch (err: any) {
+      console.error(`[scheduler] Breadth error: ${err.message}`);
+      sendAlert('Market Breadth Scan Failed', `Breadth scan failed during ${label}.\n\nError: ${err.message}`, 'breadth_scan');
+    } finally {
+      isBreadthRefreshRunning = false;
+    }
+  }
+
+  async function refreshSlowData(label: string) {
+    if (isSlowRefreshRunning) {
+      console.log(`[scheduler] Skipping slow refresh ${label} — already in progress`);
+      return;
+    }
+    isSlowRefreshRunning = true;
+    const start = Date.now();
+    console.log(`[scheduler] === Slow refresh: ${label} ===`);
 
     try {
       try {
@@ -840,107 +943,29 @@ function initBackgroundTasks() {
           for (const s of Object.values(finvizData)) {
             for (const stocks of Object.values(s.stocks)) totalStocks += stocks.length;
           }
-          console.log(`[scheduler] Finviz: ${Object.keys(finvizData).length} sectors, ${totalStocks} stocks`);
+          console.log(`[scheduler] Finviz: ${Object.keys(finvizData).length} sectors, ${totalStocks} stocks in ${((Date.now() - start) / 1000).toFixed(1)}s`);
           clearFailures('finviz_scrape');
+
+          const perfData = await computeIndustryPerformance();
+          setCache('industry_perf_all', perfData, industryPerfTtl());
+          console.log(`[scheduler] Industry perf re-enriched: ${perfData.industries?.length} industries`);
+
+          const sectors = await computeSectorsData();
+          setCache('sectors_data', sectors, sectorsTtl());
+          console.log(`[scheduler] Sectors re-enriched with industry data: ${sectors.length} sectors`);
         } else {
-          sendAlert('Scheduled Finviz Refresh Returned No Data', `Finviz scrape during ${windowLabel} returned null (possible block, timeout, or too few stocks).`, 'finviz_scrape');
+          sendAlert('Scheduled Finviz Refresh Returned No Data', `Finviz scrape during ${label} returned null.`, 'finviz_scrape');
         }
       } catch (err: any) {
         console.error(`[scheduler] Finviz refresh error: ${err.message}`);
-        sendAlert('Scheduled Finviz Refresh Failed', `Finviz scrape failed during ${windowLabel} refresh.\n\nError: ${err.message}`, 'finviz_scrape');
+        sendAlert('Scheduled Finviz Refresh Failed', `Finviz scrape failed during ${label}.\n\nError: ${err.message}`, 'finviz_scrape');
       }
-
-      try {
-        const rsData = await fetchIndustryRSFromFinviz(true);
-        console.log(`[scheduler] Industry RS refreshed: ${rsData.length} industries`);
-      } catch (e: any) {
-        console.log(`[scheduler] Industry RS refresh error: ${e.message}`);
-      }
-
-      let perfData = await computeIndustryPerformance();
-      if (!perfData.fullyEnriched) {
-        const persisted = loadPersistedIndustryPerf();
-        if (persisted) {
-          perfData = persisted;
-          console.log(`[scheduler] Falling back to persisted industry performance`);
-        }
-        sendAlert('Industry Performance Incomplete', `Industry performance not fully enriched during ${windowLabel}. Using ${persisted ? 'persisted cache' : 'empty data'} as fallback.`, 'industry_perf');
-      }
-      setCache('industry_perf_all', perfData, CACHE_TTL.INDUSTRY_PERF);
-      if (perfData.fullyEnriched) clearFailures('industry_perf');
-      console.log(`[scheduler] Industry performance refreshed: ${perfData.industries?.length} industries`);
-
-      const sectors = await computeSectorsData();
-      setCache('sectors_data', sectors, CACHE_TTL.SECTORS);
-      console.log(`[scheduler] Sectors refreshed: ${sectors.length} sectors`);
-
-      await Promise.allSettled([
-        (async () => {
-          try {
-            const indices = await yahoo.getIndices();
-            const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
-            if (indices && indices.length >= 4) {
-              setCache('market_indices', indices, indicesTtl);
-              console.log(`[scheduler] Indices refreshed: ${indices.length} indices (ttl=${indicesTtl}s)`);
-            } else {
-              console.log(`[scheduler] Yahoo returned ${indices?.length || 0} indices (need 4+), trying FMP backup...`);
-              const fmpData = await fmp.getIndicesFromFMP();
-              if (fmpData && fmpData.length >= 4) {
-                setCache('market_indices', fmpData, indicesTtl);
-                console.log(`[scheduler] Indices from FMP backup: ${fmpData.length} indices`);
-              }
-            }
-          } catch (err: any) {
-            console.log(`[scheduler] Indices refresh error: ${err.message}, trying FMP backup...`);
-            try {
-              const fmpData = await fmp.getIndicesFromFMP();
-              if (fmpData && fmpData.length > 0) {
-                const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
-                setCache('market_indices', fmpData, indicesTtl);
-                console.log(`[scheduler] Indices from FMP backup: ${fmpData.length} indices`);
-              }
-            } catch {}
-          }
-        })(),
-        (async () => {
-          try {
-            const rotData = await computeRotationData();
-            setCache('rrg_rotation', rotData, CACHE_TTL.SECTORS);
-            console.log(`[scheduler] Rotation data refreshed`);
-            clearFailures('rotation');
-          } catch (err: any) {
-            console.error(`[scheduler] Rotation error: ${err.message}`);
-            sendAlert('Rotation Data Refresh Failed', `RRG rotation data failed during ${windowLabel}.\n\nError: ${err.message}`, 'rotation');
-          }
-        })(),
-        (async () => {
-          try {
-            if (!isUSMarketOpen()) {
-              const frozen = getFrozenBreadth();
-              if (frozen) {
-                setCache('market_breadth', frozen, 43200);
-                console.log(`[scheduler] Market closed — using frozen breadth: score=${frozen.overallScore}`);
-                return;
-              }
-            }
-            const breadth = await computeMarketBreadth(true);
-            const ttl = isUSMarketOpen() ? CACHE_TTL.BREADTH : 43200;
-            setCache('market_breadth', breadth, ttl);
-            console.log(`[scheduler] Market Quality refreshed: score=${breadth.overallScore}`);
-            clearFailures('breadth_scan');
-          } catch (err: any) {
-            console.error(`[scheduler] Breadth error: ${err.message}`);
-            sendAlert('Market Breadth Scan Failed', `Breadth scan failed during ${windowLabel} refresh.\n\nError: ${err.message}`, 'breadth_scan');
-          }
-        })(),
-      ]);
 
       try {
         const mtPerf = await computeMegatrendPerformance();
         console.log(`[scheduler] Megatrend performance refreshed: ${mtPerf.size} baskets`);
       } catch (err: any) {
         console.error(`[scheduler] Megatrend performance error: ${err.message}`);
-        sendAlert('Megatrend Performance Refresh Failed', `Megatrend performance computation failed during ${windowLabel} refresh.\n\nError: ${(err as any).message}`, 'megatrend_perf');
       }
 
       if (isUSMarketOpen()) {
@@ -962,7 +987,6 @@ function initBackgroundTasks() {
               const qScores = await computeLeadersQualityBatch(qSymbols);
               console.log(`[scheduler] Quality scores refreshed: ${Object.keys(qScores).length} stocks`);
             }
-
             if (qSymbols.length > 0 && !isCSSBatchRunning()) {
               const cssScores = await computeCSSBatch(qSymbols);
               console.log(`[scheduler] Compression scores refreshed: ${Object.keys(cssScores).length} stocks`);
@@ -971,8 +995,6 @@ function initBackgroundTasks() {
         } catch (err: any) {
           console.log(`[scheduler] Quality/CSS refresh error: ${err.message}`);
         }
-      } else {
-        console.log(`[scheduler] Market closed — skipping quality/CSS score recomputation`);
       }
 
       try {
@@ -989,12 +1011,24 @@ function initBackgroundTasks() {
         console.log(`[scheduler] Pre-market briefing error: ${err.message}`);
       }
 
-      console.log(`[scheduler] === Full data refresh complete: ${windowLabel} in ${((Date.now() - start) / 1000).toFixed(1)}s ===`);
+      console.log(`[scheduler] === Slow refresh complete: ${label} in ${((Date.now() - start) / 1000).toFixed(1)}s ===`);
     } catch (outerErr: any) {
-      console.error(`[scheduler] Unhandled error in full refresh ${windowLabel}: ${outerErr.message}`);
+      console.error(`[scheduler] Slow refresh error ${label}: ${outerErr.message}`);
     } finally {
-      isFullRefreshRunning = false;
+      isSlowRefreshRunning = false;
     }
+  }
+
+  async function runFullDataRefresh(windowLabel: string) {
+    const start = Date.now();
+
+    refreshDashboardData(windowLabel);
+
+    refreshBreadth(windowLabel);
+
+    refreshSlowData(windowLabel);
+
+    console.log(`[scheduler] All refresh tasks dispatched for ${windowLabel}`);
   }
 
   setInterval(() => {
@@ -1138,7 +1172,7 @@ function initBackgroundTasks() {
   const SELF_HEAL_COOLDOWN = 10 * 60 * 1000; // 10 min cooldown between heal attempts
 
   setInterval(async () => {
-    if (selfHealingInProgress || isFullRefreshRunning) return;
+    if (selfHealingInProgress || isDashboardRefreshRunning) return;
     const uptime = process.uptime();
     if (uptime < 120) return; // wait at least 2 min after startup
 
@@ -1521,11 +1555,11 @@ export async function registerRoutes(
 
     const stale = getStale<any>(cacheKey);
     if (stale) {
-      backgroundRefresh(cacheKey, computeSectorsData, CACHE_TTL.SECTORS);
+      backgroundRefresh(cacheKey, computeSectorsData, sectorsTtl());
       return res.json(stale);
     }
 
-    backgroundRefresh(cacheKey, computeSectorsData, CACHE_TTL.SECTORS);
+    backgroundRefresh(cacheKey, computeSectorsData, sectorsTtl());
     res.status(202).json({ _warming: true, data: [] });
   });
 
@@ -1536,11 +1570,11 @@ export async function registerRoutes(
 
     const stale = getStale<any>(cacheKey);
     if (stale) {
-      backgroundRefresh(cacheKey, computeRotationData, CACHE_TTL.SECTORS);
+      backgroundRefresh(cacheKey, computeRotationData, sectorsTtl());
       return res.json(stale);
     }
 
-    backgroundRefresh(cacheKey, computeRotationData, CACHE_TTL.SECTORS);
+    backgroundRefresh(cacheKey, computeRotationData, sectorsTtl());
     res.status(202).json({ _warming: true, sectors: [] });
   });
 
@@ -1551,18 +1585,18 @@ export async function registerRoutes(
 
     const stale = getStale<any>(cacheKey);
     if (stale) {
-      backgroundRefresh(cacheKey, computeIndustryPerformance, CACHE_TTL.INDUSTRY_PERF);
+      backgroundRefresh(cacheKey, computeIndustryPerformance, industryPerfTtl());
       return res.json(stale);
     }
 
     const persisted = loadPersistedIndustryPerf();
     if (persisted) {
-      setCache(cacheKey, persisted, CACHE_TTL.INDUSTRY_PERF);
-      backgroundRefresh(cacheKey, computeIndustryPerformance, CACHE_TTL.INDUSTRY_PERF);
+      setCache(cacheKey, persisted, industryPerfTtl());
+      backgroundRefresh(cacheKey, computeIndustryPerformance, industryPerfTtl());
       return res.json(persisted);
     }
 
-    backgroundRefresh(cacheKey, computeIndustryPerformance, CACHE_TTL.INDUSTRY_PERF);
+    backgroundRefresh(cacheKey, computeIndustryPerformance, industryPerfTtl());
     res.status(202).json({ _warming: true, industries: [] });
   });
 
