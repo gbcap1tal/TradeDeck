@@ -30,7 +30,7 @@ export function MarketIndices() {
     return (
       <div className="mb-8">
         <div className="section-title mb-3">Market Indices</div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="glass-card rounded-xl p-5 shimmer h-[110px]" />
           ))}
@@ -65,7 +65,7 @@ export function MarketIndices() {
   return (
     <div className="mb-8">
       <div className="section-title mb-3" data-testid="text-indices-label">Market Indices</div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
         {indices.map((index) => {
           const price = typeof index.price === 'number' ? index.price : 0;
           const change = typeof index.change === 'number' ? index.change : 0;
