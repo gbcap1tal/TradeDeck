@@ -23,6 +23,8 @@ const PERSISTENT_KEYS = new Set([
   'market_breadth',
   'industry_perf_all',
   'finviz_sector_data',
+  'finviz_daily_digest',
+  'briefing_premarket',
 ]);
 
 export const CACHE_TTL = {
