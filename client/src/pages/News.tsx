@@ -69,11 +69,14 @@ const SENTIMENT_COLORS: Record<SentimentType, string> = {
   neutral: 'text-white',
 };
 
+const COMBINED_SENTIMENT_REGEX = new RegExp(
+  SENTIMENT_PATTERNS.map(p => `(${p.pattern.source})`).join('|'),
+  'gi'
+);
+
 function applySentimentHighlight(text: string): Array<{ text: string; sentiment?: SentimentType }> {
-  const combined = SENTIMENT_PATTERNS
-    .map(p => `(${p.pattern.source})`)
-    .join('|');
-  const regex = new RegExp(combined, 'gi');
+  COMBINED_SENTIMENT_REGEX.lastIndex = 0;
+  const regex = COMBINED_SENTIMENT_REGEX;
 
   const segments: Array<{ text: string; sentiment?: SentimentType }> = [];
   let lastIndex = 0;
@@ -100,44 +103,45 @@ function applySentimentHighlight(text: string): Array<{ text: string; sentiment?
   return segments;
 }
 
+const KNOWN_TICKERS = new Set([
+  'SPY', 'QQQ', 'IWM', 'DIA', 'AAPL', 'MSFT', 'GOOG', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA',
+  'AMD', 'INTC', 'NFLX', 'CRM', 'ADBE', 'PYPL', 'SQ', 'SHOP', 'SPOT', 'UBER', 'LYFT',
+  'JPM', 'BAC', 'GS', 'MS', 'WFC', 'C', 'V', 'MA', 'AXP',
+  'JNJ', 'UNH', 'PFE', 'ABBV', 'MRK', 'LLY', 'TMO', 'ABT', 'BMY', 'AMGN',
+  'XOM', 'CVX', 'COP', 'SLB', 'OXY', 'PSX', 'VLO', 'MPC', 'HAL',
+  'BA', 'CAT', 'HON', 'GE', 'MMM', 'UPS', 'FDX', 'LMT', 'RTX', 'DE',
+  'WMT', 'COST', 'TGT', 'HD', 'LOW', 'NKE', 'SBUX', 'MCD', 'DIS', 'CMCSA',
+  'T', 'VZ', 'TMUS', 'CHTR',
+  'NEE', 'DUK', 'SO', 'AEP',
+  'PLD', 'AMT', 'CCI', 'EQIX', 'SPG',
+  'APH', 'ANET', 'AVGO', 'QCOM', 'TXN', 'MU', 'LRCX', 'KLAC', 'ASML',
+  'NOW', 'SNOW', 'DDOG', 'NET', 'CRWD', 'ZS', 'PANW', 'FTNT',
+  'COIN', 'MSTR', 'RIOT', 'MARA',
+  'SMCI', 'DELL', 'HPQ',
+  'NVO', 'HIMS', 'LI', 'MNDY', 'KD', 'RIG', 'VAL', 'KR', 'BDX', 'CLF',
+  'DT', 'APO', 'RBLX', 'DOCS', 'STM', 'WW', 'ABUS', 'MRNA',
+  'UL', 'EPC', 'WAT', 'SBH', 'POWW', 'MTW', 'NWG',
+]);
+
+const COMMON_WORDS = new Set([
+  'THE', 'AND', 'FOR', 'ARE', 'BUT', 'NOT', 'YOU', 'ALL', 'CAN', 'HER', 'WAS', 'ONE', 'OUR',
+  'OUT', 'DAY', 'HAD', 'HAS', 'HIS', 'HOW', 'ITS', 'MAY', 'NEW', 'NOW', 'OLD', 'SEE', 'WAY',
+  'WHO', 'DID', 'GET', 'LET', 'SAY', 'SHE', 'TOO', 'USE', 'CEO', 'CFO', 'COO', 'CTO',
+  'FDA', 'SEC', 'FED', 'GDP', 'CPI', 'IPO', 'ETF', 'AI', 'EPS', 'EST', 'USD',
+  'BUY', 'SELL', 'HOLD', 'UP', 'DOWN', 'IN', 'ON', 'AT', 'TO', 'BY', 'AN', 'AS', 'OR',
+  'OF', 'IF', 'NO', 'SO', 'DO', 'AM', 'PM', 'ET', 'US', 'UK', 'EU', 'ALSO', 'BEEN',
+  'OVER', 'SOME', 'WILL', 'JUST', 'WITH', 'FROM', 'THIS', 'THAT', 'WHAT', 'WHEN',
+  'THAN', 'WELL', 'VERY', 'MUCH', 'MORE', 'MOST', 'SUCH', 'ONLY', 'EACH',
+  'INTO', 'YEAR', 'LAST', 'NEXT', 'HIGH', 'LOW', 'NEAR', 'LONG', 'OPEN', 'SAID',
+  'AMID', 'EYES', 'SEES', 'SAYS', 'SETS', 'HITS', 'CAPS', 'ADDS',
+  'FALL', 'FELL', 'RISE', 'ROSE', 'JUMP', 'DROP', 'FLAT', 'GAIN', 'LOSS',
+  'DATA', 'WEEK', 'BACK', 'MAKE', 'LIKE', 'TIME', 'TAKE', 'COME', 'MADE',
+  'UNCH', 'YOY', 'QOQ', 'MOM', 'AVG', 'PCT', 'BPS', 'LLC',
+  'CORP', 'INC', 'LTD', 'PLC', 'NYSE',
+]);
+
 function highlightTickers(text: string, onTickerClick: (ticker: string) => void, skipSentiment = false) {
   const tickerRegex = /\b([A-Z]{1,5})\b/g;
-  const knownTickers = new Set([
-    'SPY', 'QQQ', 'IWM', 'DIA', 'AAPL', 'MSFT', 'GOOG', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA',
-    'AMD', 'INTC', 'NFLX', 'CRM', 'ADBE', 'PYPL', 'SQ', 'SHOP', 'SPOT', 'UBER', 'LYFT',
-    'JPM', 'BAC', 'GS', 'MS', 'WFC', 'C', 'V', 'MA', 'AXP',
-    'JNJ', 'UNH', 'PFE', 'ABBV', 'MRK', 'LLY', 'TMO', 'ABT', 'BMY', 'AMGN',
-    'XOM', 'CVX', 'COP', 'SLB', 'OXY', 'PSX', 'VLO', 'MPC', 'HAL',
-    'BA', 'CAT', 'HON', 'GE', 'MMM', 'UPS', 'FDX', 'LMT', 'RTX', 'DE',
-    'WMT', 'COST', 'TGT', 'HD', 'LOW', 'NKE', 'SBUX', 'MCD', 'DIS', 'CMCSA',
-    'T', 'VZ', 'TMUS', 'CHTR',
-    'NEE', 'DUK', 'SO', 'AEP',
-    'PLD', 'AMT', 'CCI', 'EQIX', 'SPG',
-    'APH', 'ANET', 'AVGO', 'QCOM', 'TXN', 'MU', 'LRCX', 'KLAC', 'ASML',
-    'NOW', 'SNOW', 'DDOG', 'NET', 'CRWD', 'ZS', 'PANW', 'FTNT',
-    'COIN', 'MSTR', 'RIOT', 'MARA',
-    'SMCI', 'DELL', 'HPQ',
-    'NVO', 'HIMS', 'LI', 'MNDY', 'KD', 'RIG', 'VAL', 'KR', 'BDX', 'CLF',
-    'DT', 'APO', 'RBLX', 'DOCS', 'STM', 'WW', 'ABUS', 'MRNA',
-    'UL', 'EPC', 'WAT', 'SBH', 'POWW', 'MTW', 'NWG',
-  ]);
-
-  const commonWords = new Set([
-    'THE', 'AND', 'FOR', 'ARE', 'BUT', 'NOT', 'YOU', 'ALL', 'CAN', 'HER', 'WAS', 'ONE', 'OUR',
-    'OUT', 'DAY', 'HAD', 'HAS', 'HIS', 'HOW', 'ITS', 'MAY', 'NEW', 'NOW', 'OLD', 'SEE', 'WAY',
-    'WHO', 'DID', 'GET', 'LET', 'SAY', 'SHE', 'TOO', 'USE', 'CEO', 'CFO', 'COO', 'CTO',
-    'FDA', 'SEC', 'FED', 'GDP', 'CPI', 'IPO', 'ETF', 'AI', 'EPS', 'EST', 'USD',
-    'BUY', 'SELL', 'HOLD', 'UP', 'DOWN', 'IN', 'ON', 'AT', 'TO', 'BY', 'AN', 'AS', 'OR',
-    'OF', 'IF', 'NO', 'SO', 'DO', 'AM', 'PM', 'ET', 'US', 'UK', 'EU', 'ALSO', 'BEEN',
-    'OVER', 'SOME', 'WILL', 'JUST', 'WITH', 'FROM', 'THIS', 'THAT', 'WHAT', 'WHEN',
-    'THAN', 'WELL', 'VERY', 'MUCH', 'MORE', 'MOST', 'SUCH', 'ONLY', 'EACH',
-    'INTO', 'YEAR', 'LAST', 'NEXT', 'HIGH', 'LOW', 'NEAR', 'LONG', 'OPEN', 'SAID',
-    'AMID', 'EYES', 'SEES', 'SAYS', 'SETS', 'HITS', 'CAPS', 'ADDS',
-    'FALL', 'FELL', 'RISE', 'ROSE', 'JUMP', 'DROP', 'FLAT', 'GAIN', 'LOSS',
-    'DATA', 'WEEK', 'BACK', 'MAKE', 'LIKE', 'TIME', 'TAKE', 'COME', 'MADE',
-    'UNCH', 'YOY', 'QOQ', 'MOM', 'AVG', 'PCT', 'BPS', 'LLC',
-    'CORP', 'INC', 'LTD', 'PLC', 'NYSE',
-  ]);
 
   const parts: Array<{ text: string; isTicker: boolean; ticker?: string }> = [];
   let lastIndex = 0;
@@ -145,7 +149,7 @@ function highlightTickers(text: string, onTickerClick: (ticker: string) => void,
   let match;
   while ((match = tickerRegex.exec(text)) !== null) {
     const word = match[1];
-    if (knownTickers.has(word) && !commonWords.has(word)) {
+    if (KNOWN_TICKERS.has(word) && !COMMON_WORDS.has(word)) {
       if (match.index > lastIndex) {
         parts.push({ text: text.slice(lastIndex, match.index), isTicker: false });
       }
