@@ -214,6 +214,10 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
         </div>
 
         <div className="mb-2 pt-2 border-t border-white/[0.06]">
+          <CompressionScoreSection symbol={symbol} />
+        </div>
+
+        <div className="mb-2 pt-2 border-t border-white/[0.06]">
           <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Fundamentals</div>
           <QualityRow label="EPS QoQ" value={quality.fundamentals.epsQoQ != null ? `${quality.fundamentals.epsQoQ > 0 ? '+' : ''}${quality.fundamentals.epsQoQ}%` : '—'} color={quality.fundamentals.epsQoQ != null ? pctColor(quality.fundamentals.epsQoQ) : 'text-white/30'} />
           <QualityRow label="Sales QoQ" value={quality.fundamentals.salesQoQ != null ? `${quality.fundamentals.salesQoQ > 0 ? '+' : ''}${quality.fundamentals.salesQoQ}%` : '—'} color={quality.fundamentals.salesQoQ != null ? pctColor(quality.fundamentals.salesQoQ) : 'text-white/30'} />
@@ -270,8 +274,6 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
             </div>
           </div>
         </div>
-
-        <CompressionScoreSection symbol={symbol} />
       </div>
     </div>
   );
@@ -318,14 +320,72 @@ function CompressionScoreSection({ symbol }: { symbol: string }) {
           <Zap className="w-3 h-3 text-white/30" />
           <span className="text-[10px] text-white/30 uppercase tracking-widest font-semibold">Compression Score</span>
         </div>
-        <button
-          type="button"
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowBreakdown(prev => !prev); }}
-          className="flex items-center justify-center w-5 h-5 rounded text-white/30 hover:text-white/60 transition-colors cursor-pointer"
-          data-testid="button-compression-info"
-        >
-          <Info className="w-3.5 h-3.5" />
-        </button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="flex items-center justify-center w-5 h-5 rounded text-white/30 hover:text-white/60 transition-colors cursor-pointer"
+              data-testid="button-compression-info"
+            >
+              <Info className="w-3.5 h-3.5" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            side="left"
+            align="start"
+            className="w-80 p-0 bg-[#1a1a1a] border-white/10 shadow-2xl"
+            data-testid="popover-compression-breakdown"
+          >
+            <div className="p-3 border-b border-white/[0.06]">
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] font-semibold text-white/90">Score Breakdown</span>
+                <span className={cn("text-[13px] font-bold font-mono-nums", scoreColor)}>{css.normalizedScore}/99</span>
+              </div>
+            </div>
+            <div className="p-3 space-y-3 max-h-[300px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+              <div className="space-y-1.5">
+                {categories.map((cat) => {
+                  const effectiveMax = cat.maxAvailable > 0 ? cat.maxAvailable : cat.maxScore;
+                  const pct = effectiveMax > 0 ? (cat.score / effectiveMax) * 100 : 0;
+                  const catBarColor = pct >= 70 ? 'bg-[#30d158]' : pct >= 40 ? 'bg-[#ffd60a]' : 'bg-[#ff453a]/50';
+                  return (
+                    <div key={cat.name}>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-[11px] text-white/50 truncate flex-1">{cat.name}</span>
+                        <span className="text-[11px] font-mono-nums text-white/70 ml-2">{Math.round(cat.score * 10) / 10}/{effectiveMax}</span>
+                      </div>
+                      <div className="h-[2px] rounded-full bg-white/[0.04] overflow-hidden">
+                        <div className={cn("h-full rounded-full transition-all duration-300", catBarColor)} style={{ width: `${Math.max(1, pct)}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {(css.penalties > 0 || (css.dangerSignals && css.dangerSignals.length > 0)) && (
+                <div className="pt-2 border-t border-white/[0.06] space-y-2">
+                  {css.penalties > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-[#ff453a]/60">Total Penalties</span>
+                      <span className="text-[11px] font-mono-nums text-[#ff453a]/80">-{css.penalties}</span>
+                    </div>
+                  )}
+                  {css.dangerSignals && css.dangerSignals.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="text-[9px] text-white/20 uppercase tracking-tighter font-bold">Penalty Details</div>
+                      {css.dangerSignals.map((signal: string, i: number) => (
+                        <div key={i} className="flex items-center gap-1.5">
+                          <AlertTriangle className="w-2.5 h-2.5 text-[#ff453a]/50 flex-shrink-0" />
+                          <span className="text-[10px] text-[#ff453a]/60 leading-tight">{signal}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       <div className="flex items-center justify-between py-[3px]">
@@ -357,33 +417,6 @@ function CompressionScoreSection({ symbol }: { symbol: string }) {
               <span className="text-[10px] text-[#ff453a]/60">{signal}</span>
             </div>
           ))}
-        </div>
-      )}
-
-      {showBreakdown && categories.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-white/[0.06] space-y-1" data-testid="panel-compression-breakdown">
-          {categories.map((cat) => {
-            const effectiveMax = cat.maxAvailable > 0 ? cat.maxAvailable : cat.maxScore;
-            const pct = effectiveMax > 0 ? (cat.score / effectiveMax) * 100 : 0;
-            const catBarColor = pct >= 70 ? 'bg-[#30d158]' : pct >= 40 ? 'bg-[#ffd60a]' : 'bg-[#ff453a]/50';
-            return (
-              <div key={cat.name}>
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-white/40 truncate flex-1">{cat.name}</span>
-                  <span className="text-[10px] font-mono-nums text-white/60 ml-2">{Math.round(cat.score * 10) / 10}/{effectiveMax}</span>
-                </div>
-                <div className="h-[2px] rounded-full bg-white/[0.04] overflow-hidden mt-0.5">
-                  <div className={cn("h-full rounded-full", catBarColor)} style={{ width: `${Math.max(1, pct)}%` }} />
-                </div>
-              </div>
-            );
-          })}
-          {css.penalties > 0 && (
-            <div className="flex items-center justify-between pt-1 border-t border-white/[0.04]">
-              <span className="text-[10px] text-[#ff453a]/60">Penalties</span>
-              <span className="text-[10px] font-mono-nums text-[#ff453a]/80">-{css.penalties}</span>
-            </div>
-          )}
         </div>
       )}
     </div>
