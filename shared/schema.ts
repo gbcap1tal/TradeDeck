@@ -279,6 +279,16 @@ export interface MarketStatus {
   nextClose: string;
 }
 
+// === PERSISTENT CACHE ===
+
+export const cacheStore = pgTable("cache_store", {
+  key: varchar("key", { length: 255 }).primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type CacheStoreEntry = typeof cacheStore.$inferSelect;
+
 export interface NewsItem {
   id: string;
   headline: string;
