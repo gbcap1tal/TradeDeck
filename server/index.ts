@@ -5,6 +5,7 @@ import { createServer } from "http";
 import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from "./stripe/stripeClient";
 import { WebhookHandlers } from "./stripe/webhookHandlers";
+import { storage } from "./storage";
 
 process.on('uncaughtException', (err) => {
   console.error('[process] Uncaught exception (kept alive):', err.message);
@@ -141,7 +142,44 @@ app.use((req, res, next) => {
   next();
 });
 
+async function seedMegatrends() {
+  try {
+    const existing = await storage.getMegatrends();
+    if (existing.length > 0) {
+      console.log(`[seed] Megatrends: ${existing.length} baskets already exist`);
+      return;
+    }
+    console.log('[seed] Megatrends table is empty — seeding default baskets...');
+    const defaults = [
+      { name: 'Rare Earths', tickers: ['TMRC','TMC','UAMY','NB','IDR','MP','PPTA','USAR','UUUU','ERO','AREC','IPX','CRML'] },
+      { name: 'Memory & Storage', tickers: ['SNDK','STX','WDC','MU','LRCX','SIMO','AMAT','RMBS'] },
+      { name: 'Drones', tickers: ['ESLT','AVAV','AIRO','ONDS','UAVS','KTOS','RCAT','DPRO','AMPX','UMAC','PDYN'] },
+      { name: 'Robotics', tickers: ['OUST','RR','TER','ROK','SYM','TSLA','PATH','MDT','ISRG','SYK','SERV','ZBRA','ARBE','XPEV','AUR','KDK','OII','PRCT','TDY','CGNX'] },
+      { name: 'Batteries', tickers: ['EOSE','ABAT','AMPX','SLDP','QS','MVST','FLNC','ENVX','STEM','SES','ULBI'] },
+      { name: 'Opticals & Photonics', tickers: ['PLAB','COHR','IPGP','LITE','AAOI','CIEN','ADTN','AXTI','SLAB','VSH','NOVT','FN','GLW','APH','TEL','COMM'] },
+      { name: 'Space', tickers: ['RKLB','FLY','RDW','ASTS','NOC','BA','PL','MNTS','LUNR','GD','LHX','TDY','STM','BWTX','AME','HON','CW','VSAT','IRDM','SATS','CAE','ASTI','SATL','SPIR','RTX','GSAT','BKSY','LMT','HEI'] },
+      { name: 'Quantum Computing', tickers: ['IONQ','RGTI','QBTS','QUBT','ARQQ','LAES'] },
+      { name: 'Cannabis', tickers: ['TLRY','ACB','CGC','CRON','IIPR','ZYNE','HYFM','GRWG','VFF','SNDL','HITI'] },
+      { name: 'Data Centers & Hyperscalers', tickers: ['IREN','NBIS','APLD','WULF','CRWV','CIFR','DGXX','WIFY','GLXY','HUT','CLSK','GOGL','MSFT','AMZN','ORCL','NUAI'] },
+      { name: 'Crypto & Stablecoin', tickers: ['COIN','MARA','RIOT','HOOD','PYPL','CRCL','BK','CME','IBKR'] },
+      { name: 'Genomics', tickers: ['CRSP','NTLA','EDIT','BEAM','VERV','BLUE','FATE','SGMO','RVMD','ILMN','TMO','PACB','TXG','CDNA','RGEN','DNA','TWST','CODX','RXRX','SDGR','GRAL','EXAS'] },
+      { name: 'Autonomous Systems', tickers: ['TSLA','KDK','AUR','UBER','GOOG','MBLY','AEVA','LIDR','INVZ','OUST','BIDU','WRD','PONY'] },
+      { name: 'eVTOLs', tickers: ['ACHR','JOBY','EH','EVEX','BLDE','SRFM','BETA','HOVR','EVTL'] },
+      { name: 'Psychedelics & Mental Health', tickers: ['DFTX','CMPS','ATAI','NUVB','PRAX','HELP','GHRS','MIRA','BNOX','SEEL','KTTA','QNTM','TALK','TDOC','AMWL','HIMS','PSIL'] },
+      { name: 'Fintech & Neobanks', tickers: ['SOFI','NU','DAVE','CHYM','KLAR','AFRM','SEZL','XYZ','PYPL','TOST','FOUR','MQ','PAYO','RELY','RPAY','SHOP','UPST','NCNO','LC','LMND','ROOT','BILL','HOOD','CRCL'] },
+      { name: 'GLP-1 & Weight Loss', tickers: ['LLY','NVO','AMGN','PFE','AZN','RHHBY','MRK','JNJ','ABI','VKTX','GPCR','TERN','HIMS','ZEAL','CTLT','WST','BDX','WW'] },
+    ];
+    for (const d of defaults) {
+      await storage.createMegatrend(d);
+    }
+    console.log(`[seed] Seeded ${defaults.length} megatrend baskets`);
+  } catch (err: any) {
+    console.error(`[seed] Failed to seed megatrends: ${err.message}`);
+  }
+}
+
 (async () => {
+  await seedMegatrends();
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
