@@ -194,6 +194,85 @@ export async function getCashFlowStatement(symbol: string) {
   return data;
 }
 
+const INDEX_NAMES: Record<string, string> = {
+  SPY: 'S&P 500',
+  QQQ: 'Nasdaq 100',
+  IWM: 'Russell 2000',
+  MDY: 'S&P MidCap',
+  TLT: '20+ Year Treasury',
+  '^GSPC': 'S&P 500',
+  '^IXIC': 'Nasdaq 100',
+};
+
+export async function getIndicesFromFMP(): Promise<any[] | null> {
+  const symbols = ['SPY', 'QQQ', 'MDY', 'IWM', 'TLT'];
+
+  try {
+    const apiKey = process.env.FMP_KEY;
+    if (!apiKey) {
+      console.error('[fmp-indices] FMP_KEY not set');
+      return null;
+    }
+
+    const url = `${FMP_V3}/quote/${symbols.join(',')}?apikey=${apiKey}`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    if (!resp.ok) {
+      console.error(`[fmp-indices] HTTP ${resp.status}`);
+      return null;
+    }
+
+    const data = await resp.json();
+    if (!Array.isArray(data) || data.length === 0) {
+      console.error('[fmp-indices] Empty response');
+      return null;
+    }
+
+    const results: any[] = [];
+    for (const q of data) {
+      if (!q.symbol || q.price == null) continue;
+      results.push({
+        symbol: q.symbol,
+        name: INDEX_NAMES[q.symbol] || q.name || q.symbol,
+        price: Math.round((q.price ?? 0) * 100) / 100,
+        change: Math.round((q.change ?? 0) * 100) / 100,
+        changePercent: Math.round((q.changesPercentage ?? 0) * 100) / 100,
+        sparkline: [],
+      });
+    }
+
+    // Fetch VIX separately (FMP uses ^VIX)
+    try {
+      const vixUrl = `${FMP_V3}/quote/%5EVIX?apikey=${apiKey}`;
+      const vixResp = await fetch(vixUrl, { signal: AbortSignal.timeout(8000) });
+      if (vixResp.ok) {
+        const vixData = await vixResp.json();
+        const vix = Array.isArray(vixData) ? vixData[0] : vixData;
+        if (vix && vix.price != null) {
+          results.splice(4, 0, {
+            symbol: 'VIX',
+            name: 'Volatility Index',
+            price: Math.round((vix.price ?? 0) * 100) / 100,
+            change: Math.round((vix.change ?? 0) * 100) / 100,
+            changePercent: Math.round((vix.changesPercentage ?? 0) * 100) / 100,
+            sparkline: [],
+          });
+        }
+      }
+    } catch {
+      // VIX may fail, that's ok
+    }
+
+    if (results.length > 0) {
+      console.log(`[fmp-indices] Backup returned ${results.length} indices`);
+      return results;
+    }
+    return null;
+  } catch (e: any) {
+    console.error('[fmp-indices] Error:', e.message);
+    return null;
+  }
+}
+
 export async function getSectorPerformance() {
   const key = 'fmp_sector_perf';
   const cached = getCached<any[]>(key);

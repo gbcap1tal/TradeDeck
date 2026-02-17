@@ -631,22 +631,40 @@ function initBackgroundTasks() {
         };
         const ok = await fetchIndices(1);
         if (!ok) {
-          // Retry after 30s with fresh Yahoo auth
-          setTimeout(async () => {
-            console.log('[bg] Retrying indices fetch with fresh Yahoo auth...');
-            yahoo.clearYahooAuthCache();
-            await new Promise(r => setTimeout(r, 2000));
-            const ok2 = await fetchIndices(2);
-            if (!ok2) {
-              // Final retry after another 60s
-              setTimeout(async () => {
-                console.log('[bg] Final indices retry...');
-                yahoo.clearYahooAuthCache();
-                await new Promise(r => setTimeout(r, 3000));
-                await fetchIndices(3);
-              }, 60000);
-            }
-          }, 30000);
+          // Try FMP backup immediately
+          console.log('[bg] Yahoo indices empty, trying FMP backup...');
+          const fmpData = await fmp.getIndicesFromFMP();
+          if (fmpData && fmpData.length > 0) {
+            const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
+            setCache('market_indices', fmpData, indicesTtl);
+            console.log(`[bg] Indices from FMP backup: ${fmpData.length} indices in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+          } else {
+            // Retry Yahoo after 30s with fresh auth
+            setTimeout(async () => {
+              console.log('[bg] Retrying indices fetch with fresh Yahoo auth...');
+              yahoo.clearYahooAuthCache();
+              await new Promise(r => setTimeout(r, 2000));
+              const ok2 = await fetchIndices(2);
+              if (!ok2) {
+                // Final retry after another 60s
+                setTimeout(async () => {
+                  console.log('[bg] Final indices retry...');
+                  yahoo.clearYahooAuthCache();
+                  await new Promise(r => setTimeout(r, 3000));
+                  const ok3 = await fetchIndices(3);
+                  if (!ok3) {
+                    // Last resort: FMP again
+                    const fmpRetry = await fmp.getIndicesFromFMP();
+                    if (fmpRetry && fmpRetry.length > 0) {
+                      const ttl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
+                      setCache('market_indices', fmpRetry, ttl);
+                      console.log(`[bg] Indices from FMP final backup: ${fmpRetry.length} indices`);
+                    }
+                  }
+                }, 60000);
+              }
+            }, 30000);
+          }
         }
       })(),
       (async () => {
@@ -829,9 +847,24 @@ function initBackgroundTasks() {
             if (indices && indices.length > 0) {
               setCache('market_indices', indices, indicesTtl);
               console.log(`[scheduler] Indices refreshed: ${indices.length} indices (ttl=${indicesTtl}s)`);
+            } else {
+              console.log('[scheduler] Yahoo indices empty, trying FMP backup...');
+              const fmpData = await fmp.getIndicesFromFMP();
+              if (fmpData && fmpData.length > 0) {
+                setCache('market_indices', fmpData, indicesTtl);
+                console.log(`[scheduler] Indices from FMP backup: ${fmpData.length} indices`);
+              }
             }
           } catch (err: any) {
-            console.log(`[scheduler] Indices refresh error: ${err.message}`);
+            console.log(`[scheduler] Indices refresh error: ${err.message}, trying FMP backup...`);
+            try {
+              const fmpData = await fmp.getIndicesFromFMP();
+              if (fmpData && fmpData.length > 0) {
+                const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
+                setCache('market_indices', fmpData, indicesTtl);
+                console.log(`[scheduler] Indices from FMP backup: ${fmpData.length} indices`);
+              }
+            } catch {}
           }
         })(),
         (async () => {
@@ -1153,12 +1186,31 @@ function initBackgroundTasks() {
             setCache('market_indices', indices, indicesTtl);
             console.log(`[watchdog] Indices healed: ${indices.length} indices`);
           } else {
-            console.log('[watchdog] Indices retry returned empty');
-            sendAlert('Self-Healing: Indices Still Empty', `Watchdog retried indices but Yahoo returned empty data.\n\nReasons: ${reasons.join(', ')}`, 'watchdog_indices');
+            console.log('[watchdog] Yahoo indices empty, trying FMP backup...');
+            const fmpData = await fmp.getIndicesFromFMP();
+            if (fmpData && fmpData.length > 0) {
+              const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
+              setCache('market_indices', fmpData, indicesTtl);
+              console.log(`[watchdog] Indices healed via FMP: ${fmpData.length} indices`);
+            } else {
+              console.log('[watchdog] Both Yahoo and FMP returned empty');
+              sendAlert('Self-Healing: Indices Still Empty', `Watchdog retried indices with both Yahoo and FMP but both returned empty.\n\nReasons: ${reasons.join(', ')}`, 'watchdog_indices');
+            }
           }
         } catch (err: any) {
-          console.error(`[watchdog] Indices retry error: ${err.message}`);
-          sendAlert('Self-Healing: Indices Retry Failed', `Watchdog indices retry threw an error.\n\nError: ${err.message}`, 'watchdog_indices');
+          console.error(`[watchdog] Yahoo indices retry error: ${err.message}, trying FMP...`);
+          try {
+            const fmpData = await fmp.getIndicesFromFMP();
+            if (fmpData && fmpData.length > 0) {
+              const indicesTtl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
+              setCache('market_indices', fmpData, indicesTtl);
+              console.log(`[watchdog] Indices healed via FMP: ${fmpData.length} indices`);
+            } else {
+              sendAlert('Self-Healing: Indices Retry Failed', `Watchdog indices retry failed for both Yahoo and FMP.\n\nYahoo error: ${err.message}`, 'watchdog_indices');
+            }
+          } catch (fmpErr: any) {
+            sendAlert('Self-Healing: Indices Retry Failed', `Both Yahoo and FMP failed.\n\nYahoo: ${err.message}\nFMP: ${fmpErr.message}`, 'watchdog_indices');
+          }
         }
       }
 
@@ -1375,20 +1427,38 @@ export async function registerRoutes(
     const stale = getStale<any>(cacheKey);
     if (stale) {
       backgroundRefresh(cacheKey, async () => {
-        const data = await yahoo.getIndices();
+        let data = await yahoo.getIndices();
+        if (!data || data.length === 0) {
+          console.log('[indices] Yahoo empty during bg refresh, trying FMP backup...');
+          data = await fmp.getIndicesFromFMP() || stale;
+        }
         return (data && data.length > 0) ? data : stale;
       }, indicesTtl);
       return res.json(enrichIndicesWithTrend(stale));
     }
 
     try {
-      const data = await yahoo.getIndices();
+      let data = await yahoo.getIndices();
+      if (!data || data.length === 0) {
+        console.log('[indices] Yahoo empty on cold start, trying FMP backup...');
+        data = await fmp.getIndicesFromFMP();
+      }
       if (data && data.length > 0) {
         setCache(cacheKey, data, indicesTtl);
         return res.json(enrichIndicesWithTrend(data));
       }
     } catch (e: any) {
       console.error('Indices API error:', e.message);
+      try {
+        console.log('[indices] Yahoo threw error, trying FMP backup...');
+        const fmpData = await fmp.getIndicesFromFMP();
+        if (fmpData && fmpData.length > 0) {
+          setCache(cacheKey, fmpData, indicesTtl);
+          return res.json(enrichIndicesWithTrend(fmpData));
+        }
+      } catch (fmpErr: any) {
+        console.error('[indices] FMP backup also failed:', fmpErr.message);
+      }
     }
     res.json([]);
   });
