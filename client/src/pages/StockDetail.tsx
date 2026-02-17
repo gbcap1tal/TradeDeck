@@ -286,25 +286,13 @@ function CompressionScoreSection({ symbol }: { symbol: string }) {
 
   if (!css || css.error) return null;
 
-  const scoreColor = css.normalizedScore >= 80 ? 'text-[#30d158]'
-    : css.normalizedScore >= 60 ? 'text-[#0a84ff]'
-    : css.normalizedScore >= 40 ? 'text-[#ffd60a]'
-    : css.normalizedScore >= 20 ? 'text-[#ff9f0a]'
-    : 'text-[#ff453a]/70';
+  const scoreColor = 'text-[#ffd60a]';
 
-  const starFillColor = css.normalizedScore >= 80 ? '#ffd60a'
-    : css.normalizedScore >= 60 ? '#0a84ff'
-    : css.normalizedScore >= 40 ? '#ffd60a99'
-    : '#ffffff33';
-
+  const starFillColor = '#ffd60a';
   const starEmptyColor = '#ffffff15';
 
   const barWidth = `${Math.max(2, css.normalizedScore)}%`;
-  const barColor = css.normalizedScore >= 80 ? 'bg-[#30d158]'
-    : css.normalizedScore >= 60 ? 'bg-[#0a84ff]'
-    : css.normalizedScore >= 40 ? 'bg-[#ffd60a]'
-    : css.normalizedScore >= 20 ? 'bg-[#ff9f0a]'
-    : 'bg-[#ff453a]/70';
+  const barColor = 'bg-[#ffd60a]';
 
   const categories = css.categoryScores ? Object.values(css.categoryScores) as Array<{ name: string; score: number; maxScore: number; maxAvailable: number }> : [];
 
@@ -342,7 +330,7 @@ function CompressionScoreSection({ symbol }: { symbol: string }) {
                 {categories.map((cat) => {
                   const effectiveMax = cat.maxAvailable > 0 ? cat.maxAvailable : cat.maxScore;
                   const pct = effectiveMax > 0 ? (cat.score / effectiveMax) * 100 : 0;
-                  const catBarColor = pct >= 70 ? 'bg-[#30d158]' : pct >= 40 ? 'bg-[#ffd60a]' : 'bg-[#ff453a]/50';
+                  const catBarColor = 'bg-[#ffd60a]';
                   return (
                     <div key={cat.name}>
                       <div className="flex items-center justify-between mb-0.5">
