@@ -17,9 +17,18 @@ export function useMarketIndices() {
     queryFn: async () => {
       const res = await fetch('/api/market/indices', { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch market indices");
-      return res.json();
+      const data = await res.json();
+      if (Array.isArray(data) && data.length === 0) {
+        throw new Error("Data warming up");
+      }
+      return data;
     },
     refetchInterval: 30000,
+    retry: (failureCount, error) => {
+      if (error?.message === "Data warming up") return failureCount < 20;
+      return failureCount < 3;
+    },
+    retryDelay: (attemptIndex) => Math.min(3000 * (attemptIndex + 1), 15000),
   });
 }
 

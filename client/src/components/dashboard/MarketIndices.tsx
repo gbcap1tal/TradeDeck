@@ -1,7 +1,18 @@
 import { useMarketIndices } from "@/hooks/use-market";
-import { ArrowUp, ArrowDown } from "lucide-react";
+import { ArrowUp, ArrowDown, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { IndexChartModal } from "./IndexChartModal";
+import { Button } from "@/components/ui/button";
+
+interface MarketIndex {
+  symbol: string;
+  name: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  trend?: string;
+  sparkline?: number[];
+}
 
 const TREND_COLORS: Record<string, string> = {
   'T+': '#2eb850',
@@ -10,8 +21,10 @@ const TREND_COLORS: Record<string, string> = {
 };
 
 export function MarketIndices() {
-  const { data: indices, isLoading } = useMarketIndices();
-  const [selectedIndex, setSelectedIndex] = useState<any>(null);
+  const { data, isLoading, isError, error, refetch, isFetching } = useMarketIndices();
+  const [selectedIndex, setSelectedIndex] = useState<MarketIndex & { trend: string } | null>(null);
+
+  const indices: MarketIndex[] = Array.isArray(data) ? data : [];
 
   if (isLoading) {
     return (
@@ -26,21 +39,47 @@ export function MarketIndices() {
     );
   }
 
+  if (isError || indices.length === 0) {
+    return (
+      <div className="mb-8">
+        <div className="section-title mb-3" data-testid="text-indices-label">Market Indices</div>
+        <div className="glass-card rounded-xl p-6 flex flex-col items-center justify-center gap-3" data-testid="indices-empty-state">
+          <p className="text-[13px] text-white/40">
+            {isError ? 'Failed to load market indices' : 'Market data is warming up...'}
+          </p>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            data-testid="button-retry-indices"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isFetching ? 'animate-spin' : ''}`} />
+            {isFetching ? 'Loading...' : 'Retry'}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mb-8">
       <div className="section-title mb-3" data-testid="text-indices-label">Market Indices</div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-        {indices?.map((index: any) => {
-          const isPositive = index.change >= 0;
+        {indices.map((index) => {
+          const price = typeof index.price === 'number' ? index.price : 0;
+          const change = typeof index.change === 'number' ? index.change : 0;
+          const changePercent = typeof index.changePercent === 'number' ? index.changePercent : 0;
+          const isPositive = change >= 0;
           const color = isPositive ? '#2eb850' : '#c05050';
-          const trendColor = TREND_COLORS[index.trend] || TREND_COLORS['TS'];
+          const trendColor = TREND_COLORS[index.trend || 'TS'] || TREND_COLORS['TS'];
 
           return (
             <div
               key={index.symbol}
               className="glass-card glass-card-hover rounded-xl p-4 cursor-pointer relative"
               data-testid={`card-index-${index.symbol}`}
-              onClick={() => setSelectedIndex(index)}
+              onClick={() => setSelectedIndex({ ...index, trend: index.trend || 'TS' })}
             >
               <div className="flex items-center justify-between gap-1 mb-2">
                 <span className="text-[11px] text-white/40 font-medium truncate">{index.name}</span>
@@ -49,11 +88,11 @@ export function MarketIndices() {
                 </div>
               </div>
               <div className="text-lg font-bold font-mono-nums tracking-tight text-white mb-1">
-                {index.symbol === 'VIX' ? '' : '$'}{index.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {index.symbol === 'VIX' ? '' : '$'}{price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
               <div className="flex items-center justify-between gap-1">
                 <span className="text-xs font-mono-nums font-medium" style={{ color }}>
-                  {isPositive ? "+" : ""}{index.changePercent.toFixed(2)}%
+                  {isPositive ? "+" : ""}{changePercent.toFixed(2)}%
                 </span>
                 <div
                   className="w-[6px] h-[6px] rounded-full flex-shrink-0"
