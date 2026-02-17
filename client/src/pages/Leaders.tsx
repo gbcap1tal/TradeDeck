@@ -176,20 +176,21 @@ export default function Leaders() {
     setter(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v]);
   };
 
-  const minRS = selectedRS.length > 0 ? Math.min(...selectedRS) : 50;
+  const displayMinRS = selectedRS.length > 0 ? Math.min(...selectedRS) : 50;
+  const fetchMinRS = 50;
   const [sortField, setSortField] = useState<SortField>('composite');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   const { data, isLoading } = useQuery<{ leaders: Leader[]; total: number }>({
-    queryKey: [`/api/leaders?minRS=${minRS}`],
-    staleTime: 60000,
+    queryKey: [`/api/leaders?minRS=${fetchMinRS}`],
+    staleTime: 300000,
     refetchInterval: 300000,
   });
 
   const { data: qualityData } = useQuery<{ scores: Record<string, number>; compression: Record<string, number>; ready: boolean }>({
-    queryKey: ['/api/leaders/quality-scores', minRS],
+    queryKey: ['/api/leaders/quality-scores', fetchMinRS],
     queryFn: async () => {
-      const res = await fetch(`/api/leaders/quality-scores?minRS=${minRS}`, { credentials: 'include' });
+      const res = await fetch(`/api/leaders/quality-scores?minRS=${fetchMinRS}`, { credentials: 'include' });
       if (!res.ok) return { scores: {}, compression: {}, ready: false };
       return res.json();
     },
@@ -221,8 +222,8 @@ export default function Leaders() {
     if (leadersWithQuality.length === 0) return [];
     let list = leadersWithQuality;
 
-    if (selectedRS.length > 0) {
-      const rsMin = Math.min(...selectedRS);
+    const rsMin = selectedRS.length > 0 ? Math.min(...selectedRS) : 50;
+    if (rsMin > 0) {
       list = list.filter(l => l.rsRating >= rsMin);
     }
 
@@ -312,7 +313,7 @@ export default function Leaders() {
               Leaders
             </h1>
             <p className="text-[12px] text-white/40 mt-0.5" data-testid="text-leaders-subtitle">
-              {isLoading ? 'Loading...' : `${filtered.length} stocks with RS ${minRS}+`}
+              {isLoading ? 'Loading...' : `${filtered.length} stocks with RS ${displayMinRS}+`}
               {!isLoading && !scoresReady ? ' · loading scores...' : ''}
             </p>
           </div>
