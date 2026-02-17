@@ -1,9 +1,9 @@
 import { useRoute, Link } from "wouter";
 import { Navbar } from "@/components/layout/Navbar";
-import { useStockQuote, useStockQuality, useStockEarnings, useStockNews, useInsiderBuying } from "@/hooks/use-stocks";
+import { useStockQuote, useStockQuality, useStockEarnings, useStockNews, useInsiderBuying, useCompressionScore } from "@/hooks/use-stocks";
 import { StockChart } from "@/components/stock/StockChart";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, Plus, ArrowUp, ArrowDown, Check, X, AlertTriangle, Calendar, Newspaper, Flame, Zap, Info, Building2, Sparkles, Loader2 } from "lucide-react";
+import { ChevronRight, Plus, ArrowUp, ArrowDown, Check, X, AlertTriangle, Calendar, Newspaper, Flame, Zap, Info, Building2, Sparkles, Loader2, Star } from "lucide-react";
 import { useAddToWatchlist, useWatchlists } from "@/hooks/use-watchlists";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
@@ -270,7 +270,121 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
             </div>
           </div>
         </div>
+
+        <CompressionScoreSection symbol={symbol} />
       </div>
+    </div>
+  );
+}
+
+function CompressionScoreSection({ symbol }: { symbol: string }) {
+  const { data: css, isLoading } = useCompressionScore(symbol);
+  const [showBreakdown, setShowBreakdown] = useState(false);
+
+  if (isLoading) return (
+    <div className="pt-2 border-t border-white/[0.06]">
+      <div className="shimmer h-8 rounded" />
+    </div>
+  );
+
+  if (!css || css.error) return null;
+
+  const scoreColor = css.normalizedScore >= 80 ? 'text-[#30d158]'
+    : css.normalizedScore >= 60 ? 'text-[#0a84ff]'
+    : css.normalizedScore >= 40 ? 'text-[#ffd60a]'
+    : css.normalizedScore >= 20 ? 'text-[#ff9f0a]'
+    : 'text-[#ff453a]/70';
+
+  const starFillColor = css.normalizedScore >= 80 ? '#ffd60a'
+    : css.normalizedScore >= 60 ? '#0a84ff'
+    : css.normalizedScore >= 40 ? '#ffd60a99'
+    : '#ffffff33';
+
+  const starEmptyColor = '#ffffff15';
+
+  const barWidth = `${Math.max(2, css.normalizedScore)}%`;
+  const barColor = css.normalizedScore >= 80 ? 'bg-[#30d158]'
+    : css.normalizedScore >= 60 ? 'bg-[#0a84ff]'
+    : css.normalizedScore >= 40 ? 'bg-[#ffd60a]'
+    : css.normalizedScore >= 20 ? 'bg-[#ff9f0a]'
+    : 'bg-[#ff453a]/70';
+
+  const categories = css.categoryScores ? Object.values(css.categoryScores) as Array<{ name: string; score: number; maxScore: number; maxAvailable: number }> : [];
+
+  return (
+    <div className="pt-2 border-t border-white/[0.06]" data-testid="section-compression-score">
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-1.5">
+          <Zap className="w-3 h-3 text-white/30" />
+          <span className="text-[10px] text-white/30 uppercase tracking-widest font-semibold">VCP Score</span>
+        </div>
+        <button
+          onClick={() => setShowBreakdown(!showBreakdown)}
+          className="flex items-center gap-0.5 text-white/30 hover:text-white/60 transition-colors"
+          data-testid="button-compression-info"
+        >
+          <Info className="w-3 h-3" />
+        </button>
+      </div>
+
+      <div className="flex items-center justify-between py-[3px]">
+        <div className="flex items-center gap-2">
+          <span className={cn("text-[14px] font-bold font-mono-nums", scoreColor)} data-testid="text-compression-score">
+            {css.normalizedScore}
+          </span>
+          <span className="text-[10px] text-white/30">/99</span>
+          <span className="flex items-center gap-[1px]">
+            {Array.from({ length: 5 }, (_, i) => (
+              <Star key={i} className="w-3 h-3" fill={i < css.stars ? starFillColor : starEmptyColor} stroke="none" />
+            ))}
+          </span>
+        </div>
+        <span className={cn("text-[11px] font-medium", scoreColor)} data-testid="text-compression-label">
+          {css.label}
+        </span>
+      </div>
+
+      <div className="mt-1 mb-1.5 h-[3px] rounded-full bg-white/[0.06] overflow-hidden">
+        <div className={cn("h-full rounded-full transition-all duration-500", barColor)} style={{ width: barWidth }} />
+      </div>
+
+      {css.dangerSignals && css.dangerSignals.length > 0 && (
+        <div className="mt-1 mb-1">
+          {css.dangerSignals.map((signal: string, i: number) => (
+            <div key={i} className="flex items-center gap-1 py-[2px]">
+              <AlertTriangle className="w-2.5 h-2.5 text-[#ff453a]/70 flex-shrink-0" />
+              <span className="text-[10px] text-[#ff453a]/60">{signal}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showBreakdown && categories.length > 0 && (
+        <div className="mt-2 pt-2 border-t border-white/[0.06] space-y-1" data-testid="panel-compression-breakdown">
+          {categories.map((cat) => {
+            const effectiveMax = cat.maxAvailable > 0 ? cat.maxAvailable : cat.maxScore;
+            const pct = effectiveMax > 0 ? (cat.score / effectiveMax) * 100 : 0;
+            const catBarColor = pct >= 70 ? 'bg-[#30d158]' : pct >= 40 ? 'bg-[#ffd60a]' : 'bg-[#ff453a]/50';
+            return (
+              <div key={cat.name}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-white/40 truncate flex-1">{cat.name}</span>
+                  <span className="text-[10px] font-mono-nums text-white/60 ml-2">{Math.round(cat.score * 10) / 10}/{effectiveMax}</span>
+                </div>
+                <div className="h-[2px] rounded-full bg-white/[0.04] overflow-hidden mt-0.5">
+                  <div className={cn("h-full rounded-full", catBarColor)} style={{ width: `${Math.max(1, pct)}%` }} />
+                </div>
+              </div>
+            );
+          })}
+          {css.penalties > 0 && (
+            <div className="flex items-center justify-between pt-1 border-t border-white/[0.04]">
+              <span className="text-[10px] text-[#ff453a]/60">Penalties</span>
+              <span className="text-[10px] font-mono-nums text-[#ff453a]/80">-{css.penalties}</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

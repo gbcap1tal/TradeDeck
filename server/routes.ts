@@ -14,6 +14,7 @@ import { computeLeadersQualityBatch, getCachedLeadersQuality, getPersistedScores
 import { sendAlert, clearFailures } from "./api/alerts";
 import { fetchEarningsCalendar, generateAiSummary, getEarningsDatesWithData } from "./api/earnings";
 import { getFirecrawlUsage } from "./api/transcripts";
+import { calculateCompressionScore } from "./api/compression-score";
 import { scrapeFinvizDigest, scrapeBriefingPreMarket, getPersistedDigest, scrapeDigestRaw, saveDigestFromRaw } from "./api/news-scrapers";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripe/stripeClient";
 import { db } from "./db";
@@ -2434,6 +2435,50 @@ export async function registerRoutes(
       const staleQuality = getStale<any>(qualityCacheKey);
       if (staleQuality) return res.json(staleQuality);
       return res.json({ ...defaultResponse, _failed: true });
+    }
+  });
+
+  app.get('/api/stocks/:symbol/compression', async (req, res) => {
+    const { symbol } = req.params;
+    const sym = symbol.toUpperCase();
+
+    const cacheKey = `compression_score_${sym}`;
+    const cached = getCached<any>(cacheKey);
+    if (cached) return res.json(cached);
+
+    try {
+      const [dailyHist, weeklyHist, spyHist, rsRating] = await Promise.all([
+        yahoo.getHistory(sym, '1Y'),
+        yahoo.getHistory(sym, 'W').catch(() => []),
+        yahoo.getHistory('SPY', '1Y').catch(() => []),
+        getRSScore(sym).catch(() => 0),
+      ]);
+
+      if (!dailyHist || dailyHist.length < 50) {
+        return res.json({ error: 'Insufficient data', normalizedScore: 0, stars: 0, label: 'No Signal', starsDisplay: '\u2606\u2606\u2606\u2606\u2606 (0/99)', categoryScores: {}, rulesDetail: [], dangerSignals: ['Insufficient data'], penalties: 0, rawScore: 0, maxPossible: 115 });
+      }
+
+      const toOHLCV = (d: any) => ({ date: d.time, open: d.open, high: d.high, low: d.low, close: d.close, volume: d.volume });
+      const dailyData = dailyHist.map(toOHLCV);
+      const weeklyData = weeklyHist.length > 0 ? weeklyHist.map(toOHLCV) : null;
+
+      let marketData = null;
+      if (spyHist.length >= 200) {
+        const spyCloses = spyHist.map((d: any) => d.close);
+        const spySma50 = spyCloses.slice(-50).reduce((a: number, b: number) => a + b, 0) / 50;
+        const spySma200 = spyCloses.slice(-200).reduce((a: number, b: number) => a + b, 0) / 200;
+        marketData = { close: spyCloses[spyCloses.length - 1], sma50: spySma50, sma200: spySma200 };
+      }
+
+      const result = calculateCompressionScore(dailyData, weeklyData, marketData, null, rsRating);
+
+      setCache(cacheKey, result, CACHE_TTL.HISTORY);
+      return res.json(result);
+    } catch (e: any) {
+      console.error(`Compression score error for ${symbol}:`, e.message);
+      const stale = getStale<any>(cacheKey);
+      if (stale) return res.json(stale);
+      return res.json({ error: e.message, normalizedScore: 0, stars: 0, label: 'No Signal', starsDisplay: '\u2606\u2606\u2606\u2606\u2606 (0/99)', categoryScores: {}, rulesDetail: [], dangerSignals: [], penalties: 0, rawScore: 0, maxPossible: 115 });
     }
   });
 

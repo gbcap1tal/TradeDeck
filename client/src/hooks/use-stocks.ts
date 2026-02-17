@@ -79,6 +79,21 @@ export function useStockQuality(symbol: string, rsTimeframe: string = 'current')
   });
 }
 
+export function useCompressionScore(symbol: string) {
+  return useQuery({
+    queryKey: ['/api/stocks', symbol, 'compression'],
+    queryFn: async () => {
+      const res = await fetch(`/api/stocks/${symbol}/compression`, { credentials: "include" });
+      if (!res.ok) throw new Error(`Compression fetch failed: ${res.status}`);
+      return res.json();
+    },
+    enabled: !!symbol,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(3000 * 2 ** attempt, 15000),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useStockNews(symbol: string) {
   return useQuery({
     queryKey: ['/api/stocks', symbol, 'news'],
