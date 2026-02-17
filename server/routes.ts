@@ -5,7 +5,7 @@ import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import * as yahoo from "./api/yahoo";
 import * as fmp from "./api/fmp";
-import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL } from "./api/cache";
+import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL, loadPersistentCache } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP, FINVIZ_SECTOR_MAP } from "./data/sectors";
 import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe, isUSMarketOpen, getFrozenBreadth, getTrendStatus } from "./api/breadth";
@@ -610,6 +610,11 @@ function initBackgroundTasks() {
   bgInitialized = true;
 
   setTimeout(async () => {
+    const persistentCount = await loadPersistentCache();
+    if (persistentCount > 0) {
+      console.log(`[bg] Persistent cache restored: ${persistentCount} dashboard keys loaded from DB — dashboard ready instantly`);
+    }
+
     const warmCount = await warmUpQualityCache();
     if (warmCount > 0) {
       console.log(`[bg] Quality cache warm-up: loaded ${warmCount} persisted scores from DB into memory`);
