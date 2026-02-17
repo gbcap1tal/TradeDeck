@@ -2059,6 +2059,19 @@ export async function registerRoutes(
     const cachedQuality = getCached<any>(qualityCacheKey);
     if (cachedQuality) return res.json(cachedQuality);
 
+    const staleQualityData = getStale<any>(qualityCacheKey);
+    if (staleQualityData && !isRefreshing(qualityCacheKey)) {
+      markRefreshing(qualityCacheKey);
+      const bgPort = process.env.PORT || 5000;
+      fetch(`http://localhost:${bgPort}/api/stocks/${sym}/quality?rsTimeframe=${rsTimeframe}&_bgRefresh=1`)
+        .catch((e: any) => console.error(`Background quality refresh error for ${sym}:`, e.message))
+        .finally(() => clearRefreshing(qualityCacheKey));
+      return res.json(staleQualityData);
+    }
+    if (req.query._bgRefresh) {
+      // Background refresh: skip stale serve, fall through to full compute below
+    }
+
     try {
       const parsePercent = (val: string | undefined): number => {
         if (!val) return 0;
@@ -2484,7 +2497,7 @@ export async function registerRoutes(
           atrMultiple,
         },
       };
-      setCache(qualityCacheKey, qualityResponse, CACHE_TTL.QUOTE);
+      setCache(qualityCacheKey, qualityResponse, CACHE_TTL.BREADTH);
       return res.json(qualityResponse);
     } catch (e: any) {
       console.error(`Quality error for ${symbol}:`, e.message);
