@@ -39,11 +39,12 @@ Preferred communication style: Simple, everyday language.
 - **Type**: PostgreSQL.
 - **ORM**: Drizzle ORM.
 - **Schema**: Defined in `shared/schema.ts` and `shared/models/auth.ts`.
-- **Tables**: `sessions`, `users`, `watchlists`, `watchlistItems`, `megatrends`.
+- **Tables**: `sessions`, `users`, `watchlists`, `watchlistItems`, `megatrends`, `cache_store`.
 - **Megatrends**: Stores custom industry baskets; performance is dynamically computed using market-cap weighted averages of constituent stocks.
+- **cache_store**: Persists critical dashboard cache entries (indices, sectors, rotation, breadth, industry perf, finviz) to PostgreSQL so they survive server restarts. Loaded on startup before background tasks.
 
 ### Production Hardening
-- **Cache System**: `node-cache` with maxKeys (5000), 3-day TTL on stale cache, auto-timeout (120s) for stuck refresh keys, `finally` blocks to ensure cleanup.
+- **Cache System**: `node-cache` with maxKeys (5000), 3-day TTL on stale cache, auto-timeout (120s) for stuck refresh keys, `finally` blocks to ensure cleanup. Critical dashboard keys are additionally persisted to PostgreSQL (`cache_store` table) via async writes on `setCache()`. On startup, `loadPersistentCache()` restores these 6 keys from DB into memory before any background computation, ensuring the dashboard serves data instantly after restarts.
 - **Background Scheduler**: Three independent refresh tasks with per-task mutex locks: `refreshDashboardData` (indices, sectors, rotation, industry RS — ~5s), `refreshBreadth` (breadth scan — ~15min), `refreshSlowData` (Finviz scrape, quality/CSS scores — ~25min). All dispatched in parallel so fast dashboard data is never blocked by slow tasks. Dynamic cache TTLs: 30min during market hours, 12h off-hours. Hourly scheduler, overnight digest polling.
 - **Self-Healing Watchdog**: Runs every 5 min during market hours; detects broken breadth data (0 universe stocks) or missing sectors/indices; clears Yahoo auth cache and retries with fresh credentials; 10-min cooldown between heal attempts; sends email alerts if healing fails.
 - **Env Var Validation**: Startup checks for required (`DATABASE_URL`, `SESSION_SECRET`) and optional (`FMP_KEY`, `ALPHA_VANTAGE_KEY`, `ADMIN_USER_ID`) environment variables.
