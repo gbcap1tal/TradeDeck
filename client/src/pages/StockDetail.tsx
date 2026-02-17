@@ -312,18 +312,19 @@ function CompressionScoreSection({ symbol }: { symbol: string }) {
   const categories = css.categoryScores ? Object.values(css.categoryScores) as Array<{ name: string; score: number; maxScore: number; maxAvailable: number }> : [];
 
   return (
-    <div className="pt-2 border-t border-white/[0.06]" data-testid="section-compression-score">
+    <div className="pt-4 mt-2 border-t border-white/[0.06]" data-testid="section-compression-score">
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-1.5">
           <Zap className="w-3 h-3 text-white/30" />
-          <span className="text-[10px] text-white/30 uppercase tracking-widest font-semibold">VCP Score</span>
+          <span className="text-[10px] text-white/30 uppercase tracking-widest font-semibold">Compression Score</span>
         </div>
         <button
-          onClick={() => setShowBreakdown(!showBreakdown)}
-          className="flex items-center gap-0.5 text-white/30 hover:text-white/60 transition-colors"
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowBreakdown(prev => !prev); }}
+          className="flex items-center justify-center w-5 h-5 rounded text-white/30 hover:text-white/60 transition-colors cursor-pointer"
           data-testid="button-compression-info"
         >
-          <Info className="w-3 h-3" />
+          <Info className="w-3.5 h-3.5" />
         </button>
       </div>
 
