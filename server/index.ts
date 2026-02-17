@@ -6,6 +6,14 @@ import { runMigrations } from 'stripe-replit-sync';
 import { getStripeSync } from "./stripe/stripeClient";
 import { WebhookHandlers } from "./stripe/webhookHandlers";
 
+process.on('uncaughtException', (err) => {
+  console.error('[process] Uncaught exception (kept alive):', err.message);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[process] Unhandled rejection (kept alive):', reason);
+});
+
 const requiredEnvVars = ['DATABASE_URL', 'SESSION_SECRET'] as const;
 const missingVars = requiredEnvVars.filter(v => !process.env[v]);
 if (missingVars.length > 0) {
