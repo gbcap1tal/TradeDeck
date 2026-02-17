@@ -43,30 +43,30 @@ const RS_OPTIONS = [
 
 const QUALITY_OPTIONS = [
   { label: 'Any', value: 0 },
-  { label: '5+', value: 5 },
-  { label: '6+', value: 6 },
-  { label: '7+', value: 7 },
-  { label: '8+', value: 8 },
   { label: '9+', value: 9 },
+  { label: '8+', value: 8 },
+  { label: '7+', value: 7 },
+  { label: '6+', value: 6 },
+  { label: '5+', value: 5 },
 ];
 
 const CS_OPTIONS = [
   { label: 'Any', value: 0 },
-  { label: '20+', value: 20 },
-  { label: '30+', value: 30 },
-  { label: '40+', value: 40 },
-  { label: '50+', value: 50 },
-  { label: '60+', value: 60 },
   { label: '70+', value: 70 },
+  { label: '60+', value: 60 },
+  { label: '50+', value: 50 },
+  { label: '40+', value: 40 },
+  { label: '30+', value: 30 },
+  { label: '20+', value: 20 },
 ];
 
 const MCAP_OPTIONS = [
-  { label: 'Nano (<$300M)', key: 'nano' },
-  { label: 'Micro ($300M-$2B)', key: 'micro' },
-  { label: 'Small ($2B-$10B)', key: 'small' },
-  { label: 'Mid ($10B-$50B)', key: 'mid' },
-  { label: 'Large ($50B-$200B)', key: 'large' },
   { label: 'Mega ($200B+)', key: 'mega' },
+  { label: 'Large ($50B-$200B)', key: 'large' },
+  { label: 'Mid ($10B-$50B)', key: 'mid' },
+  { label: 'Small ($2B-$10B)', key: 'small' },
+  { label: 'Micro ($300M-$2B)', key: 'micro' },
+  { label: 'Nano (<$300M)', key: 'nano' },
 ];
 
 const MCAP_RANGES: Record<string, [number, number]> = {
