@@ -477,9 +477,10 @@ async function computeRotationData(): Promise<any> {
   const spyByDate = new Map<string, number>();
   spyHist.forEach(d => spyByDate.set(d.time, d.close));
 
-  const RS_PERIOD = 10;
-  const MOM_PERIOD = 5;
+  const RS_PERIOD = 14;
+  const MOM_PERIOD = 7;
   const TAIL_LENGTH = 10;
+  const MOM_SCALE = 2.5;
 
   const calcSMA = (arr: number[], period: number): number[] => {
     const result: number[] = [];
@@ -517,12 +518,14 @@ async function computeRotationData(): Promise<any> {
       isNaN(ratioSMA[i]) ? NaN : (r / ratioSMA[i]) * 100
     );
 
-    const rsMomentum: number[] = rsRatio.map((r, i) => {
+    const rawMomentum: number[] = rsRatio.map((r, i) => {
       if (isNaN(r) || i < MOM_PERIOD) return NaN;
       const prev = rsRatio[i - MOM_PERIOD];
       if (isNaN(prev) || prev === 0) return NaN;
       return ((r - prev) / prev) * 100;
     });
+
+    const rsMomentum = rawMomentum.map(m => isNaN(m) ? NaN : m * MOM_SCALE);
 
     const validPairs: Array<{ date: string; rsRatio: number; rsMomentum: number }> = [];
     for (let i = 0; i < rsRatio.length; i++) {
