@@ -126,7 +126,19 @@ export function SectorRotation() {
     );
   }
 
-  if (!chartData) return null;
+  if (!chartData) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="section-title mb-4" data-testid="text-rotation-title">Sector Rotation</div>
+        <div className="glass-card rounded-xl p-5 flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="text-white/30 text-xs font-medium mb-1">RRG Chart</div>
+            <div className="text-white/15 text-[10px]">Warming up rotation data...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const { typedSectors, rsMin, rsMax, momMin, momMax } = chartData;
 
