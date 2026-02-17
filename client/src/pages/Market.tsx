@@ -227,16 +227,32 @@ export default function Market() {
 
   const isAdminUser = user?.id === ADMIN_ID;
   const megatrends = Array.isArray(megatrendData) ? megatrendData : [];
-  const megatrendNames = new Set<string>();
+  const megatrendNames = new Set(megatrends.map((mt: any) => mt.name));
 
   const allIndustries = Array.isArray(perfData?.industries) ? perfData.industries : [];
   const industries = allIndustries.filter((ind: any) =>
     ind.dailyChange !== 0 || ind.weeklyChange !== 0 || ind.monthlyChange !== 0 || ind.quarterChange !== 0
   );
 
-  const sorted = [...industries].sort((a: any, b: any) => getChange(b, tf) - getChange(a, tf));
+  const megatrendItems = megatrends.map((mt: any) => ({
+    name: mt.name,
+    megatrendId: mt.id,
+    dailyChange: mt.dailyChange || 0,
+    weeklyChange: mt.weeklyChange || 0,
+    monthlyChange: mt.monthlyChange || 0,
+    quarterChange: mt.quarterChange || 0,
+    halfChange: mt.halfChange || 0,
+    yearlyChange: mt.yearlyChange || 0,
+    ytdChange: mt.ytdChange || 0,
+    sector: 'Megatrend',
+    isMegatrend: true,
+  }));
+
+  const combined = [...industries, ...megatrendItems];
+
+  const sorted = [...combined].sort((a: any, b: any) => getChange(b, tf) - getChange(a, tf));
   const top20 = sorted.slice(0, 20);
-  const bottom20 = [...industries].sort((a: any, b: any) => getChange(a, tf) - getChange(b, tf)).slice(0, 20);
+  const bottom20 = [...combined].sort((a: any, b: any) => getChange(a, tf) - getChange(b, tf)).slice(0, 20);
 
   const handleClickItem = (item: any) => {
     if (item.megatrendId) {
