@@ -15,6 +15,7 @@ import { sendAlert, clearFailures } from "./api/alerts";
 import { fetchEarningsCalendar, generateAiSummary, getEarningsDatesWithData } from "./api/earnings";
 import { getFirecrawlUsage } from "./api/transcripts";
 import { calculateCompressionScore } from "./api/compression-score";
+import { computeCompressionForSymbol, getCachedCSS, computeCSSBatch, warmUpCSSCache, isCSSBatchRunning, persistSingleCSSToDB, CSS_CACHE_PREFIX, CSS_PER_SYMBOL_TTL } from "./api/compression-batch";
 import { scrapeFinvizDigest, scrapeBriefingPreMarket, getPersistedDigest, scrapeDigestRaw, saveDigestFromRaw } from "./api/news-scrapers";
 import { getUncachableStripeClient, getStripePublishableKey } from "./stripe/stripeClient";
 import { db } from "./db";
@@ -601,6 +602,10 @@ function initBackgroundTasks() {
     if (warmCount > 0) {
       console.log(`[bg] Quality cache warm-up: loaded ${warmCount} persisted scores from DB into memory`);
     }
+    const cssWarmCount = await warmUpCSSCache();
+    if (cssWarmCount > 0) {
+      console.log(`[bg] CSS cache warm-up: loaded ${cssWarmCount} persisted compression scores from DB into memory`);
+    }
 
     console.log('[bg] Starting background data pre-computation...');
     const bgStart = Date.now();
@@ -785,8 +790,32 @@ function initBackgroundTasks() {
       } catch (err: any) {
         console.log(`[bg] Quality pre-compute error: ${err.message}`);
       }
+
+      try {
+        const cssRatings = getAllRSRatings();
+        const cssFinviz = getFinvizDataSync();
+        if (cssFinviz) {
+          const cssLookup: Record<string, number> = {};
+          for (const [_s, sd] of Object.entries(cssFinviz)) {
+            for (const [_i, stocks] of Object.entries(sd.stocks)) {
+              for (const stock of stocks) cssLookup[stock.symbol] = stock.marketCap;
+            }
+          }
+          const cssSymbols: string[] = [];
+          for (const [sym, rs] of Object.entries(cssRatings)) {
+            if (rs >= 80 && (cssLookup[sym] || 0) >= 300) cssSymbols.push(sym);
+          }
+          if (cssSymbols.length > 0) {
+            console.log(`[bg] Pre-computing compression scores for ${cssSymbols.length} leaders (RS>=80)...`);
+            const cssScores = await computeCSSBatch(cssSymbols);
+            console.log(`[bg] Compression scores pre-computed: ${Object.keys(cssScores).length} stocks in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+          }
+        }
+      } catch (err: any) {
+        console.log(`[bg] CSS pre-compute error: ${err.message}`);
+      }
     } else {
-      console.log(`[bg] Market closed — serving ${warmCount} quality scores from DB, skipping recomputation`);
+      console.log(`[bg] Market closed — serving ${warmCount} quality scores + ${cssWarmCount} CSS scores from DB, skipping recomputation`);
     }
   }, 1000);
 
@@ -932,12 +961,17 @@ function initBackgroundTasks() {
               const qScores = await computeLeadersQualityBatch(qSymbols);
               console.log(`[scheduler] Quality scores refreshed: ${Object.keys(qScores).length} stocks`);
             }
+
+            if (qSymbols.length > 0 && !isCSSBatchRunning()) {
+              const cssScores = await computeCSSBatch(qSymbols);
+              console.log(`[scheduler] Compression scores refreshed: ${Object.keys(cssScores).length} stocks`);
+            }
           }
         } catch (err: any) {
-          console.log(`[scheduler] Quality refresh error: ${err.message}`);
+          console.log(`[scheduler] Quality/CSS refresh error: ${err.message}`);
         }
       } else {
-        console.log(`[scheduler] Market closed — skipping quality score recomputation`);
+        console.log(`[scheduler] Market closed — skipping quality/CSS score recomputation`);
       }
 
       try {
@@ -1403,6 +1437,12 @@ export async function registerRoutes(
             console.log(`[warm-up] First API request — triggering background quality refresh for ${qSymbols.length} leaders`);
             computeLeadersQualityBatch(qSymbols).catch(err =>
               console.error(`[warm-up] Quality refresh failed: ${err.message}`)
+            );
+          }
+          if (qSymbols.length > 0 && !isCSSBatchRunning()) {
+            console.log(`[warm-up] First API request — triggering background CSS refresh for ${qSymbols.length} leaders`);
+            computeCSSBatch(qSymbols).catch(err =>
+              console.error(`[warm-up] CSS refresh failed: ${err.message}`)
             );
           }
         }
@@ -2442,59 +2482,17 @@ export async function registerRoutes(
     const { symbol } = req.params;
     const sym = symbol.toUpperCase();
 
-    const cacheKey = `compression_score_${sym}`;
-    const cached = getCached<any>(cacheKey);
+    const cached = getCachedCSS(sym);
     if (cached) return res.json(cached);
 
     try {
-      const stockSearch = searchStocks(sym, 1);
-      const finvizSector = stockSearch.length > 0 ? stockSearch[0].sector : '';
-      const mappedSector = FINVIZ_SECTOR_MAP[finvizSector] || finvizSector;
-      const sectorConfig = SECTORS_DATA.find(s => s.name === mappedSector);
-      const sectorEtfTicker = sectorConfig?.ticker || null;
-
-      const fetches: Promise<any>[] = [
-        yahoo.getHistory(sym, '1Y'),
-        yahoo.getHistory(sym, 'W').catch(() => []),
-        yahoo.getHistory('SPY', '1Y').catch(() => []),
-        getRSScore(sym).catch(() => 0),
-        sectorEtfTicker ? yahoo.getHistory(sectorEtfTicker, '1Y').catch(() => []) : Promise.resolve([]),
-      ];
-
-      const [dailyHist, weeklyHist, spyHist, rsRating, sectorHist] = await Promise.all(fetches);
-
-      if (!dailyHist || dailyHist.length < 50) {
-        return res.json({ error: 'Insufficient data', normalizedScore: 0, stars: 0, label: 'No Signal', starsDisplay: '\u2606\u2606\u2606\u2606\u2606 (0/99)', categoryScores: {}, rulesDetail: [], dangerSignals: ['Insufficient data'], penalties: 0, rawScore: 0, maxPossible: 115 });
-      }
-
-      const toOHLCV = (d: any) => ({ date: d.time, open: d.open, high: d.high, low: d.low, close: d.close, volume: d.volume });
-      const dailyData = dailyHist.map(toOHLCV);
-      const weeklyData = weeklyHist.length > 0 ? weeklyHist.map(toOHLCV) : null;
-
-      let marketData = null;
-      const spyClosesArr: number[] = spyHist.length > 0 ? spyHist.map((d: any) => d.close) : [];
-      if (spyClosesArr.length >= 200) {
-        const spySma50 = spyClosesArr.slice(-50).reduce((a: number, b: number) => a + b, 0) / 50;
-        const spySma200 = spyClosesArr.slice(-200).reduce((a: number, b: number) => a + b, 0) / 200;
-        marketData = { close: spyClosesArr[spyClosesArr.length - 1], sma50: spySma50, sma200: spySma200 };
-      }
-
-      let sectorData = null;
-      if (sectorHist && sectorHist.length >= 60) {
-        const secCloses = sectorHist.map((d: any) => d.close);
-        const secSma50 = secCloses.slice(-50).reduce((a: number, b: number) => a + b, 0) / Math.min(50, secCloses.length);
-        const secClose = secCloses[secCloses.length - 1];
-        const secClose60dAgo = secCloses.length >= 60 ? secCloses[secCloses.length - 60] : secCloses[0];
-        sectorData = { close: secClose, sma50: secSma50, close60dAgo: secClose60dAgo };
-      }
-
-      const result = calculateCompressionScore(dailyData, weeklyData, marketData, sectorData, rsRating, spyClosesArr.length > 0 ? spyClosesArr : null);
-
-      setCache(cacheKey, result, CACHE_TTL.HISTORY);
+      const result = await computeCompressionForSymbol(sym);
+      setCache(`${CSS_CACHE_PREFIX}${sym}`, result, CSS_PER_SYMBOL_TTL);
+      persistSingleCSSToDB(sym, result).catch(() => {});
       return res.json(result);
     } catch (e: any) {
       console.error(`Compression score error for ${symbol}:`, e.message);
-      const stale = getStale<any>(cacheKey);
+      const stale = getStale<any>(`${CSS_CACHE_PREFIX}${sym}`);
       if (stale) return res.json(stale);
       return res.json({ error: e.message, normalizedScore: 0, stars: 0, label: 'No Signal', starsDisplay: '\u2606\u2606\u2606\u2606\u2606 (0/99)', categoryScores: {}, rulesDetail: [], dangerSignals: [], penalties: 0, rawScore: 0, maxPossible: 115 });
     }

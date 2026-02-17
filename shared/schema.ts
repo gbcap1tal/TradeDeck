@@ -70,6 +70,15 @@ export const qualityScoresCache = pgTable("quality_scores_cache", {
 
 export type QualityScoreCache = typeof qualityScoresCache.$inferSelect;
 
+export const compressionScoresCache = pgTable("compression_scores_cache", {
+  symbol: varchar("symbol", { length: 20 }).primaryKey(),
+  score: real("score").notNull(),
+  data: text("data"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type CompressionScoreCache = typeof compressionScoresCache.$inferSelect;
+
 export const epScores = pgTable("ep_scores", {
   id: serial("id").primaryKey(),
   earningsReportId: integer("earnings_report_id").notNull().references(() => earningsReports.id, { onDelete: 'cascade' }),
