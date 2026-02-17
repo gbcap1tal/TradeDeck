@@ -184,7 +184,7 @@ function highlightTickers(text: string, onTickerClick: (ticker: string) => void,
         part.isTicker ? (
           <span
             key={i}
-            className="text-[#0a84ff] font-semibold cursor-pointer hover:underline"
+            className="text-[#fcbb0b] font-semibold cursor-pointer hover:underline"
             onClick={(e) => {
               e.stopPropagation();
               onTickerClick(part.ticker!);
@@ -454,12 +454,12 @@ export default function News() {
                             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                               {entry.ticker && !isSummary && (
                                 <span
-                                  className="text-[12px] font-bold text-[#0a84ff] cursor-pointer hover:underline"
+                                  className="text-[12px] font-bold text-[#fcbb0b] cursor-pointer hover:underline"
                                   onClick={() => goToStock(entry.ticker)}
                                   data-testid={`premarket-ticker-${entry.ticker}`}
                                 >
                                   {premarketSearch.trim() && entry.ticker.toUpperCase().includes(premarketSearch.trim().toUpperCase()) ? (
-                                    <mark className="bg-yellow-400/25 text-[#0a84ff] rounded-sm px-0.5">{entry.ticker}</mark>
+                                    <mark className="bg-yellow-400/25 text-[#fcbb0b] rounded-sm px-0.5">{entry.ticker}</mark>
                                   ) : entry.ticker}
                                 </span>
                               )}
