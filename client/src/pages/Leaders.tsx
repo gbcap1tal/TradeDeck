@@ -39,25 +39,26 @@ const RS_OPTIONS = [
   { label: '60+', value: 60 },
   { label: '55+', value: 55 },
   { label: '50+', value: 50 },
+  { label: 'Any', value: 0 },
 ];
 
 const QUALITY_OPTIONS = [
-  { label: 'Any', value: 0 },
   { label: '9+', value: 9 },
   { label: '8+', value: 8 },
   { label: '7+', value: 7 },
   { label: '6+', value: 6 },
   { label: '5+', value: 5 },
+  { label: 'Any', value: 0 },
 ];
 
 const CS_OPTIONS = [
-  { label: 'Any', value: 0 },
   { label: '70+', value: 70 },
   { label: '60+', value: 60 },
   { label: '50+', value: 50 },
   { label: '40+', value: 40 },
   { label: '30+', value: 30 },
   { label: '20+', value: 20 },
+  { label: 'Any', value: 0 },
 ];
 
 const MCAP_OPTIONS = [
