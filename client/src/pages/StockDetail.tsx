@@ -286,13 +286,13 @@ function CompressionScoreSection({ symbol }: { symbol: string }) {
 
   if (!css || css.error) return null;
 
-  const scoreColor = 'text-[#ffd60a]';
+  const scoreColor = 'text-[#fcbb0b]';
 
-  const starFillColor = '#ffd60a';
+  const starFillColor = '#fcbb0b';
   const starEmptyColor = '#ffffff15';
 
   const barWidth = `${Math.max(2, css.normalizedScore)}%`;
-  const barColor = 'bg-[#ffd60a]';
+  const barColor = 'bg-[#fcbb0b]';
 
   const categories = css.categoryScores ? Object.values(css.categoryScores) as Array<{ name: string; score: number; maxScore: number; maxAvailable: number }> : [];
 
