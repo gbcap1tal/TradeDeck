@@ -322,7 +322,7 @@ function CompressionScoreSection({ symbol }: { symbol: string }) {
             <div className="p-3 border-b border-white/[0.06]">
               <div className="flex items-center justify-between">
                 <span className="text-[13px] font-semibold text-white/90">Score Breakdown</span>
-                <span className={cn("text-[13px] font-bold font-mono-nums", scoreColor)}>{css.normalizedScore}/99</span>
+                <span className="text-[13px] font-bold font-mono-nums text-white/90">{css.normalizedScore}/99</span>
               </div>
             </div>
             <div className="p-3 space-y-3 max-h-[300px] overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
@@ -330,7 +330,7 @@ function CompressionScoreSection({ symbol }: { symbol: string }) {
                 {categories.map((cat) => {
                   const effectiveMax = cat.maxAvailable > 0 ? cat.maxAvailable : cat.maxScore;
                   const pct = effectiveMax > 0 ? (cat.score / effectiveMax) * 100 : 0;
-                  const catBarColor = 'bg-[#ffd60a]';
+                  const catBarColor = pct >= 70 ? 'bg-[#30d158]/60' : pct >= 40 ? 'bg-[#ffd60a]/60' : 'bg-[#ff453a]/40';
                   return (
                     <div key={cat.name}>
                       <div className="flex items-center justify-between mb-0.5">
