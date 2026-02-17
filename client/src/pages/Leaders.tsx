@@ -367,35 +367,35 @@ export default function Leaders() {
                       Industry<SortIcon field="industry" />
                     </th>
                     <th
-                      className="text-right px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold cursor-pointer select-none"
+                      className="text-right px-4 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold cursor-pointer select-none w-[70px]"
                       onClick={() => handleSort('rsRating')}
                       data-testid="th-rs"
                     >
                       RS<SortIcon field="rsRating" />
                     </th>
                     <th
-                      className="text-right px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold cursor-pointer select-none"
+                      className="text-right px-4 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold cursor-pointer select-none w-[80px]"
                       onClick={() => handleSort('qualityScore')}
                       data-testid="th-quality"
                     >
                       Quality<SortIcon field="qualityScore" />
                     </th>
                     <th
-                      className="text-right px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold cursor-pointer select-none"
+                      className="text-right px-4 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold cursor-pointer select-none w-[60px]"
                       onClick={() => handleSort('compressionScore')}
                       data-testid="th-cs"
                     >
                       CS<SortIcon field="compressionScore" />
                     </th>
                     <th
-                      className="text-right px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold cursor-pointer select-none"
+                      className="text-right px-4 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold cursor-pointer select-none w-[75px]"
                       onClick={() => handleSort('changePercent')}
                       data-testid="th-change"
                     >
                       Chg%<SortIcon field="changePercent" />
                     </th>
                     <th
-                      className="text-right px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold cursor-pointer select-none"
+                      className="text-right px-4 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold cursor-pointer select-none w-[80px]"
                       onClick={() => handleSort('marketCap')}
                       data-testid="th-mcap"
                     >
@@ -428,7 +428,7 @@ export default function Leaders() {
                       <td className="px-3 py-2">
                         <span className="text-[11px] text-white/40 whitespace-nowrap" data-testid={`text-industry-${stock.symbol}`}>{stock.industry}</span>
                       </td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-4 py-2 text-right">
                         <span className={cn(
                           "text-[13px] font-bold tabular-nums",
                           stock.rsRating >= 95 ? "text-[#30d158]" : stock.rsRating >= 90 ? "text-[#30d158]/80" : "text-white/70"
@@ -436,7 +436,7 @@ export default function Leaders() {
                           {stock.rsRating}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-4 py-2 text-right">
                         {stock.qualityScore != null ? (
                           <span className="text-[12px] font-semibold tabular-nums" style={{ color: qualityColor(stock.qualityScore) }} data-testid={`text-quality-${stock.symbol}`}>
                             {stock.qualityScore.toFixed(1)}
@@ -445,19 +445,16 @@ export default function Leaders() {
                           <span className="text-[11px] text-white/15" data-testid={`text-quality-${stock.symbol}`}>--</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-4 py-2 text-right">
                         {stock.compressionScore != null ? (
-                          <span className={cn(
-                            "text-[12px] font-semibold tabular-nums",
-                            stock.compressionScore >= 80 ? "text-[#30d158]" : stock.compressionScore >= 60 ? "text-[#0a84ff]" : stock.compressionScore >= 40 ? "text-[#ffd60a]" : "text-white/70"
-                          )} data-testid={`text-cs-${stock.symbol}`}>
+                          <span className="text-[12px] font-semibold tabular-nums text-[#fcbb0b]" data-testid={`text-cs-${stock.symbol}`}>
                             {stock.compressionScore}
                           </span>
                         ) : (
                           <span className="text-[11px] text-white/15" data-testid={`text-cs-${stock.symbol}`}>--</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-4 py-2 text-right">
                         <span className={cn(
                           "text-[12px] font-medium tabular-nums",
                           stock.changePercent > 0 ? "text-[#30d158]" : stock.changePercent < 0 ? "text-[#ff453a]" : "text-white/50"
@@ -465,7 +462,7 @@ export default function Leaders() {
                           {stock.changePercent > 0 ? '+' : ''}{stock.changePercent.toFixed(1)}%
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-right">
+                      <td className="px-4 py-2 text-right">
                         <span className="text-[12px] text-white/50 tabular-nums whitespace-nowrap" data-testid={`text-mcap-${stock.symbol}`}>{formatMcap(stock.marketCap)}</span>
                       </td>
                     </tr>
