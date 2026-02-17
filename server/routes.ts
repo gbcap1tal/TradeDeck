@@ -6,7 +6,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import * as yahoo from "./api/yahoo";
 import * as fmp from "./api/fmp";
 import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL } from "./api/cache";
-import { SECTORS_DATA, INDUSTRY_ETF_MAP } from "./data/sectors";
+import { SECTORS_DATA, INDUSTRY_ETF_MAP, FINVIZ_SECTOR_MAP } from "./data/sectors";
 import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe, isUSMarketOpen, getFrozenBreadth, getTrendStatus } from "./api/breadth";
 import { getRSScore, getAllRSRatings } from "./api/rs";
@@ -2447,12 +2447,21 @@ export async function registerRoutes(
     if (cached) return res.json(cached);
 
     try {
-      const [dailyHist, weeklyHist, spyHist, rsRating] = await Promise.all([
+      const stockSearch = searchStocks(sym, 1);
+      const finvizSector = stockSearch.length > 0 ? stockSearch[0].sector : '';
+      const mappedSector = FINVIZ_SECTOR_MAP[finvizSector] || finvizSector;
+      const sectorConfig = SECTORS_DATA.find(s => s.name === mappedSector);
+      const sectorEtfTicker = sectorConfig?.ticker || null;
+
+      const fetches: Promise<any>[] = [
         yahoo.getHistory(sym, '1Y'),
         yahoo.getHistory(sym, 'W').catch(() => []),
         yahoo.getHistory('SPY', '1Y').catch(() => []),
         getRSScore(sym).catch(() => 0),
-      ]);
+        sectorEtfTicker ? yahoo.getHistory(sectorEtfTicker, '1Y').catch(() => []) : Promise.resolve([]),
+      ];
+
+      const [dailyHist, weeklyHist, spyHist, rsRating, sectorHist] = await Promise.all(fetches);
 
       if (!dailyHist || dailyHist.length < 50) {
         return res.json({ error: 'Insufficient data', normalizedScore: 0, stars: 0, label: 'No Signal', starsDisplay: '\u2606\u2606\u2606\u2606\u2606 (0/99)', categoryScores: {}, rulesDetail: [], dangerSignals: ['Insufficient data'], penalties: 0, rawScore: 0, maxPossible: 115 });
@@ -2463,14 +2472,23 @@ export async function registerRoutes(
       const weeklyData = weeklyHist.length > 0 ? weeklyHist.map(toOHLCV) : null;
 
       let marketData = null;
-      if (spyHist.length >= 200) {
-        const spyCloses = spyHist.map((d: any) => d.close);
-        const spySma50 = spyCloses.slice(-50).reduce((a: number, b: number) => a + b, 0) / 50;
-        const spySma200 = spyCloses.slice(-200).reduce((a: number, b: number) => a + b, 0) / 200;
-        marketData = { close: spyCloses[spyCloses.length - 1], sma50: spySma50, sma200: spySma200 };
+      const spyClosesArr: number[] = spyHist.length > 0 ? spyHist.map((d: any) => d.close) : [];
+      if (spyClosesArr.length >= 200) {
+        const spySma50 = spyClosesArr.slice(-50).reduce((a: number, b: number) => a + b, 0) / 50;
+        const spySma200 = spyClosesArr.slice(-200).reduce((a: number, b: number) => a + b, 0) / 200;
+        marketData = { close: spyClosesArr[spyClosesArr.length - 1], sma50: spySma50, sma200: spySma200 };
       }
 
-      const result = calculateCompressionScore(dailyData, weeklyData, marketData, null, rsRating);
+      let sectorData = null;
+      if (sectorHist && sectorHist.length >= 60) {
+        const secCloses = sectorHist.map((d: any) => d.close);
+        const secSma50 = secCloses.slice(-50).reduce((a: number, b: number) => a + b, 0) / Math.min(50, secCloses.length);
+        const secClose = secCloses[secCloses.length - 1];
+        const secClose60dAgo = secCloses.length >= 60 ? secCloses[secCloses.length - 60] : secCloses[0];
+        sectorData = { close: secClose, sma50: secSma50, close60dAgo: secClose60dAgo };
+      }
+
+      const result = calculateCompressionScore(dailyData, weeklyData, marketData, sectorData, rsRating, spyClosesArr.length > 0 ? spyClosesArr : null);
 
       setCache(cacheKey, result, CACHE_TTL.HISTORY);
       return res.json(result);

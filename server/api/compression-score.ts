@@ -123,6 +123,7 @@ export function calculateCompressionScore(
   marketData: { close: number; sma50: number; sma200: number } | null = null,
   sectorData: { close: number; sma50: number; close60dAgo: number } | null = null,
   rsRating: number = 0,
+  spyCloses: number[] | null = null,
 ): CompressionResult {
   const rules: RuleResult[] = [];
   const dangerSignals: string[] = [];
@@ -400,14 +401,23 @@ export function calculateCompressionScore(
   else if (rsRating >= 80) rs1 = 2.0;
   addRule('RS1', 'RS rating top 20%', 'Relative Strength', rs1, 3, rsRating > 0);
 
-  // RS2: RS line at new highs (vs SPX)
+  // RS2: RS line at new highs (vs SPY)
   let rs2 = 0;
-  if (marketData && closes.length >= 252) {
-    const rsLineNow = marketData.close > 0 ? close / marketData.close : 0;
-    addRule('RS2', 'RS line at new highs', 'Relative Strength', rs2, 3, false);
-  } else {
-    addRule('RS2', 'RS line at new highs', 'Relative Strength', 0, 3, false);
+  const hasRsLineData = spyCloses != null && spyCloses.length >= 50 && closes.length >= 50;
+  if (hasRsLineData) {
+    const minLen = Math.min(closes.length, spyCloses!.length);
+    const stockSlice = closes.slice(-minLen);
+    const spySlice = spyCloses!.slice(-minLen);
+    const rsLine: number[] = [];
+    for (let i = 0; i < minLen; i++) {
+      rsLine.push(spySlice[i] > 0 ? stockSlice[i] / spySlice[i] : 0);
+    }
+    const rsLineNow = rsLine[rsLine.length - 1];
+    const rsLineMax252 = Math.max(...rsLine.slice(-Math.min(252, rsLine.length)));
+    if (rsLineMax252 > 0 && rsLineNow >= rsLineMax252 * 0.98) rs2 = 3.0;
+    else if (rsLineMax252 > 0 && rsLineNow >= rsLineMax252 * 0.95) rs2 = 1.5;
   }
+  addRule('RS2', 'RS line at new highs', 'Relative Strength', rs2, 3, hasRsLineData);
 
   // RS3: Outperforming sector
   let rs3 = 0;
@@ -455,7 +465,21 @@ export function calculateCompressionScore(
   addRule('B3', 'Flat base range < 15%', 'Base Structure', b3, 2, true);
 
   // B4: Higher lows in base
-  const swingLowsBase = detectSwingLows(closes.slice(-baseDays > 10 ? -baseDays : -20), 3);
+  const baseLookback = Math.max(baseDays, 30);
+  const baseLows = lows.slice(-baseLookback);
+  let swingLowsBase = detectSwingLows(baseLows, 3);
+  if (swingLowsBase.length < 2) swingLowsBase = detectSwingLows(baseLows, 2);
+  if (swingLowsBase.length < 2) {
+    const weeklyLows = (weeklyData || []).slice(-8).map(w => w.low);
+    swingLowsBase = detectSwingLows(weeklyLows, 1);
+  }
+  if (swingLowsBase.length < 2 && baseLows.length >= 10) {
+    const third = Math.floor(baseLows.length / 3);
+    const low1 = Math.min(...baseLows.slice(0, third));
+    const low2 = Math.min(...baseLows.slice(third, third * 2));
+    const low3 = Math.min(...baseLows.slice(third * 2));
+    swingLowsBase = [low1, low2, low3];
+  }
   const hasHigherLows = swingLowsBase.length >= 2 && swingLowsBase.every((v, i) => i === 0 || v > swingLowsBase[i - 1]);
   const b4 = hasHigherLows ? 2.0 : 0.0;
   addRule('B4', 'Higher lows in base', 'Base Structure', b4, 2, swingLowsBase.length >= 2);
