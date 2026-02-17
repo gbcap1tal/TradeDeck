@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import { Search, X, ChevronUp, ChevronDown, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface Leader {
@@ -29,23 +28,58 @@ function compositeScore(rs: number, quality?: number): number {
 }
 
 const RS_OPTIONS = [
-  { label: '99', value: '99' },
-  { label: '95+', value: '95' },
-  { label: '90+', value: '90' },
-  { label: '85+', value: '85' },
-  { label: '80+', value: '80' },
+  { label: '99', value: 99 },
+  { label: '95+', value: 95 },
+  { label: '90+', value: 90 },
+  { label: '85+', value: 85 },
+  { label: '80+', value: 80 },
+  { label: '75+', value: 75 },
+  { label: '70+', value: 70 },
+  { label: '65+', value: 65 },
+  { label: '60+', value: 60 },
+  { label: '55+', value: 55 },
+  { label: '50+', value: 50 },
 ];
 
 const QUALITY_OPTIONS = [
-  { label: 'Any', value: '0' },
-  { label: '5+', value: '5' },
-  { label: '6+', value: '6' },
-  { label: '7+', value: '7' },
-  { label: '8+', value: '8' },
+  { label: 'Any', value: 0 },
+  { label: '5+', value: 5 },
+  { label: '6+', value: 6 },
+  { label: '7+', value: 7 },
+  { label: '8+', value: 8 },
+  { label: '9+', value: 9 },
 ];
 
+const CS_OPTIONS = [
+  { label: 'Any', value: 0 },
+  { label: '20+', value: 20 },
+  { label: '30+', value: 30 },
+  { label: '40+', value: 40 },
+  { label: '50+', value: 50 },
+  { label: '60+', value: 60 },
+  { label: '70+', value: 70 },
+];
+
+const MCAP_OPTIONS = [
+  { label: 'Nano (<$300M)', key: 'nano' },
+  { label: 'Micro ($300M-$2B)', key: 'micro' },
+  { label: 'Small ($2B-$10B)', key: 'small' },
+  { label: 'Mid ($10B-$50B)', key: 'mid' },
+  { label: 'Large ($50B-$200B)', key: 'large' },
+  { label: 'Mega ($200B+)', key: 'mega' },
+];
+
+const MCAP_RANGES: Record<string, [number, number]> = {
+  nano: [0, 300e6],
+  micro: [300e6, 2e9],
+  small: [2e9, 10e9],
+  mid: [10e9, 50e9],
+  large: [50e9, 200e9],
+  mega: [200e9, Infinity],
+};
+
 const SECTORS = [
-  'All Sectors', 'Technology', 'Healthcare', 'Industrials', 'Consumer Cyclical',
+  'Technology', 'Healthcare', 'Industrials', 'Consumer Cyclical',
   'Financial', 'Energy', 'Materials', 'Consumer Defensive', 'Communication Services',
   'Utilities', 'Real Estate'
 ];
@@ -61,19 +95,87 @@ function qualityColor(_score: number): string {
   return 'rgba(255,255,255,0.85)';
 }
 
+function MultiSelectFilter({ label, options, selected, onToggle, onClear, testId }: {
+  label: string;
+  options: { label: string; value: number }[];
+  selected: number[];
+  onToggle: (v: number) => void;
+  onClear: () => void;
+  testId: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const displayLabel = selected.length === 0 ? 'Any'
+    : selected.length === 1 ? options.find(o => o.value === selected[0])?.label ?? String(selected[0])
+    : `${selected.length} selected`;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[12px] bg-white/5 border border-white/10 text-white"
+          data-testid={testId}
+        >
+          <span className="text-white/40">{label}</span>
+          <span className="truncate max-w-[80px]">{displayLabel}</span>
+          <ChevronDown className="w-3.5 h-3.5 text-white/30 shrink-0" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[180px] p-1.5 bg-[#1a1a1a] border-white/10">
+        <div className="flex items-center justify-between px-2 py-1 mb-1">
+          <span className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">{label}</span>
+          {selected.length > 0 && (
+            <button className="text-[10px] text-white/40 hover:text-white/60" onClick={onClear}>Clear</button>
+          )}
+        </div>
+        {options.map(o => (
+          <button
+            key={o.value}
+            className={cn(
+              "flex items-center gap-2 w-full px-2 py-1.5 rounded text-[12px] text-left transition-colors",
+              selected.includes(o.value) ? "text-white bg-white/10" : "text-white/60 hover:bg-white/5"
+            )}
+            onClick={() => onToggle(o.value)}
+            data-testid={`${testId}-${o.value}`}
+          >
+            <div className={cn(
+              "w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0",
+              selected.includes(o.value) ? "bg-white/20 border-white/30" : "border-white/15"
+            )}>
+              {selected.includes(o.value) && <Check className="w-2.5 h-2.5 text-white" />}
+            </div>
+            <span>{o.label}</span>
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export default function Leaders() {
   const [, navigate] = useLocation();
-  const [minRS, setMinRS] = useState(90);
+  const [selectedRS, setSelectedRS] = useState<number[]>([90]);
   const [search, setSearch] = useState('');
   const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
-  const [minQuality, setMinQuality] = useState(0);
+  const [selectedQuality, setSelectedQuality] = useState<number[]>([]);
+  const [selectedCS, setSelectedCS] = useState<number[]>([]);
+  const [selectedMcap, setSelectedMcap] = useState<string[]>([]);
   const [sectorOpen, setSectorOpen] = useState(false);
+  const [mcapOpen, setMcapOpen] = useState(false);
 
   const toggleSector = (sector: string) => {
     setSelectedSectors(prev =>
       prev.includes(sector) ? prev.filter(s => s !== sector) : [...prev, sector]
     );
   };
+  const toggleMcap = (key: string) => {
+    setSelectedMcap(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  };
+  const toggleNumeric = (setter: React.Dispatch<React.SetStateAction<number[]>>) => (v: number) => {
+    setter(prev => prev.includes(v) ? prev.filter(x => x !== v) : [...prev, v]);
+  };
+
+  const minRS = selectedRS.length > 0 ? Math.min(...selectedRS) : 50;
   const [sortField, setSortField] = useState<SortField>('composite');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
@@ -118,12 +220,32 @@ export default function Leaders() {
     if (leadersWithQuality.length === 0) return [];
     let list = leadersWithQuality;
 
+    if (selectedRS.length > 0) {
+      const rsMin = Math.min(...selectedRS);
+      list = list.filter(l => l.rsRating >= rsMin);
+    }
+
     if (selectedSectors.length > 0) {
       list = list.filter(l => selectedSectors.includes(l.sector));
     }
 
-    if (minQuality > 0) {
-      list = list.filter(l => l.qualityScore != null && l.qualityScore >= minQuality);
+    if (selectedMcap.length > 0) {
+      list = list.filter(l => {
+        return selectedMcap.some(key => {
+          const [lo, hi] = MCAP_RANGES[key];
+          return l.marketCap >= lo && l.marketCap < hi;
+        });
+      });
+    }
+
+    if (selectedQuality.length > 0) {
+      const qMin = Math.min(...selectedQuality);
+      list = list.filter(l => l.qualityScore != null && l.qualityScore >= qMin);
+    }
+
+    if (selectedCS.length > 0) {
+      const csMin = Math.min(...selectedCS);
+      list = list.filter(l => l.compressionScore != null && l.compressionScore >= csMin);
     }
 
     if (search.trim()) {
@@ -152,7 +274,7 @@ export default function Leaders() {
     });
 
     return list;
-  }, [leadersWithQuality, selectedSectors, minQuality, search, sortField, sortDir, scoresReady]);
+  }, [leadersWithQuality, selectedRS, selectedSectors, selectedMcap, selectedQuality, selectedCS, search, sortField, sortDir, scoresReady]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -190,9 +312,7 @@ export default function Leaders() {
             </h1>
             <p className="text-[12px] text-white/40 mt-0.5" data-testid="text-leaders-subtitle">
               {isLoading ? 'Loading...' : `${filtered.length} stocks with RS ${minRS}+`}
-              {!isLoading && !scoresReady ? ' · sorting by quality...' : ''}
-              {selectedSectors.length > 0 ? ` in ${selectedSectors.length === 1 ? selectedSectors[0] : `${selectedSectors.length} sectors`}` : ''}
-              {minQuality > 0 ? ` · Quality ${minQuality}+` : ''}
+              {!isLoading && !scoresReady ? ' · loading scores...' : ''}
             </p>
           </div>
         </div>
@@ -220,28 +340,20 @@ export default function Leaders() {
             )}
           </div>
 
-          <Select value={String(minRS)} onValueChange={(v) => setMinRS(Number(v))}>
-            <SelectTrigger
-              className="w-auto min-w-[90px] h-8 text-[12px] bg-white/5 border-white/10 text-white gap-1"
-              data-testid="select-rs-filter"
-            >
-              <span className="text-white/40 mr-0.5">RS</span>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {RS_OPTIONS.map(o => (
-                <SelectItem key={o.value} value={o.value} data-testid={`option-rs-${o.value}`}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <MultiSelectFilter
+            label="RS"
+            options={RS_OPTIONS}
+            selected={selectedRS}
+            onToggle={toggleNumeric(setSelectedRS)}
+            onClear={() => setSelectedRS([])}
+            testId="filter-rs"
+          />
 
           <Popover open={sectorOpen} onOpenChange={setSectorOpen}>
             <PopoverTrigger asChild>
               <button
                 className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[12px] bg-white/5 border border-white/10 text-white"
-                data-testid="select-sector-filter"
+                data-testid="filter-sector"
               >
                 <span className="text-white/40">Sector</span>
                 <span className="truncate max-w-[120px]">
@@ -254,16 +366,10 @@ export default function Leaders() {
               <div className="flex items-center justify-between px-2 py-1 mb-1">
                 <span className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Sectors</span>
                 {selectedSectors.length > 0 && (
-                  <button
-                    className="text-[10px] text-white/40 hover:text-white/60"
-                    onClick={() => setSelectedSectors([])}
-                    data-testid="button-clear-sectors"
-                  >
-                    Clear
-                  </button>
+                  <button className="text-[10px] text-white/40 hover:text-white/60" onClick={() => setSelectedSectors([])} data-testid="button-clear-sectors">Clear</button>
                 )}
               </div>
-              {SECTORS.filter(s => s !== 'All Sectors' && (sectorCounts[s] || 0) > 0).map(s => (
+              {SECTORS.filter(s => (sectorCounts[s] || 0) > 0).map(s => (
                 <button
                   key={s}
                   className={cn(
@@ -271,7 +377,7 @@ export default function Leaders() {
                     selectedSectors.includes(s) ? "text-white bg-white/10" : "text-white/60 hover:bg-white/5"
                   )}
                   onClick={() => toggleSector(s)}
-                  data-testid={`option-sector-${s.replace(/\s+/g, '-')}`}
+                  data-testid={`filter-sector-${s.replace(/\s+/g, '-')}`}
                 >
                   <div className={cn(
                     "w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0",
@@ -286,31 +392,77 @@ export default function Leaders() {
             </PopoverContent>
           </Popover>
 
-          <Select value={String(minQuality)} onValueChange={(v) => setMinQuality(Number(v))}>
-            <SelectTrigger
-              className="w-auto min-w-[100px] h-8 text-[12px] bg-white/5 border-white/10 text-white gap-1"
-              data-testid="select-quality-filter"
-            >
-              <span className="text-white/40 mr-0.5">Quality</span>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {QUALITY_OPTIONS.map(o => (
-                <SelectItem key={o.value} value={o.value} data-testid={`option-quality-${o.value}`}>
-                  {o.label}
-                </SelectItem>
+          <Popover open={mcapOpen} onOpenChange={setMcapOpen}>
+            <PopoverTrigger asChild>
+              <button
+                className="inline-flex items-center gap-1 h-8 px-3 rounded-md text-[12px] bg-white/5 border border-white/10 text-white"
+                data-testid="filter-mcap"
+              >
+                <span className="text-white/40">Mkt Cap</span>
+                <span className="truncate max-w-[100px]">
+                  {selectedMcap.length === 0 ? 'All' : selectedMcap.length === 1 ? MCAP_OPTIONS.find(o => o.key === selectedMcap[0])?.label.split(' ')[0] : `${selectedMcap.length} selected`}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-white/30 shrink-0" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-[200px] p-1.5 bg-[#1a1a1a] border-white/10">
+              <div className="flex items-center justify-between px-2 py-1 mb-1">
+                <span className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Market Cap</span>
+                {selectedMcap.length > 0 && (
+                  <button className="text-[10px] text-white/40 hover:text-white/60" onClick={() => setSelectedMcap([])} data-testid="button-clear-mcap">Clear</button>
+                )}
+              </div>
+              {MCAP_OPTIONS.map(o => (
+                <button
+                  key={o.key}
+                  className={cn(
+                    "flex items-center gap-2 w-full px-2 py-1.5 rounded text-[12px] text-left transition-colors",
+                    selectedMcap.includes(o.key) ? "text-white bg-white/10" : "text-white/60 hover:bg-white/5"
+                  )}
+                  onClick={() => toggleMcap(o.key)}
+                  data-testid={`filter-mcap-${o.key}`}
+                >
+                  <div className={cn(
+                    "w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0",
+                    selectedMcap.includes(o.key) ? "bg-white/20 border-white/30" : "border-white/15"
+                  )}>
+                    {selectedMcap.includes(o.key) && <Check className="w-2.5 h-2.5 text-white" />}
+                  </div>
+                  <span className="truncate">{o.label}</span>
+                </button>
               ))}
-            </SelectContent>
-          </Select>
+            </PopoverContent>
+          </Popover>
 
-          {(selectedSectors.length > 0 || minQuality > 0 || search) && (
+          <MultiSelectFilter
+            label="Quality"
+            options={QUALITY_OPTIONS}
+            selected={selectedQuality}
+            onToggle={toggleNumeric(setSelectedQuality)}
+            onClear={() => setSelectedQuality([])}
+            testId="filter-quality"
+          />
+
+          <MultiSelectFilter
+            label="CS"
+            options={CS_OPTIONS}
+            selected={selectedCS}
+            onToggle={toggleNumeric(setSelectedCS)}
+            onClear={() => setSelectedCS([])}
+            testId="filter-cs"
+          />
+
+          {(selectedSectors.length > 0 || selectedQuality.length > 0 || selectedCS.length > 0 || selectedMcap.length > 0 || selectedRS.length > 0 || search) && (
             <Button
               variant="ghost"
               size="sm"
               className="text-[11px] text-white/40"
               onClick={() => {
+                setSelectedRS([90]);
                 setSelectedSectors([]);
-                setMinQuality(0);
+                setSelectedQuality([]);
+                setSelectedCS([]);
+                setSelectedMcap([]);
                 setSearch('');
               }}
               data-testid="button-clear-all-filters"
