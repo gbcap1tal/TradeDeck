@@ -14,7 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 const StockDetail = lazy(() => import("@/pages/StockDetail"));
 const SectorDetail = lazy(() => import("@/pages/SectorDetail"));
 const IndustryDetail = lazy(() => import("@/pages/IndustryDetail"));
-const Market = lazy(() => import("@/pages/Market"));
+const Megatrends = lazy(() => import("@/pages/Megatrends"));
 const MegatrendDetail = lazy(() => import("@/pages/MegatrendDetail"));
 const News = lazy(() => import("@/pages/News"));
 const Leaders = lazy(() => import("@/pages/Leaders"));
@@ -87,7 +87,7 @@ function ProtectedDashboard() { return <PaymentGate><Dashboard /></PaymentGate>;
 function ProtectedStockDetail() { return <PaymentGate><Suspense fallback={<PageLoader />}><StockDetail /></Suspense></PaymentGate>; }
 function ProtectedSectorDetail() { return <PaymentGate><Suspense fallback={<PageLoader />}><SectorDetail /></Suspense></PaymentGate>; }
 function ProtectedIndustryDetail() { return <PaymentGate><Suspense fallback={<PageLoader />}><IndustryDetail /></Suspense></PaymentGate>; }
-function ProtectedMarket() { return <PaymentGate><Suspense fallback={<PageLoader />}><Market /></Suspense></PaymentGate>; }
+function ProtectedMegatrends() { return <PaymentGate><Suspense fallback={<PageLoader />}><Megatrends /></Suspense></PaymentGate>; }
 function ProtectedMegatrendDetail() { return <PaymentGate><Suspense fallback={<PageLoader />}><MegatrendDetail /></Suspense></PaymentGate>; }
 function ProtectedNews() { return <PaymentGate><Suspense fallback={<PageLoader />}><News /></Suspense></PaymentGate>; }
 function ProtectedLeaders() { return <PaymentGate><Suspense fallback={<PageLoader />}><Leaders /></Suspense></PaymentGate>; }
@@ -110,7 +110,7 @@ function Router() {
         <Route path="/sectors/:sectorName/industries/:industryName" component={ProtectedIndustryDetail} />
         <Route path="/sectors/:sectorName" component={ProtectedSectorDetail} />
         <Route path="/megatrends/:id" component={ProtectedMegatrendDetail} />
-        <Route path="/markets" component={ProtectedMarket} />
+        <Route path="/markets" component={ProtectedMegatrends} />
         <Route path="/leaders" component={ProtectedLeaders} />
         <Route path="/earnings" component={ProtectedEarnings} />
         <Route path="/news" component={ProtectedNews} />
