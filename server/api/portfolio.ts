@@ -512,8 +512,13 @@ export async function deleteSetupTag(id: number, userId: string) {
 export async function getHoldingsDetail(userId: string) {
   const { getQuote, getWeinsteinStage, getEMAIndicators, getYearStartPrices } = await import('./yahoo');
   const { getRSRating } = await import('./rs');
-  const { getCachedScoreForSymbol, computeQualityScore } = await import('./quality');
   const { searchStocks } = await import('./finviz');
+  const { getCached } = await import('./cache');
+  const { computeStockQuality } = await import('./stock-quality');
+  const { scrapeFinvizQuote, scrapeFinvizInsiderBuying } = await import('./finviz');
+  const { getRSScore } = await import('./rs');
+  const yahoo = await import('./yahoo');
+  const fmp = await import('./fmp');
 
   const trades = await db.select().from(portfolioTrades)
     .where(eq(portfolioTrades.userId, userId))
@@ -574,11 +579,18 @@ export async function getHoldingsDetail(userId: string) {
     } catch {}
 
     const rs = getRSRating(ticker);
-    const quality = getCachedScoreForSymbol(ticker);
 
-    let qualityScore = quality;
-    if (qualityScore === undefined) {
-      try { qualityScore = await computeQualityScore(ticker); } catch { qualityScore = undefined; }
+    let qualityScore: number | null = null;
+    const cachedQualityResponse = getCached<any>(`quality_response_${ticker}_current`);
+    if (cachedQualityResponse?.qualityScore?.total != null) {
+      qualityScore = cachedQualityResponse.qualityScore.total;
+    } else {
+      try {
+        const qResult = await computeStockQuality(ticker, 'current', { scrapeFinvizQuote, scrapeFinvizInsiderBuying, yahoo, getRSScore, fmp });
+        if (qResult?.qualityScore?.total != null) {
+          qualityScore = qResult.qualityScore.total;
+        }
+      } catch {}
     }
 
     return {

@@ -606,10 +606,10 @@ function OverviewTab({ equityData, analytics, trades, config, showBenchmarks, se
                       <th className="text-right p-1.5 font-medium">YTD %</th>
                       <th className="text-right p-1.5 font-medium">Mkt Cap</th>
                       <th className="text-center p-1.5 font-medium">Stage</th>
-                      <th className="text-center p-1.5 font-medium">10e</th>
-                      <th className="text-center p-1.5 font-medium">20e</th>
-                      <th className="text-center p-1.5 font-medium">50s</th>
-                      <th className="text-center p-1.5 font-medium">200s</th>
+                      <th className="text-center p-1.5 font-medium">10ema</th>
+                      <th className="text-center p-1.5 font-medium">20ema</th>
+                      <th className="text-center p-1.5 font-medium">50sma</th>
+                      <th className="text-center p-1.5 font-medium">200sma</th>
                       <th className="text-right p-1.5 font-medium">RS</th>
                       <th className="text-right p-1.5 font-medium">QS</th>
                     </tr>
@@ -708,6 +708,7 @@ function TradesTab({ trades, isLoading, onEdit }: { trades: Trade[]; isLoading: 
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio/trades'] });
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio/equity'] });
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio/analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio/holdings-detail'] });
       toast({ title: "Trade deleted" });
     },
   });
@@ -718,6 +719,7 @@ function TradesTab({ trades, isLoading, onEdit }: { trades: Trade[]; isLoading: 
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio/trades'] });
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio/equity'] });
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio/analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio/holdings-detail'] });
       toast({ title: "All trades deleted" });
     },
   });
@@ -867,6 +869,7 @@ function PartialCloseDialog({ trade, onClose }: { trade: Trade | null; onClose: 
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio/trades'] });
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio/equity'] });
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio/analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio/holdings-detail'] });
       toast({ title: "Partial close recorded" });
       onClose();
     },
@@ -1146,6 +1149,7 @@ function TradeDialog({ open, onClose, editTrade, setupTags }: { open: boolean; o
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio/trades'] });
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio/equity'] });
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio/analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio/holdings-detail'] });
       toast({ title: "Trade added" });
       onClose();
     },
@@ -1158,6 +1162,7 @@ function TradeDialog({ open, onClose, editTrade, setupTags }: { open: boolean; o
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio/trades'] });
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio/equity'] });
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio/analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio/holdings-detail'] });
       toast({ title: "Trade updated" });
       onClose();
     },
@@ -1273,6 +1278,7 @@ function CsvUploadDialog({ open, onClose }: { open: boolean; onClose: () => void
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio/trades'] });
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio/equity'] });
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio/analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/portfolio/holdings-detail'] });
       toast({ title: `${data.imported} trades imported` });
       setCsvContent('');
       onClose();
