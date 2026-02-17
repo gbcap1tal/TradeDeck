@@ -154,6 +154,11 @@ export function useIndustryStocks(sectorName: string, industryName: string) {
 export function useMegatrends() {
   return useQuery({
     queryKey: ['/api/megatrends'],
+    queryFn: async () => {
+      const res = await fetch('/api/megatrends', { credentials: 'include' });
+      if (!res.ok) throw new Error(`Failed to fetch megatrends: ${res.status}`);
+      return res.json();
+    },
     refetchInterval: 120000,
     retry: 3,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
