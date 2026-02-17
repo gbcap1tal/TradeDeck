@@ -2508,17 +2508,13 @@ Keep the entire response under 1000 characters. Be concise, direct, and useful f
   app.get('/api/megatrends', async (req, res) => {
     try {
       const mts = await storage.getMegatrends();
-      let perfCached = getMegatrendPerfCached();
+      const perfCached = getMegatrendPerfCached();
       const finvizData = getFinvizDataSync();
 
       if (!perfCached && mts.length > 0) {
-        try {
-          const perfMap = await computeMegatrendPerformance();
-          perfCached = Object.fromEntries(perfMap);
-        } catch (compErr: any) {
-          console.error(`[api] Megatrend cold-cache computation failed: ${compErr.message}`);
-          sendAlert('Megatrend Performance Computation Failed', `On-demand megatrend performance computation failed (cold cache).\n\nError: ${compErr.message}`, 'megatrend_perf');
-        }
+        computeMegatrendPerformance().catch(err =>
+          console.error(`[api] Background megatrend perf computation failed: ${err.message}`)
+        );
       }
 
       const megatrendsWithPerf = mts.map(mt => {
