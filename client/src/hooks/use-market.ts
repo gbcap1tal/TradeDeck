@@ -24,11 +24,11 @@ export function useMarketIndices() {
       return data;
     },
     refetchInterval: 30000,
-    retry: (_failureCount, error) => {
-      if (error?.message === "Data warming up") return true;
-      return false;
+    retry: (failureCount, error) => {
+      if (error?.message === "Data warming up") return failureCount < 30;
+      return failureCount < 3;
     },
-    retryDelay: (attemptIndex) => Math.min(3000 * (attemptIndex + 1), 15000),
+    retryDelay: (attemptIndex) => Math.min(2000 * (attemptIndex + 1), 10000),
   });
 }
 
@@ -37,11 +37,11 @@ export function useSectorPerformance() {
     queryKey: ['/api/market/sectors'],
     queryFn: () => fetchWithWarmingRetry('/api/market/sectors'),
     refetchInterval: 120000,
-    retry: (_failureCount, error) => {
-      if (error?.message === "Data warming up") return true;
-      return false;
+    retry: (failureCount, error) => {
+      if (error?.message === "Data warming up") return failureCount < 30;
+      return failureCount < 3;
     },
-    retryDelay: (attemptIndex) => Math.min(3000 * (attemptIndex + 1), 15000),
+    retryDelay: (attemptIndex) => Math.min(2000 * (attemptIndex + 1), 10000),
   });
 }
 
@@ -53,11 +53,11 @@ export function useSectorRotation() {
       return data.sectors || [];
     },
     refetchInterval: 300000,
-    retry: (_failureCount, error) => {
-      if (error?.message === "Data warming up") return true;
-      return false;
+    retry: (failureCount, error) => {
+      if (error?.message === "Data warming up") return failureCount < 30;
+      return failureCount < 3;
     },
-    retryDelay: (attemptIndex) => Math.min(3000 * (attemptIndex + 1), 15000),
+    retryDelay: (attemptIndex) => Math.min(2000 * (attemptIndex + 1), 10000),
   });
 }
 
@@ -71,11 +71,11 @@ export function useMarketBreadth(timeframe: 'daily' | 'weekly' | 'monthly' = 'da
       if (data && !data.fullyEnriched) return 15000;
       return 300000;
     },
-    retry: (_failureCount, error) => {
-      if (error?.message === "Data warming up") return true;
-      return false;
+    retry: (failureCount, error) => {
+      if (error?.message === "Data warming up") return failureCount < 30;
+      return failureCount < 3;
     },
-    retryDelay: (attemptIndex) => Math.min(3000 * (attemptIndex + 1), 15000),
+    retryDelay: (attemptIndex) => Math.min(2000 * (attemptIndex + 1), 10000),
   });
 }
 
@@ -99,11 +99,11 @@ export function useIndustryPerformance() {
       if (data && !data.fullyEnriched) return 15000;
       return 120000;
     },
-    retry: (_failureCount, error) => {
-      if (error?.message === "Data warming up") return true;
-      return false;
+    retry: (failureCount, error) => {
+      if (error?.message === "Data warming up") return failureCount < 30;
+      return failureCount < 3;
     },
-    retryDelay: (attemptIndex) => Math.min(3000 * (attemptIndex + 1), 15000),
+    retryDelay: (attemptIndex) => Math.min(2000 * (attemptIndex + 1), 10000),
   });
 }
 

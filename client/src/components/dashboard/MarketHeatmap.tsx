@@ -58,6 +58,19 @@ export function MarketHeatmap() {
   const sectorList = Array.isArray(sectors) ? sectors : [];
   const sorted = [...sectorList].sort((a: any, b: any) => getChange(b) - getChange(a));
 
+  if (sorted.length === 0) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <div className="section-title" data-testid="text-heatmap-title">Market Heatmap</div>
+        </div>
+        <div className="glass-card rounded-xl p-5 flex-1 flex items-center justify-center">
+          <span className="text-white/20 text-xs">Warming up sector data...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">

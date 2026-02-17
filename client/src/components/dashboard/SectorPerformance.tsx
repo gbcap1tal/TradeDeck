@@ -71,13 +71,17 @@ export function SectorPerformance() {
 
   const { data: maSignals } = useIndustryMASignals(allDisplayedNames);
 
-  if (isLoading) {
+  if (isLoading || allIndustries.length === 0) {
     return (
       <div className="mb-8">
+        <div className="section-title mb-4" data-testid="text-industry-perf-title">Industry Performance</div>
         <div className="grid md:grid-cols-2 gap-4">
           {[1, 2].map(i => (
             <div key={i} className="glass-card rounded-xl p-5 space-y-3">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(j => <div key={j} className="shimmer h-7 rounded-md" />)}
+              {isLoading
+                ? [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(j => <div key={j} className="shimmer h-7 rounded-md" />)
+                : <div className="flex items-center justify-center py-8"><span className="text-white/20 text-xs">Warming up industry data...</span></div>
+              }
             </div>
           ))}
         </div>
