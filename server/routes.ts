@@ -1763,36 +1763,47 @@ export async function registerRoutes(
       }
 
       if (symbols.length === 0) {
-        return res.json({ scores: {}, ready: true });
+        return res.json({ scores: {}, compression: {}, ready: true });
       }
 
-      const { scores: cached, complete } = getCachedLeadersQuality(symbols);
-      if (complete) {
-        return res.json({ scores: cached, ready: true });
-      }
+      const { scores: cachedQuality, complete: qualityComplete } = getCachedLeadersQuality(symbols);
+      const compressionScores: Record<string, number> = {};
+      let compressionComplete = true;
 
-      const merged = { ...cached };
-      const missingFromCache = symbols.filter(s => !(s in merged));
-      if (missingFromCache.length > 0) {
-        const { scores: persisted } = await getPersistedScoresForSymbols(missingFromCache);
-        for (const [sym, score] of Object.entries(persisted)) {
-          merged[sym] = score;
-          setCache(`${PER_SYMBOL_CACHE_PREFIX}${sym}`, score, PER_SYMBOL_TTL);
+      for (const symbol of symbols) {
+        const cCached = getCachedCSS(symbol);
+        if (cCached) {
+          compressionScores[symbol] = cCached.normalizedScore;
+        } else {
+          compressionComplete = false;
         }
       }
 
-      const stillMissing = symbols.filter(s => !(s in merged));
+      const allReady = qualityComplete && compressionComplete;
 
-      if (stillMissing.length > 0 && !isBatchComputeRunning()) {
-        computeLeadersQualityBatch(stillMissing).catch(err =>
-          console.error(`[leaders-quality] Background compute failed: ${err.message}`)
-        );
+      if (!allReady) {
+        if (!isBatchComputeRunning()) {
+          const missingQuality = symbols.filter(s => !(s in cachedQuality));
+          if (missingQuality.length > 0) {
+            computeLeadersQualityBatch(missingQuality).catch(() => {});
+          }
+        }
+        if (!isCSSBatchRunning()) {
+          const missingCSS = symbols.filter(s => !(s in compressionScores));
+          if (missingCSS.length > 0) {
+            computeCSSBatch(missingCSS).catch(() => {});
+          }
+        }
       }
 
-      res.json({ scores: merged, ready: stillMissing.length === 0 });
+      return res.json({ 
+        scores: cachedQuality, 
+        compression: compressionScores,
+        ready: allReady 
+      });
     } catch (err: any) {
       console.error(`[leaders-quality] Error: ${err.message}`);
-      res.json({ scores: {}, ready: false });
+      res.json({ scores: {}, compression: {}, ready: false });
     }
   });
 

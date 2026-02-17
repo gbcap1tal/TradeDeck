@@ -172,7 +172,7 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
 
   return (
     <div className="glass-card rounded-xl px-4 py-3 h-full flex flex-col overflow-hidden" data-testid="card-stock-quality">
-      <div className="flex items-center justify-between mb-3 flex-shrink-0 gap-2">
+      <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
         <h2 className="text-[13px] font-semibold text-white/90 tracking-wide">Stock Quality</h2>
         <div className="flex items-center gap-1 px-3 py-1.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }} data-testid="badge-stock-quality-score">
           <span className="text-[15px] font-bold text-white leading-none font-mono-nums">{quality.qualityScore?.total ?? 0}</span>
@@ -181,8 +181,8 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
-        <div className="mb-2">
-          <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Details</div>
+        <div className="mb-1.5">
+          <div className="text-[10px] text-white/30 uppercase tracking-widest mb-0.5 font-semibold">Details</div>
           <QualityRow label="Market Cap" value={formatLargeNumber(quality.details.marketCap)} />
           <QualityRow label="Float" value={formatVolume(quality.details.floatShares)} />
           <QualityRow
@@ -190,9 +190,7 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
             value={quality.details.rsVsSpy > 0 ? String(quality.details.rsVsSpy) : '—'}
             color={quality.details.rsVsSpy >= 80 ? "text-[#30d158]" : quality.details.rsVsSpy >= 50 ? "text-[#ffd60a]" : quality.details.rsVsSpy > 0 ? "text-[#ff453a]/80" : "text-white/30"}
           />
-
           <QualityRow label="Inst. Own" value={`${quality.details.instOwnership}%`} />
-
           <QualityRow label="Avg Vol 50D" value={formatVolume(quality.details.avgVolume50d)} />
           {quality.details.shortInterest > 0 && (
             <QualityRow
@@ -202,8 +200,8 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
             />
           )}
           <SmartMoneyIndicator symbol={symbol} />
-          <div className="mt-1 pt-1 border-t border-white/[0.06]">
-            <div className="flex items-center justify-between py-[3px]">
+          <div className="mt-0.5 pt-0.5 border-t border-white/[0.06]">
+            <div className="flex items-center justify-between py-[2px]">
               <div className="flex items-center gap-1.5">
                 <Calendar className="w-3 h-3 text-white/30" />
                 <span className="text-[12px] text-white/50">Earnings</span>
@@ -213,17 +211,13 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
           </div>
         </div>
 
-        <div className="mb-2 pt-2 border-t border-white/[0.06]">
-          <CompressionScoreSection symbol={symbol} />
-        </div>
-
-        <div className="mb-2 pt-2 border-t border-white/[0.06]">
-          <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Fundamentals</div>
+        <div className="mb-1.5 pt-1.5 border-t border-white/[0.06]">
+          <div className="text-[10px] text-white/30 uppercase tracking-widest mb-0.5 font-semibold">Fundamentals</div>
           <QualityRow label="EPS QoQ" value={quality.fundamentals.epsQoQ != null ? `${quality.fundamentals.epsQoQ > 0 ? '+' : ''}${quality.fundamentals.epsQoQ}%` : '—'} color={quality.fundamentals.epsQoQ != null ? pctColor(quality.fundamentals.epsQoQ) : 'text-white/30'} />
           <QualityRow label="Sales QoQ" value={quality.fundamentals.salesQoQ != null ? `${quality.fundamentals.salesQoQ > 0 ? '+' : ''}${quality.fundamentals.salesQoQ}%` : '—'} color={quality.fundamentals.salesQoQ != null ? pctColor(quality.fundamentals.salesQoQ) : 'text-white/30'} />
           <QualityRow label="EPS YoY" value={quality.fundamentals.epsYoY != null ? `${quality.fundamentals.epsYoY > 0 ? '+' : ''}${quality.fundamentals.epsYoY}%` : '—'} color={quality.fundamentals.epsYoY != null ? pctColor(quality.fundamentals.epsYoY) : 'text-white/30'} />
           <QualityRow label="Sales YoY" value={quality.fundamentals.salesYoY != null ? `${quality.fundamentals.salesYoY > 0 ? '+' : ''}${quality.fundamentals.salesYoY}%` : '—'} color={quality.fundamentals.salesYoY != null ? pctColor(quality.fundamentals.salesYoY) : 'text-white/30'} />
-          <div className="flex items-center justify-between py-[3px]">
+          <div className="flex items-center justify-between py-[2px]">
             <span className="text-[12px] text-white/50">Earnings Accel.</span>
             <span className="text-[11px] font-medium">
               {quality.fundamentals.earningsAcceleration >= 5 ? (
@@ -241,17 +235,16 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
               )}
             </span>
           </div>
-
         </div>
 
-        <div className="mb-2 pt-2 border-t border-white/[0.06]">
-          <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Profitability</div>
+        <div className="mb-1.5 pt-1.5 border-t border-white/[0.06]">
+          <div className="text-[10px] text-white/30 uppercase tracking-widest mb-0.5 font-semibold">Profitability</div>
           <BoolIndicator label="Oper. Margin > 0" value={quality.profitability.operMarginPositive} />
           <BoolIndicator label="FCF > 0" value={quality.profitability.fcfPositive} />
         </div>
 
-        <div className="pt-2 border-t border-white/[0.06]">
-          <div className="text-[10px] text-white/30 uppercase tracking-widest mb-1 font-semibold">Trend</div>
+        <div className="pt-1.5 border-t border-white/[0.06]">
+          <div className="text-[10px] text-white/30 uppercase tracking-widest mb-0.5 font-semibold">Trend</div>
           <QualityRow label="Weinstein Stage" value={`Stage ${quality.trend.weinsteinStage}`} color={stageColors[quality.trend.weinsteinStage]} />
           <BoolIndicator label="Price > 10 EMA" value={quality.trend.aboveEma10} />
           <BoolIndicator label="Price > 20 EMA" value={quality.trend.aboveEma20} />
@@ -262,7 +255,7 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
             value={`${quality.trend.distFromSma50 > 0 ? '+' : ''}${quality.trend.distFromSma50}%`}
             color="text-white/80"
           />
-          <div className="flex items-center justify-between py-[3px]">
+          <div className="flex items-center justify-between py-[2px]">
             <span className="text-[12px] text-white/50">Overextension</span>
             <div className="flex items-center gap-1.5">
               <span className={cn("text-[12px] font-mono-nums font-medium", overextColors[quality.trend.overextensionFlag])}>
@@ -274,6 +267,8 @@ function StockQualityPanel({ symbol }: { symbol: string }) {
             </div>
           </div>
         </div>
+
+        <CompressionScoreSection symbol={symbol} />
       </div>
     </div>
   );

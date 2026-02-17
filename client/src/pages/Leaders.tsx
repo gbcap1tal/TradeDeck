@@ -18,9 +18,10 @@ interface Leader {
   changePercent: number;
   marketCap: number;
   qualityScore?: number;
+  compressionScore?: number;
 }
 
-type SortField = 'composite' | 'rsRating' | 'changePercent' | 'marketCap' | 'symbol' | 'sector' | 'industry' | 'qualityScore';
+type SortField = 'composite' | 'rsRating' | 'changePercent' | 'marketCap' | 'symbol' | 'sector' | 'industry' | 'qualityScore' | 'compressionScore';
 type SortDir = 'asc' | 'desc';
 
 function compositeScore(rs: number, quality?: number): number {
@@ -82,11 +83,11 @@ export default function Leaders() {
     refetchInterval: 300000,
   });
 
-  const { data: qualityData } = useQuery<{ scores: Record<string, number>; ready: boolean }>({
+  const { data: qualityData } = useQuery<{ scores: Record<string, number>; compression: Record<string, number>; ready: boolean }>({
     queryKey: ['/api/leaders/quality-scores', minRS],
     queryFn: async () => {
       const res = await fetch(`/api/leaders/quality-scores?minRS=${minRS}`, { credentials: 'include' });
-      if (!res.ok) return { scores: {}, ready: false };
+      if (!res.ok) return { scores: {}, compression: {}, ready: false };
       return res.json();
     },
     staleTime: (query) => {
@@ -100,6 +101,7 @@ export default function Leaders() {
   });
 
   const qualityScores = qualityData?.scores ?? {};
+  const compressionScores = qualityData?.compression ?? {};
   const scoresReady = qualityData?.ready ?? false;
 
   const leadersWithQuality = useMemo(() => {
@@ -107,8 +109,9 @@ export default function Leaders() {
     return data.leaders.map(l => ({
       ...l,
       qualityScore: qualityScores[l.symbol],
+      compressionScore: compressionScores[l.symbol],
     }));
-  }, [data, qualityScores]);
+  }, [data, qualityScores, compressionScores]);
 
   const filtered = useMemo(() => {
     if (leadersWithQuality.length === 0) return [];
@@ -141,6 +144,7 @@ export default function Leaders() {
         case 'sector': cmp = a.sector.localeCompare(b.sector); break;
         case 'industry': cmp = a.industry.localeCompare(b.industry); break;
         case 'qualityScore': cmp = (a.qualityScore ?? -1) - (b.qualityScore ?? -1); break;
+        case 'compressionScore': cmp = (a.compressionScore ?? -1) - (b.compressionScore ?? -1); break;
         default: cmp = (a[effectiveSort] as number) - (b[effectiveSort] as number);
       }
       return sortDir === 'desc' ? -cmp : cmp;
@@ -377,6 +381,13 @@ export default function Leaders() {
                     </th>
                     <th
                       className="text-right px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold cursor-pointer select-none"
+                      onClick={() => handleSort('compressionScore')}
+                      data-testid="th-cs"
+                    >
+                      CS<SortIcon field="compressionScore" />
+                    </th>
+                    <th
+                      className="text-right px-3 py-2.5 text-[10px] text-white/40 uppercase tracking-wider font-semibold cursor-pointer select-none"
                       onClick={() => handleSort('changePercent')}
                       data-testid="th-change"
                     >
@@ -431,6 +442,18 @@ export default function Leaders() {
                           </span>
                         ) : (
                           <span className="text-[11px] text-white/15" data-testid={`text-quality-${stock.symbol}`}>--</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {stock.compressionScore != null ? (
+                          <span className={cn(
+                            "text-[12px] font-semibold tabular-nums",
+                            stock.compressionScore >= 80 ? "text-[#30d158]" : stock.compressionScore >= 60 ? "text-[#0a84ff]" : stock.compressionScore >= 40 ? "text-[#ffd60a]" : "text-white/70"
+                          )} data-testid={`text-cs-${stock.symbol}`}>
+                            {stock.compressionScore}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-white/15" data-testid={`text-cs-${stock.symbol}`}>--</span>
                         )}
                       </td>
                       <td className="px-3 py-2 text-right">
