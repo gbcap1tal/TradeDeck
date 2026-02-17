@@ -88,25 +88,36 @@ export async function fetchEarningsCalendar(dateStr: string, forceRefresh: boole
     const isRecent = daysDiff >= 0 && daysDiff <= 7;
     const isYesterday = daysDiff >= 0.5 && daysDiff <= 1.5;
 
-    const hasMissingActuals = (isRecent || dateStr >= today) && existingReports.some(r => r.epsReported === null);
-    if (hasMissingActuals) {
-      await refreshActualsFromFinnhub(dateStr, existingReports);
-    }
-
-    if (isToday || isYesterday) {
-      await refreshLivePrices(dateStr);
-    }
-
-    if (hasMissingActuals || isToday || isYesterday) {
-      const refreshed = await db.select().from(earningsReports)
-        .where(eq(earningsReports.reportDate, dateStr));
-      const items = await enrichWithEpScores(refreshed);
-      setCache(cacheKey, items, isToday ? 90 : (isYesterday ? 180 : 300));
-      return items;
-    }
-
     const items = await enrichWithEpScores(existingReports);
-    setCache(cacheKey, items, 300);
+    const cacheTtl = isToday ? 90 : (isYesterday ? 180 : 300);
+    setCache(cacheKey, items, cacheTtl);
+
+    const needsActualsRefresh = (isRecent || dateStr >= today) && existingReports.some(r => r.epsReported === null);
+    const needsPriceRefresh = isToday || isYesterday;
+
+    if (needsActualsRefresh || needsPriceRefresh) {
+      const bgKey = `earnings_bg_refresh_${dateStr}`;
+      if (!getCached<boolean>(bgKey)) {
+        setCache(bgKey, true, 30);
+        (async () => {
+          try {
+            if (needsActualsRefresh) {
+              await refreshActualsFromFinnhub(dateStr, existingReports);
+            }
+            if (needsPriceRefresh) {
+              await refreshLivePrices(dateStr);
+            }
+            const refreshed = await db.select().from(earningsReports)
+              .where(eq(earningsReports.reportDate, dateStr));
+            const freshItems = await enrichWithEpScores(refreshed);
+            setCache(cacheKey, freshItems, cacheTtl);
+          } catch (e: any) {
+            console.error(`[earnings] Background refresh error for ${dateStr}:`, e.message);
+          }
+        })();
+      }
+    }
+
     return items;
   }
 
