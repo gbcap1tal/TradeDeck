@@ -69,14 +69,10 @@ const SENTIMENT_COLORS: Record<SentimentType, string> = {
   neutral: 'text-white',
 };
 
-const COMBINED_SENTIMENT_REGEX = new RegExp(
-  SENTIMENT_PATTERNS.map(p => `(${p.pattern.source})`).join('|'),
-  'gi'
-);
+const COMBINED_SENTIMENT_SOURCE = SENTIMENT_PATTERNS.map(p => `(${p.pattern.source})`).join('|');
 
 function applySentimentHighlight(text: string): Array<{ text: string; sentiment?: SentimentType }> {
-  COMBINED_SENTIMENT_REGEX.lastIndex = 0;
-  const regex = COMBINED_SENTIMENT_REGEX;
+  const regex = new RegExp(COMBINED_SENTIMENT_SOURCE, 'gi');
 
   const segments: Array<{ text: string; sentiment?: SentimentType }> = [];
   let lastIndex = 0;
