@@ -219,11 +219,18 @@ function MegatrendAdmin({ megatrends, onClose }: { megatrends: any[]; onClose: (
 
 export default function Market() {
   const { data: perfData, isLoading: perfLoading } = useIndustryPerformance();
-  const { data: megatrendData } = useMegatrends();
+  const { data: megatrendData, isError: mtError, error: mtErrorObj, isLoading: mtLoading } = useMegatrends();
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [tf, setTf] = useState<Timeframe>('D');
   const [showAdmin, setShowAdmin] = useState(false);
+
+  if (mtError) {
+    console.error('[Megatrends] Query error:', mtErrorObj);
+  }
+  if (!mtLoading && !mtError) {
+    console.log('[Megatrends] Data received:', Array.isArray(megatrendData) ? `${megatrendData.length} baskets` : typeof megatrendData);
+  }
 
   const isAdminUser = user?.id === ADMIN_ID;
   const megatrends = Array.isArray(megatrendData) ? megatrendData : [];

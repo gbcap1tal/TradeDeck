@@ -81,7 +81,7 @@ async function computeMegatrendPerformance(): Promise<Map<number, any>> {
   const tickerPrices = new Map<string, { current: number; w: number; m: number; q: number; h: number; y: number; ytd: number }>();
 
   const tickerArr = Array.from(allTickers);
-  const BATCH_SIZE = 5;
+  const BATCH_SIZE = 20;
   const histories: PromiseSettledResult<{ ticker: string; hist: any[] }>[] = [];
   for (let i = 0; i < tickerArr.length; i += BATCH_SIZE) {
     const batch = tickerArr.slice(i, i + BATCH_SIZE);
@@ -98,7 +98,7 @@ async function computeMegatrendPerformance(): Promise<Map<number, any>> {
     );
     histories.push(...batchResults);
     if (i + BATCH_SIZE < tickerArr.length) {
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 50));
     }
   }
 
@@ -2507,7 +2507,9 @@ Keep the entire response under 1000 characters. Be concise, direct, and useful f
 
   app.get('/api/megatrends', async (req, res) => {
     try {
+      console.log('[api] GET /api/megatrends - request received');
       const mts = await storage.getMegatrends();
+      console.log(`[api] GET /api/megatrends - ${mts.length} baskets from DB`);
       const perfCached = getMegatrendPerfCached();
       const finvizData = getFinvizDataSync();
 
