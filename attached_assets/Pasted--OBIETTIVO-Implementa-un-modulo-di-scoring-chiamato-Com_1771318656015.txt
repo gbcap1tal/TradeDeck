@@ -1,0 +1,52 @@
+## OBIETTIVO
+Implementa un modulo di scoring chiamato "Compression Score" nella mia app. Il sistema valuta quanto un titolo azionario è compresso e pronto per un breakout, basandosi su 42 regole quantitative derivate dai metodi di Minervini, O'Neil, Kullamagi, Weinstein, Darvas, Morales, Zanger, Kell, Bonde, Dennis, Ritchie, Ryan e Lynch.
+
+Il punteggio grezzo va da 0 a 115 punti. Deve essere NORMALIZZATO in un valore da 0 a 99 e visualizzato con un sistema a 5 stelle.
+
+---
+
+## OUTPUT FINALE RICHIESTO
+Per ogni titolo analizzato, mostra:
+- ★★★★★ (87/99) — oppure il numero di stelle piene/vuote corrispondente
+- Il valore numerico normalizzato tra parentesi (0-99)
+
+### Scala Stelle:
+- ★★★★★ = 80-99 (Compressione Eccezionale — "Spring Loaded")
+- ★★★★☆ = 60-79 (Compressione Forte — "High Potential")
+- ★★★☆☆ = 40-59 (Compressione Moderata — "Building")
+- ★★☆☆☆ = 20-39 (Compressione Debole — "Early Stage")
+- ★☆☆☆☆ = 1-19  (Nessuna Compressione — "Not Ready")
+- ☆☆☆☆☆ = 0     (Nessun segnale)
+
+### Formula di normalizzazione:
+normalized_score = round((raw_score / 115) * 99)
+Dove 115 è il punteggio massimo teorico.
+
+---
+
+## ARCHITETTURA DEL MODULO
+
+Crea un file `compression_score.py` (o integra nel modulo esistente di analisi tecnica) con:
+
+### 1. Funzione principale:
+```python
+def calculate_compression_score(df_daily, df_weekly=None, market_data=None, sector_data=None):
+    """
+    Parametri:
+    - df_daily: DataFrame con colonne OHLCV (Open, High, Low, Close, Volume) + Date come index
+    - df_weekly: DataFrame opzionale con dati weekly OHLCV
+    - market_data: DataFrame opzionale con dati SPX/mercato (Close, SMA50, SMA200)
+    - sector_data: DataFrame opzionale con dati del settore (Close, SMA50)
+    
+    Ritorna:
+    {
+        "raw_score": float,          # 0-115
+        "normalized_score": int,     # 0-99
+        "stars": int,                # 1-5
+        "stars_display": str,        # "★★★★☆ (72/99)"
+        "label": str,                # "High Potential"
+        "category_scores": dict,     # punteggio per ogni categoria
+        "rules_detail": list,        # dettaglio di ogni regola (pass/fail, score)
+        "danger_signals": list       # segnali di pericolo attivi
+    }
+    """
