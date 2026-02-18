@@ -1061,8 +1061,14 @@ function initBackgroundTasks() {
     } else if (timeMinutes >= 961 && timeMinutes <= 963) {
       windowKey = `${dateStr}-close`;
     } else if (minutes >= 0 && minutes <= 10 && timeMinutes !== 960) {
+      if (timeMinutes >= 570 && timeMinutes <= 573) {
+        return;
+      }
       windowKey = `${dateStr}-h${hours}`;
     } else if (minutes >= 30 && minutes <= 40) {
+      if (timeMinutes >= 570 && timeMinutes <= 573) {
+        return;
+      }
       windowKey = `${dateStr}-h${hours}m30`;
     }
 
@@ -1071,6 +1077,48 @@ function initBackgroundTasks() {
       runFullDataRefresh(windowKey);
     }
   }, 60000);
+
+  // Market open rapid-fire: at 9:31 ET, force a full refresh every 30s for 4 minutes
+  // This ensures all Capital Flow data is fully fresh by 9:35 ET at the latest
+  (async () => {
+    const getETMinutes = () => {
+      const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+      return { timeMinutes: et.getHours() * 60 + et.getMinutes(), day: et.getDay() };
+    };
+
+    const waitUntilMarketOpen = () => new Promise<void>((resolve) => {
+      const check = setInterval(() => {
+        const { timeMinutes, day } = getETMinutes();
+        if (day >= 1 && day <= 5 && timeMinutes >= 571) {
+          clearInterval(check);
+          resolve();
+        }
+      }, 10000);
+    });
+
+    while (true) {
+      const { timeMinutes, day } = getETMinutes();
+      if (day >= 1 && day <= 5 && timeMinutes >= 571 && timeMinutes <= 575) {
+        console.log(`[open-burst] Market just opened — forcing rapid refresh cycle`);
+        const dateStr2 = (() => {
+          const et2 = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+          return `${et2.getFullYear()}-${et2.getMonth()}-${et2.getDate()}`;
+        })();
+        const burstKey = `${dateStr2}-open-burst`;
+        if (burstKey !== lastScheduledWindow) {
+          lastScheduledWindow = burstKey;
+          runFullDataRefresh(burstKey);
+        }
+        await new Promise(r => setTimeout(r, 4 * 60 * 1000));
+        continue;
+      }
+      if (day >= 1 && day <= 5 && timeMinutes < 571) {
+        await waitUntilMarketOpen();
+        continue;
+      }
+      await new Promise(r => setTimeout(r, 60000));
+    }
+  })();
 
   let overnightDigestDate = '';
   let overnightDigestDone = false;
