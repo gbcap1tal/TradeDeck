@@ -2510,28 +2510,36 @@ export async function registerRoutes(
         }
       } catch {}
 
-      const prompt = `You are a financial analyst. Create a company profile for ${sym}.${context ? ` Context: ${context}` : ''}
+      const prompt = `You are an elite equity research analyst writing a briefing for an active trader. Create a detailed company profile for ${sym}.${context ? ` Context: ${context}` : ''}
 
-1. **Explain Like I'm 12** — Three short bullet points about what the company does. Use relatable examples and analogies a kid would understand.
+1. **Explain Like I'm 12** — Three short bullet points about what the company does. Use relatable examples and analogies a kid would understand. Keep it fun and clear.
 
-2. **Professional Summary (max 10 sentences)** — Cover: industry, main products/services, primary competitors (list tickers), notable metrics or achievements, competitive advantage/moat, why they are unique. If biotech, state whether they have a commercial product or are in clinical stages.
+2. **Professional Summary** — Write 8-12 sentences covering:
+- What the company actually does and its core business segments with approximate revenue split
+- Primary competitors (include tickers) and how this company differentiates
+- Competitive moat: pricing power, switching costs, network effects, IP, regulatory barriers
+- Recent strategic moves: acquisitions, divestitures, new market entries, partnerships
+- Management quality: founder-led? track record? insider buying/selling trends?
+- If biotech/pharma: pipeline stage, key drugs, FDA timeline, cash runway
+- If tech: TAM size, growth rate, customer concentration, Rule of 40 score if SaaS
 
-3. **Key Intel Table** — Provide in a markdown table with columns "Category" and "Details":
+3. **Key Intel Table** — Provide in a markdown table with columns "Category" and "Details". Be SPECIFIC — use real names, dates, dollar amounts, percentages. Never write vague filler like "analysts are watching closely".
 | Category | Details |
 |----------|---------|
-| Hot Theme/Narrative | Any trending story or narrative driving the stock |
-| Catalysts | Upcoming earnings, news, macro events |
-| Key Fundamentals | Growth in earnings/revenues, moat, unique products, management quality, patents |
-| Upcoming (30 days) | Flag any earnings, product launches, or regulatory events in the next 30 days |
-| Analyst Targets | Recent changes in analyst price targets, consensus direction |
+| Hot Theme/Narrative | The specific trending story or macro theme driving interest (AI, GLP-1, reshoring, defense spending, etc.) — explain WHY this stock is linked to it |
+| Bull Case | The strongest 2-3 arguments for owning this stock right now |
+| Bear Case | The strongest 2-3 risks or concerns — be honest and specific |
+| Key Fundamentals | Revenue/EPS growth rates (YoY), margins trend, debt/cash position, FCF yield |
+| Catalysts (Next 60 days) | Specific upcoming events: earnings date, FDA decisions, product launches, conferences, lock-up expirations |
+| Institutional Activity | Notable fund positions, 13F changes, insider transactions if significant |
 
-Keep the entire response under 1000 characters. Be concise, direct, and useful for trading decisions.`;
+Be direct, opinionated, and useful for trading decisions. Avoid generic statements.`;
 
       const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4.1-mini',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 600,
-        temperature: 0.5,
+        max_tokens: 1500,
+        temperature: 0.4,
       });
 
       const summary = completion.choices?.[0]?.message?.content || 'No summary available.';
