@@ -730,9 +730,9 @@ export async function getEnhancedEarningsData(symbol: string): Promise<EarningsQ
       const [, qNum, yearStr] = qMatch;
       const shortLabel = `Q${qNum} '${yearStr.slice(-2)}`;
 
-      const rev = Math.round((item.revenue || 0) / 1e9 * 10) / 10;
+      const rev = Math.round((item.revenue || 0) / 1e6 * 100) / 100;
       const epsData = epsMap.get(`${qNum}Q${yearStr}`);
-      const eps = epsData?.actual ?? Math.round((item.earnings || 0) / 1e9 * 100) / 100;
+      const eps = epsData?.actual ?? Math.round((item.earnings || 0) / 1e6 * 100) / 100;
 
       qKeyToIdx.set(`${qNum}Q${yearStr}`, result.length);
       result.push({
@@ -761,7 +761,7 @@ export async function getEnhancedEarningsData(symbol: string): Promise<EarningsQ
 
         const shortLabel = `Q${qNum} '${String(yr).slice(-2)}`;
         const estEps = t.earningsEstimate?.avg != null ? Math.round(t.earningsEstimate.avg * 100) / 100 : 0;
-        const estRev = t.revenueEstimate?.avg != null ? Math.round(t.revenueEstimate.avg / 1e9 * 10) / 10 : 0;
+        const estRev = t.revenueEstimate?.avg != null ? Math.round(t.revenueEstimate.avg / 1e6 * 100) / 100 : 0;
 
         qKeyToIdx.set(k, result.length);
         result.push({
