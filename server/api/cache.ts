@@ -8,7 +8,7 @@ const cache = new NodeCache({ checkperiod: 120, useClones: false });
 const staleCache = new NodeCache({
   checkperiod: 600,
   stdTTL: 86400 * 3,
-  maxKeys: 5000,
+  maxKeys: 25000,
   useClones: false,
 });
 
@@ -50,9 +50,22 @@ export function getStale<T>(key: string): T | undefined {
   return staleCache.get<T>(key);
 }
 
+export function getCacheStats(): { primary: number; stale: number } {
+  return { primary: cache.keys().length, stale: staleCache.keys().length };
+}
+
 export function setCache<T>(key: string, value: T, ttlSeconds: number): void {
-  cache.set(key, value, ttlSeconds);
-  staleCache.set(key, value, 86400 * 3);
+  try {
+    cache.set(key, value, ttlSeconds);
+  } catch (e: any) {
+    console.error(`[cache] Primary cache set error for ${key}: ${e.message}`);
+  }
+  try {
+    staleCache.set(key, value, 86400 * 3);
+  } catch (e: any) {
+    const stats = getCacheStats();
+    console.error(`[cache] Stale cache set error for ${key}: ${e.message} (stale keys: ${stats.stale})`);
+  }
 
   if (PERSISTENT_KEYS.has(key)) {
     persistToDb(key, value).catch(err => {
