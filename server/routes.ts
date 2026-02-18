@@ -2397,12 +2397,12 @@ export async function registerRoutes(
     const cached = getCached<string>(cacheKey);
     if (cached) return res.json({ summary: cached });
 
-    const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-    const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
-    if (!apiKey) return res.status(503).json({ error: 'AI not configured' });
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!geminiKey) return res.status(503).json({ error: 'AI not configured' });
 
-    const OpenAI = (await import('openai')).default;
-    const openai = new OpenAI({ apiKey, baseURL });
+    const { GoogleGenerativeAI } = await import('@google/generative-ai');
+    const genAI = new GoogleGenerativeAI(geminiKey);
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
     try {
       let context = '';
@@ -2430,14 +2430,15 @@ export async function registerRoutes(
 
 Keep the entire response under 1000 characters. Be concise, direct, and useful for trading decisions.`;
 
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 600,
-        temperature: 0.5,
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: {
+          maxOutputTokens: 600,
+          temperature: 0.5,
+        },
       });
 
-      const summary = completion.choices?.[0]?.message?.content || 'No summary available.';
+      const summary = result.response?.text() || 'No summary available.';
       setCache(cacheKey, summary, 86400);
       res.json({ summary });
     } catch (err: any) {
