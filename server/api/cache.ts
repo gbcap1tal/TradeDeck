@@ -3,12 +3,13 @@ import { db } from '../db';
 import { cacheStore } from '../../shared/schema';
 import { eq } from 'drizzle-orm';
 
-const cache = new NodeCache({ checkperiod: 120 });
+const cache = new NodeCache({ checkperiod: 120, useClones: false });
 
 const staleCache = new NodeCache({
   checkperiod: 600,
   stdTTL: 86400 * 3,
   maxKeys: 5000,
+  useClones: false,
 });
 
 const refreshingKeys = new Set<string>();

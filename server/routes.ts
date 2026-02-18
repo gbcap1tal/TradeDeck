@@ -590,6 +590,13 @@ async function computeRotationData(): Promise<any> {
   return { sectors };
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms);
+    promise.then(val => { clearTimeout(timer); resolve(val); }).catch(err => { clearTimeout(timer); reject(err); });
+  });
+}
+
 function backgroundRefresh(cacheKey: string, computeFn: () => Promise<any>, ttl: number) {
   if (isRefreshing(cacheKey)) return;
   markRefreshing(cacheKey);
@@ -696,9 +703,11 @@ function initBackgroundTasks() {
       })(),
       (async () => {
         try {
-          const rsData = await fetchIndustryRSFromFinviz(isDuringMarket);
+          const rsData = await withTimeout(fetchIndustryRSFromFinviz(isDuringMarket), 30000, 'Boot Industry RS');
           console.log(`[bg] Industry RS ratings loaded: ${rsData.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+          const t0 = Date.now();
           const perfData = await computeIndustryPerformance();
+          console.log(`[bg] computeIndustryPerformance took ${Date.now() - t0}ms`);
           setCache('industry_perf_all', perfData, isDuringMarket ? 1800 : 43200);
           console.log(`[bg] Industry performance computed: ${perfData.industries?.length} industries, enriched=${perfData.fullyEnriched} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
         } catch (e: any) {
@@ -841,13 +850,13 @@ function initBackgroundTasks() {
       await Promise.allSettled([
         (async () => {
           try {
-            const indices = await yahoo.getIndices();
+            const indices = await withTimeout(yahoo.getIndices(), 30000, 'Indices fetch');
             const ttl = isUSMarketOpen() ? CACHE_TTL.INDICES : 43200;
             if (indices && indices.length >= 4) {
               setCache('market_indices', indices, ttl);
               console.log(`[scheduler] Indices refreshed: ${indices.length} in ${((Date.now() - start) / 1000).toFixed(1)}s`);
             } else {
-              const fmpData = await fmp.getIndicesFromFMP();
+              const fmpData = await withTimeout(fmp.getIndicesFromFMP(), 15000, 'FMP indices');
               if (fmpData && fmpData.length >= 4) {
                 setCache('market_indices', fmpData, ttl);
                 console.log(`[scheduler] Indices from FMP backup: ${fmpData.length}`);
@@ -865,7 +874,7 @@ function initBackgroundTasks() {
         })(),
         (async () => {
           try {
-            const sectors = await computeSectorsData();
+            const sectors = await withTimeout(computeSectorsData(), 30000, 'Sectors compute');
             setCache('sectors_data', sectors, sectorsTtl());
             console.log(`[scheduler] Sectors refreshed: ${sectors.length} in ${((Date.now() - start) / 1000).toFixed(1)}s`);
           } catch (err: any) {
@@ -874,7 +883,7 @@ function initBackgroundTasks() {
         })(),
         (async () => {
           try {
-            const rotData = await computeRotationData();
+            const rotData = await withTimeout(computeRotationData(), 30000, 'Rotation compute');
             setCache('rrg_rotation', rotData, sectorsTtl());
             console.log(`[scheduler] Rotation refreshed in ${((Date.now() - start) / 1000).toFixed(1)}s`);
             clearFailures('rotation');
@@ -885,9 +894,11 @@ function initBackgroundTasks() {
         })(),
         (async () => {
           try {
-            const rsData = await fetchIndustryRSFromFinviz(isUSMarketOpen());
+            const rsData = await withTimeout(fetchIndustryRSFromFinviz(isUSMarketOpen()), 30000, 'Industry RS fetch');
             console.log(`[scheduler] Industry RS refreshed: ${rsData.length} industries in ${((Date.now() - start) / 1000).toFixed(1)}s`);
+            const t0 = Date.now();
             const perfData = await computeIndustryPerformance();
+            console.log(`[scheduler] computeIndustryPerformance took ${Date.now() - t0}ms`);
             setCache('industry_perf_all', perfData, industryPerfTtl());
             clearFailures('industry_perf');
             console.log(`[scheduler] Industry performance refreshed: ${perfData.industries?.length} industries, enriched=${perfData.fullyEnriched} in ${((Date.now() - start) / 1000).toFixed(1)}s`);
