@@ -289,8 +289,10 @@ async function computeIndustryPerformance(_etfOnly: boolean = false): Promise<an
     }
 
     const EXCLUDED_FROM_RANKING = new Set(['Shell Companies', 'Exchange Traded Fund']);
+    let hasRealStockData = false;
     const industries = rsData.filter(ind => !EXCLUDED_FROM_RANKING.has(ind.name)).map(ind => {
       const capWeightedDaily = getIndustryAvgChange(ind.name);
+      if (capWeightedDaily !== 0) hasRealStockData = true;
 
       return {
         name: ind.name,
@@ -309,8 +311,8 @@ async function computeIndustryPerformance(_etfOnly: boolean = false): Promise<an
     });
 
     const hasData = industries.some(ind => ind.dailyChange !== 0);
-    const result = { industries, fullyEnriched: hasData };
-    if (hasData) persistIndustryPerfToFile(result);
+    const result = { industries, fullyEnriched: hasRealStockData };
+    if (hasRealStockData) persistIndustryPerfToFile(result);
     return result;
   }
 
@@ -692,14 +694,27 @@ function initBackgroundTasks() {
           const rsData = await fetchIndustryRSFromFinviz(isDuringMarket);
           console.log(`[bg] Industry RS ratings loaded: ${rsData.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
           const perfData = await computeIndustryPerformance();
-          setCache('industry_perf_all', perfData, isDuringMarket ? 1800 : 43200);
-          console.log(`[bg] Industry performance computed: ${perfData.industries?.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+          if (perfData.fullyEnriched) {
+            setCache('industry_perf_all', perfData, isDuringMarket ? 1800 : 43200);
+            console.log(`[bg] Industry performance computed (enriched): ${perfData.industries?.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
+          } else {
+            const existing = getCached<any>('industry_perf_all');
+            if (!existing) {
+              setCache('industry_perf_all', perfData, isDuringMarket ? 1800 : 43200);
+              console.log(`[bg] Industry performance computed (NOT enriched, no existing cache): ${perfData.industries?.length} industries`);
+            } else {
+              console.log(`[bg] Industry performance NOT enriched — keeping existing cache (${existing.industries?.length} industries). Will re-enrich after Finviz scrape.`);
+            }
+          }
         } catch (e: any) {
           console.log(`[bg] Industry RS/perf error: ${e.message}`);
-          const persisted = loadPersistedIndustryPerf();
-          if (persisted) {
-            setCache('industry_perf_all', persisted, isDuringMarket ? 1800 : 43200);
-            console.log(`[bg] Using persisted industry performance: ${persisted.industries?.length} industries`);
+          const existing = getCached<any>('industry_perf_all');
+          if (!existing) {
+            const persisted = loadPersistedIndustryPerf();
+            if (persisted) {
+              setCache('industry_perf_all', persisted, isDuringMarket ? 1800 : 43200);
+              console.log(`[bg] Using persisted industry performance: ${persisted.industries?.length} industries`);
+            }
           }
         }
       })(),
