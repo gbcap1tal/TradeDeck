@@ -2,7 +2,7 @@ import { getCached, setCache } from './cache';
 import { db } from '../db';
 import { earningsReports, epScores } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 
 const FINNHUB_BASE = 'https://finnhub.io/api/v1';
 const FMP_V3 = 'https://financialmodelingprep.com/api/v3';
@@ -20,11 +20,11 @@ function getFmpKey(): string | undefined {
   return process.env.FMP_KEY;
 }
 
-function getGemini() {
-  const apiKey = process.env.GEMINI_API_KEY;
+function getOpenAI(): OpenAI | null {
+  const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+  const baseURL = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
   if (!apiKey) return null;
-  const genAI = new GoogleGenerativeAI(apiKey);
-  return genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+  return new OpenAI({ apiKey, baseURL });
 }
 
 export interface EarningsCalendarItem {
@@ -891,8 +891,8 @@ async function enrichWithEpScores(reports: any[]): Promise<EarningsCalendarItem[
 }
 
 export async function generateAiSummary(ticker: string, reportDate: string): Promise<string | null> {
-  const model = getGemini();
-  if (!model) return null;
+  const openai = getOpenAI();
+  if (!openai) return null;
 
   const reports = await db.select().from(earningsReports)
     .where(and(eq(earningsReports.ticker, ticker), eq(earningsReports.reportDate, reportDate)));
@@ -1024,16 +1024,14 @@ Format as JSON:
   }
 
   try {
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: 'application/json',
-        maxOutputTokens: 1024,
-        temperature: 0.5,
-      },
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+      max_tokens: 1024,
     });
 
-    const content = result.response?.text();
+    const content = response.choices?.[0]?.message?.content;
     if (!content) return null;
 
     let parsed: any;
