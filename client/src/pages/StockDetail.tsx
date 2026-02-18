@@ -1,7 +1,6 @@
 import { useRoute, Link } from "wouter";
 import { Navbar } from "@/components/layout/Navbar";
-import { useStockQuote, useStockQuality, useStockEarnings, useStockNews, useInsiderBuying, useCompressionScore, useStockBundle } from "@/hooks/use-stocks";
-import { queryClient } from "@/lib/queryClient";
+import { useStockQuality, useStockEarnings, useStockNews, useInsiderBuying, useCompressionScore, useStockBundle } from "@/hooks/use-stocks";
 import { StockChart } from "@/components/stock/StockChart";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, Plus, ArrowUp, ArrowDown, Check, X, AlertTriangle, Calendar, Newspaper, Flame, Zap, Info, Building2, Sparkles, Loader2, Star } from "lucide-react";
@@ -1055,28 +1054,12 @@ function AiSummaryDialog({ symbol, open, onOpenChange }: { symbol: string; open:
 export default function StockDetail() {
   const [, params] = useRoute("/stocks/:symbol");
   const symbol = params?.symbol?.toUpperCase() || "";
-  const { data: quote, isLoading: isQuoteLoading, isFetching: isQuoteFetching, isError: _isQuoteError } = useStockQuote(symbol);
+  const { data: bundle, isLoading: isBundleLoading, isFetching: isBundleFetching } = useStockBundle(symbol);
+  const quote = bundle?.quote || null;
   const { mutate: addToWatchlist } = useAddToWatchlist();
   const { data: watchlists } = useWatchlists();
   const { user } = useAuth();
   const [aiSummaryOpen, setAiSummaryOpen] = useState(false);
-
-  const { data: bundle } = useStockBundle(symbol);
-  useEffect(() => {
-    if (!bundle || !symbol) return;
-    if (bundle.earnings?.length > 0) {
-      queryClient.setQueryData(['/api/stocks', symbol, 'earnings', 'quarterly'], bundle.earnings);
-    }
-    if (bundle.snapshot && Object.keys(bundle.snapshot).length > 0) {
-      queryClient.setQueryData(['/api/stocks', symbol, 'snapshot'], bundle.snapshot);
-    }
-    if (bundle.insider) {
-      queryClient.setQueryData(['/api/stocks', symbol, 'insider-buying'], bundle.insider);
-    }
-    if (bundle.news) {
-      queryClient.setQueryData(['/api/stocks', symbol, 'news'], bundle.news);
-    }
-  }, [bundle, symbol]);
 
   const handleAddToWatchlist = (watchlistId: number) => {
     addToWatchlist({ id: watchlistId, symbol });
@@ -1089,7 +1072,7 @@ export default function StockDetail() {
       <Navbar />
       <main className="flex-1 min-h-0 flex flex-col">
         <div className="max-w-[1440px] w-full mx-auto px-3 sm:px-4 py-2 flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
-          {(isQuoteLoading || (isQuoteFetching && !quote)) ? (
+          {(isBundleLoading || (isBundleFetching && !bundle)) ? (
             <div className="flex-1 flex flex-col gap-2">
               <div className="shimmer h-10 rounded-xl" />
               <div className="flex-1 shimmer rounded-xl" />

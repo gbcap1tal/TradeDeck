@@ -1,4 +1,59 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
+
+interface StockBundle {
+  quote: any;
+  snapshot: Record<string, string>;
+  earnings: any[];
+  insider: { transactions: any[]; hasBuying: boolean };
+  news: any[];
+}
+
+export function useStockBundle(symbol: string) {
+  const qc = useQueryClient();
+  const seeded = useRef(false);
+
+  const query = useQuery({
+    queryKey: ['/api/stocks', symbol, 'bundle'],
+    queryFn: async () => {
+      const res = await fetch(`/api/stocks/${symbol}/bundle`, { credentials: "include" });
+      if (!res.ok) throw new Error(`Bundle fetch failed: ${res.status}`);
+      return res.json() as Promise<StockBundle>;
+    },
+    enabled: !!symbol,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
+    staleTime: 60 * 1000,
+    refetchInterval: 15000,
+  });
+
+  useEffect(() => {
+    if (!query.data || !symbol || seeded.current) return;
+    seeded.current = true;
+    const d = query.data;
+    if (d.quote) {
+      qc.setQueryData(['/api/stocks', symbol, 'quote'], d.quote);
+    }
+    if (d.earnings?.length > 0) {
+      qc.setQueryData(['/api/stocks', symbol, 'earnings', 'quarterly'], d.earnings);
+    }
+    if (d.snapshot && Object.keys(d.snapshot).length > 0) {
+      qc.setQueryData(['/api/stocks', symbol, 'snapshot'], d.snapshot);
+    }
+    if (d.insider) {
+      qc.setQueryData(['/api/stocks', symbol, 'insider-buying'], d.insider);
+    }
+    if (d.news) {
+      qc.setQueryData(['/api/stocks', symbol, 'news'], d.news);
+    }
+  }, [query.data, symbol, qc]);
+
+  useEffect(() => {
+    seeded.current = false;
+  }, [symbol]);
+
+  return query;
+}
 
 export function useStockQuote(symbol: string) {
   return useQuery({
@@ -109,6 +164,7 @@ export function useStockNews(symbol: string) {
     enabled: !!symbol,
     retry: 3,
     retryDelay: (attempt) => Math.min(2000 * 2 ** attempt, 10000),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -123,6 +179,7 @@ export function useInsiderBuying(symbol: string) {
     enabled: !!symbol,
     retry: 2,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -133,25 +190,6 @@ export function useStockSnapshot(symbol: string) {
       const res = await fetch(`/api/stocks/${symbol}/snapshot`, { credentials: "include" });
       if (!res.ok) throw new Error(`Snapshot fetch failed: ${res.status}`);
       return res.json();
-    },
-    enabled: !!symbol,
-    retry: 2,
-    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
-  });
-}
-
-export function useStockBundle(symbol: string, view: 'quarterly' | 'annual' = 'quarterly') {
-  return useQuery({
-    queryKey: ['/api/stocks', symbol, 'bundle', view],
-    queryFn: async () => {
-      const res = await fetch(`/api/stocks/${symbol}/bundle?view=${view}`, { credentials: "include" });
-      if (!res.ok) throw new Error(`Bundle fetch failed: ${res.status}`);
-      return res.json() as Promise<{
-        snapshot: Record<string, string>;
-        earnings: any[];
-        insider: { transactions: any[]; hasBuying: boolean };
-        news: any[];
-      }>;
     },
     enabled: !!symbol,
     retry: 2,

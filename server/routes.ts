@@ -2493,7 +2493,7 @@ export async function registerRoutes(
 
     const t0 = Date.now();
 
-    const [finvizData, insiderTxns, newsData] = await Promise.all([
+    const [finvizData, insiderTxns, newsData, quoteData] = await Promise.all([
       scrapeFinvizQuote(sym).catch((e: any) => { console.error(`Bundle finviz error ${sym}:`, e.message); return null; }),
       scrapeFinvizInsiderBuying(sym).catch((e: any) => { console.error(`Bundle insider error ${sym}:`, e.message); return [] as any[]; }),
       (async () => {
@@ -2506,6 +2506,21 @@ export async function registerRoutes(
           if (fmpNews && fmpNews.length > 0) return fmpNews;
         } catch (e: any) { console.error(`Bundle fmp news error ${sym}:`, e.message); }
         return [];
+      })(),
+      (async () => {
+        try {
+          const quote = await yahoo.getQuote(sym);
+          if (quote) {
+            const profile = await fmp.getCompanyProfile(sym);
+            return {
+              ...quote,
+              sector: quote.sector || profile?.sector || '',
+              industry: quote.industry || profile?.industry || '',
+              rs: 0,
+            };
+          }
+        } catch (e: any) { console.error(`Bundle quote error ${sym}:`, e.message); }
+        return null;
       })(),
     ]);
 
@@ -2621,7 +2636,7 @@ export async function registerRoutes(
     const elapsed = Date.now() - t0;
     if (elapsed > 3000) console.log(`[bundle] ${sym} took ${elapsed}ms`);
 
-    return res.json({ snapshot, earnings, insider, news: newsData });
+    return res.json({ quote: quoteData, snapshot, earnings, insider, news: newsData });
   });
 
   app.get('/api/stocks/:symbol/ai-summary', async (req, res) => {
