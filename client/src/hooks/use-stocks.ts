@@ -11,7 +11,7 @@ interface StockBundle {
 
 export function useStockBundle(symbol: string) {
   const qc = useQueryClient();
-  const seeded = useRef(false);
+  const lastUpdated = useRef(0);
 
   const query = useQuery({
     queryKey: ['/api/stocks', symbol, 'bundle'],
@@ -28,8 +28,8 @@ export function useStockBundle(symbol: string) {
   });
 
   useEffect(() => {
-    if (!query.data || !symbol || seeded.current) return;
-    seeded.current = true;
+    if (!query.data || !symbol || query.dataUpdatedAt === lastUpdated.current) return;
+    lastUpdated.current = query.dataUpdatedAt;
     const d = query.data;
     if (d.quote) {
       qc.setQueryData(['/api/stocks', symbol, 'quote'], d.quote);
@@ -46,11 +46,7 @@ export function useStockBundle(symbol: string) {
     if (d.news) {
       qc.setQueryData(['/api/stocks', symbol, 'news'], d.news);
     }
-  }, [query.data, symbol, qc]);
-
-  useEffect(() => {
-    seeded.current = false;
-  }, [symbol]);
+  }, [query.data, query.dataUpdatedAt, symbol, qc]);
 
   return query;
 }
