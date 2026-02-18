@@ -5,9 +5,9 @@ import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import * as yahoo from "./api/yahoo";
 import * as fmp from "./api/fmp";
-import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL, loadPersistentCache } from "./api/cache";
+import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL, loadPersistentCache, deleteCacheKey } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP, FINVIZ_SECTOR_MAP } from "./data/sectors";
-import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying } from "./api/finviz";
+import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying, getFinvizDataAge } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe, isUSMarketOpen, getFrozenBreadth, getTrendStatus } from "./api/breadth";
 import { getRSScore, getAllRSRatings } from "./api/rs";
 import { computeLeadersQualityBatch, getCachedLeadersQuality, getPersistedScoresForSymbols, isBatchComputeRunning, warmUpQualityCache, PER_SYMBOL_CACHE_PREFIX, PER_SYMBOL_TTL } from "./api/quality";
@@ -290,8 +290,13 @@ async function computeIndustryPerformance(_etfOnly: boolean = false): Promise<an
 
     const EXCLUDED_FROM_RANKING = new Set(['Shell Companies', 'Exchange Traded Fund']);
     let hasRealStockData = false;
+    const finvizAgeHours = getFinvizDataAge();
+    const finvizStockDataFresh = finvizAgeHours < 4;
+    if (finvizAgeHours > 4) {
+      console.log(`[industry-perf] Finviz stock data is ${finvizAgeHours.toFixed(1)}h old — using RS groups page for dailyChange`);
+    }
     const industries = rsData.filter(ind => !EXCLUDED_FROM_RANKING.has(ind.name)).map(ind => {
-      const capWeightedDaily = getIndustryAvgChange(ind.name);
+      const capWeightedDaily = finvizStockDataFresh ? getIndustryAvgChange(ind.name) : 0;
       if (capWeightedDaily !== 0) hasRealStockData = true;
 
       return {
@@ -900,7 +905,25 @@ function initBackgroundTasks() {
             } else {
               const existing = getCached<any>('industry_perf_all');
               if (existing?.fullyEnriched) {
-                console.log(`[scheduler] Industry performance NOT enriched — keeping existing enriched cache`);
+                const merged = {
+                  ...existing,
+                  industries: existing.industries.map((oldInd: any) => {
+                    const freshInd = perfData.industries?.find((n: any) => n.name === oldInd.name);
+                    if (!freshInd) return oldInd;
+                    return {
+                      ...oldInd,
+                      weeklyChange: freshInd.weeklyChange,
+                      monthlyChange: freshInd.monthlyChange,
+                      quarterChange: freshInd.quarterChange,
+                      halfChange: freshInd.halfChange,
+                      yearlyChange: freshInd.yearlyChange,
+                      ytdChange: freshInd.ytdChange,
+                      rsRating: freshInd.rsRating,
+                    };
+                  }),
+                };
+                setCache('industry_perf_all', merged, industryPerfTtl());
+                console.log(`[scheduler] Industry performance merged: kept enriched dailyChange, updated weekly/monthly/RS from fresh RS data (${merged.industries.length} industries)`);
               } else {
                 setCache('industry_perf_all', perfData, industryPerfTtl());
                 console.log(`[scheduler] Industry performance updated (non-enriched, no better data): ${perfData.industries?.length} industries`);
@@ -1679,6 +1702,38 @@ export async function registerRoutes(
 
     backgroundRefresh(cacheKey, computeIndustryPerformance, industryPerfTtl());
     res.status(202).json({ _warming: true, industries: [] });
+  });
+
+  app.post('/api/market/industries/force-refresh', isAuthenticated, async (req: any, res) => {
+    if (!isAdmin(req)) return res.status(403).json({ message: "Admin only" });
+    try {
+      console.log(`[admin] Force-refreshing industry performance data...`);
+      const cacheKey = 'industry_perf_all';
+      const rsKey = 'finviz_industry_rs';
+
+      deleteCacheKey(cacheKey);
+      deleteCacheKey(rsKey);
+
+      console.log(`[admin] Cleared industry caches. Re-fetching RS data...`);
+      const rsData = await fetchIndustryRSFromFinviz(true);
+      console.log(`[admin] RS data refreshed: ${rsData.length} industries`);
+
+      const perfData = await computeIndustryPerformance();
+      setCache(cacheKey, perfData, industryPerfTtl());
+      console.log(`[admin] Industry perf recomputed: ${perfData.industries?.length} industries, enriched=${perfData.fullyEnriched}`);
+
+      const ageHours = getFinvizDataAge();
+      res.json({
+        success: true,
+        industries: perfData.industries?.length ?? 0,
+        fullyEnriched: perfData.fullyEnriched,
+        finvizStockDataAgeHours: Math.round(ageHours * 10) / 10,
+        rsIndustries: rsData.length,
+      });
+    } catch (err: any) {
+      console.error(`[admin] Force refresh error: ${err.message}`);
+      res.status(500).json({ error: err.message });
+    }
   });
 
   app.post('/api/market/industries/ma-signals', async (req, res) => {

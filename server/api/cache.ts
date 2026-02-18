@@ -62,12 +62,24 @@ export function setCache<T>(key: string, value: T, ttlSeconds: number): void {
 
 async function persistToDb(key: string, value: any): Promise<void> {
   const json = JSON.stringify(value);
-  await db.insert(cacheStore)
-    .values({ key, value: json, updatedAt: new Date() })
-    .onConflictDoUpdate({
-      target: cacheStore.key,
-      set: { value: json, updatedAt: new Date() },
-    });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await db.insert(cacheStore)
+        .values({ key, value: json, updatedAt: new Date() })
+        .onConflictDoUpdate({
+          target: cacheStore.key,
+          set: { value: json, updatedAt: new Date() },
+        });
+      return;
+    } catch (err: any) {
+      if (attempt === 0 && (err.message?.includes('timeout') || err.message?.includes('terminated'))) {
+        console.log(`[cache] DB persist retry for ${key} after timeout...`);
+        await new Promise(r => setTimeout(r, 2000));
+        continue;
+      }
+      throw err;
+    }
+  }
 }
 
 export async function loadPersistentCache(): Promise<number> {
@@ -122,4 +134,9 @@ export function clearRefreshing(key: string): void {
 
 export function clearCache(): void {
   cache.flushAll();
+}
+
+export function deleteCacheKey(key: string): void {
+  cache.del(key);
+  staleCache.del(key);
 }

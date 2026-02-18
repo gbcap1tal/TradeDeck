@@ -71,6 +71,9 @@ function loadPersistedFinviz(): FinvizSectorData | null {
   return null;
 }
 
+let fetchPage429Count = 0;
+let fetchPage429LastLog = 0;
+
 async function fetchPage(url: string): Promise<{ html: string | null; status: number }> {
   try {
     const response = await fetch(url, {
@@ -82,10 +85,20 @@ async function fetchPage(url: string): Promise<{ html: string | null; status: nu
       },
     });
     if (!response.ok) {
+      if (response.status === 429) {
+        fetchPage429Count++;
+        if (Date.now() - fetchPage429LastLog > 30000) {
+          console.log(`[finviz] Rate limited (429): ${fetchPage429Count} total hits`);
+          fetchPage429LastLog = Date.now();
+        }
+      } else {
+        console.log(`[finviz] fetchPage ${url.split('?')[0]} returned HTTP ${response.status}`);
+      }
       return { html: null, status: response.status };
     }
     return { html: await response.text(), status: response.status };
-  } catch {
+  } catch (err: any) {
+    console.log(`[finviz] fetchPage ${url.split('?')[0]} network error: ${err.message}`);
     return { html: null, status: 0 };
   }
 }
@@ -341,6 +354,7 @@ export async function getFinvizData(forceRefresh: boolean = false): Promise<Finv
 
       setCache(cacheKey, organized, FINVIZ_CACHE_TTL);
       persistFinvizToFile(organized);
+      markFinvizScrapeTime();
       return organized;
     } catch (err: any) {
       console.log(`[finviz] Scrape failed: ${err.message}`);
@@ -362,6 +376,27 @@ export function getFinvizDataSync(): FinvizSectorData | null {
   const cached = getCached<FinvizSectorData>('finviz_sector_data');
   if (cached) return cached;
   return loadPersistedFinviz();
+}
+
+let lastFinvizScrapeTimestamp: number = 0;
+
+export function getFinvizDataAge(): number {
+  if (lastFinvizScrapeTimestamp > 0) {
+    return (Date.now() - lastFinvizScrapeTimestamp) / (1000 * 60 * 60);
+  }
+  try {
+    if (fs.existsSync(FINVIZ_PERSIST_PATH)) {
+      const raw = JSON.parse(fs.readFileSync(FINVIZ_PERSIST_PATH, 'utf-8'));
+      if (raw?.savedAt) {
+        return (Date.now() - raw.savedAt) / (1000 * 60 * 60);
+      }
+    }
+  } catch {}
+  return 999;
+}
+
+export function markFinvizScrapeTime(): void {
+  lastFinvizScrapeTimestamp = Date.now();
 }
 
 export function getIndustriesForSector(sectorName: string): string[] {
