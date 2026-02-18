@@ -1,4 +1,4 @@
-const CALL_TIMEOUT_MS = 2500;
+const CALL_TIMEOUT_MS = 8000;
 
 function withTimeout<T>(promise: Promise<T>, fallback: T, label?: string): Promise<T> {
   return Promise.race([
