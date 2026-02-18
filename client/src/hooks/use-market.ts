@@ -94,11 +94,7 @@ export function useIndustryPerformance() {
   return useQuery({
     queryKey: ['/api/market/industries/performance'],
     queryFn: () => fetchWithWarmingRetry('/api/market/industries/performance'),
-    refetchInterval: (query) => {
-      const data = query.state.data as any;
-      if (data && !data.fullyEnriched) return 15000;
-      return 30000;
-    },
+    refetchInterval: 30000,
     retry: (failureCount, error) => {
       if (error?.message === "Data warming up") return failureCount < 30;
       return failureCount < 3;

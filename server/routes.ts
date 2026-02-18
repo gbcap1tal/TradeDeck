@@ -699,18 +699,8 @@ function initBackgroundTasks() {
           const rsData = await fetchIndustryRSFromFinviz(isDuringMarket);
           console.log(`[bg] Industry RS ratings loaded: ${rsData.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
           const perfData = await computeIndustryPerformance();
-          if (perfData.fullyEnriched) {
-            setCache('industry_perf_all', perfData, isDuringMarket ? 1800 : 43200);
-            console.log(`[bg] Industry performance computed (enriched): ${perfData.industries?.length} industries in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
-          } else {
-            const existing = getCached<any>('industry_perf_all');
-            if (!existing) {
-              setCache('industry_perf_all', perfData, isDuringMarket ? 1800 : 43200);
-              console.log(`[bg] Industry performance computed (NOT enriched, no existing cache): ${perfData.industries?.length} industries`);
-            } else {
-              console.log(`[bg] Industry performance NOT enriched — keeping existing cache (${existing.industries?.length} industries). Will re-enrich after Finviz scrape.`);
-            }
-          }
+          setCache('industry_perf_all', perfData, isDuringMarket ? 1800 : 43200);
+          console.log(`[bg] Industry performance computed: ${perfData.industries?.length} industries, enriched=${perfData.fullyEnriched} in ${((Date.now() - bgStart) / 1000).toFixed(1)}s`);
         } catch (e: any) {
           console.log(`[bg] Industry RS/perf error: ${e.message}`);
           const existing = getCached<any>('industry_perf_all');
@@ -898,37 +888,9 @@ function initBackgroundTasks() {
             const rsData = await fetchIndustryRSFromFinviz(isUSMarketOpen());
             console.log(`[scheduler] Industry RS refreshed: ${rsData.length} industries in ${((Date.now() - start) / 1000).toFixed(1)}s`);
             const perfData = await computeIndustryPerformance();
-            if (perfData.fullyEnriched) {
-              setCache('industry_perf_all', perfData, industryPerfTtl());
-              clearFailures('industry_perf');
-              console.log(`[scheduler] Industry performance refreshed (enriched): ${perfData.industries?.length} industries in ${((Date.now() - start) / 1000).toFixed(1)}s`);
-            } else {
-              const existing = getCached<any>('industry_perf_all');
-              if (existing?.fullyEnriched) {
-                const merged = {
-                  ...existing,
-                  industries: existing.industries.map((oldInd: any) => {
-                    const freshInd = perfData.industries?.find((n: any) => n.name === oldInd.name);
-                    if (!freshInd) return oldInd;
-                    return {
-                      ...oldInd,
-                      weeklyChange: freshInd.weeklyChange,
-                      monthlyChange: freshInd.monthlyChange,
-                      quarterChange: freshInd.quarterChange,
-                      halfChange: freshInd.halfChange,
-                      yearlyChange: freshInd.yearlyChange,
-                      ytdChange: freshInd.ytdChange,
-                      rsRating: freshInd.rsRating,
-                    };
-                  }),
-                };
-                setCache('industry_perf_all', merged, industryPerfTtl());
-                console.log(`[scheduler] Industry performance merged: kept enriched dailyChange, updated weekly/monthly/RS from fresh RS data (${merged.industries.length} industries)`);
-              } else {
-                setCache('industry_perf_all', perfData, industryPerfTtl());
-                console.log(`[scheduler] Industry performance updated (non-enriched, no better data): ${perfData.industries?.length} industries`);
-              }
-            }
+            setCache('industry_perf_all', perfData, industryPerfTtl());
+            clearFailures('industry_perf');
+            console.log(`[scheduler] Industry performance refreshed: ${perfData.industries?.length} industries, enriched=${perfData.fullyEnriched} in ${((Date.now() - start) / 1000).toFixed(1)}s`);
           } catch (e: any) {
             console.log(`[scheduler] Industry RS/perf error: ${e.message}`);
             const existing = getCached<any>('industry_perf_all');
@@ -999,12 +961,8 @@ function initBackgroundTasks() {
           clearFailures('finviz_scrape');
 
           const perfData = await computeIndustryPerformance();
-          if (perfData.fullyEnriched) {
-            setCache('industry_perf_all', perfData, industryPerfTtl());
-            console.log(`[scheduler] Industry perf re-enriched: ${perfData.industries?.length} industries`);
-          } else {
-            console.log(`[scheduler] WARNING: Post-Finviz industry perf still NOT enriched (${perfData.industries?.length} industries). Keeping existing cache.`);
-          }
+          setCache('industry_perf_all', perfData, industryPerfTtl());
+          console.log(`[scheduler] Industry perf re-enriched: ${perfData.industries?.length} industries, enriched=${perfData.fullyEnriched}`);
 
           const sectors = await computeSectorsData();
           setCache('sectors_data', sectors, sectorsTtl());
