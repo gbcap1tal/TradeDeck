@@ -1,6 +1,7 @@
 import { useRoute, Link } from "wouter";
 import { Navbar } from "@/components/layout/Navbar";
-import { useStockQuote, useStockQuality, useStockEarnings, useStockNews, useInsiderBuying, useCompressionScore } from "@/hooks/use-stocks";
+import { useStockQuote, useStockQuality, useStockEarnings, useStockNews, useInsiderBuying, useCompressionScore, useStockBundle } from "@/hooks/use-stocks";
+import { queryClient } from "@/lib/queryClient";
 import { StockChart } from "@/components/stock/StockChart";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, Plus, ArrowUp, ArrowDown, Check, X, AlertTriangle, Calendar, Newspaper, Flame, Zap, Info, Building2, Sparkles, Loader2, Star } from "lucide-react";
@@ -1059,6 +1060,23 @@ export default function StockDetail() {
   const { data: watchlists } = useWatchlists();
   const { user } = useAuth();
   const [aiSummaryOpen, setAiSummaryOpen] = useState(false);
+
+  const { data: bundle } = useStockBundle(symbol);
+  useEffect(() => {
+    if (!bundle || !symbol) return;
+    if (bundle.earnings?.length > 0) {
+      queryClient.setQueryData(['/api/stocks', symbol, 'earnings', 'quarterly'], bundle.earnings);
+    }
+    if (bundle.snapshot && Object.keys(bundle.snapshot).length > 0) {
+      queryClient.setQueryData(['/api/stocks', symbol, 'snapshot'], bundle.snapshot);
+    }
+    if (bundle.insider) {
+      queryClient.setQueryData(['/api/stocks', symbol, 'insider-buying'], bundle.insider);
+    }
+    if (bundle.news) {
+      queryClient.setQueryData(['/api/stocks', symbol, 'news'], bundle.news);
+    }
+  }, [bundle, symbol]);
 
   const handleAddToWatchlist = (watchlistId: number) => {
     addToWatchlist({ id: watchlistId, symbol });

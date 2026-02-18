@@ -845,10 +845,27 @@ export interface FinvizQuoteData {
 
 const FINVIZ_QUOTE_CACHE_TTL = 86400;
 
+const inflightQuoteScrapes = new Map<string, Promise<FinvizQuoteData | null>>();
+
 export async function scrapeFinvizQuote(symbol: string): Promise<FinvizQuoteData | null> {
   const cacheKey = `finviz_quote_${symbol}`;
   const cached = getCached<FinvizQuoteData>(cacheKey);
   if (cached) return cached;
+
+  const inflight = inflightQuoteScrapes.get(symbol);
+  if (inflight) return inflight;
+
+  const promise = _scrapeFinvizQuoteImpl(symbol);
+  inflightQuoteScrapes.set(symbol, promise);
+  try {
+    return await promise;
+  } finally {
+    inflightQuoteScrapes.delete(symbol);
+  }
+}
+
+async function _scrapeFinvizQuoteImpl(symbol: string): Promise<FinvizQuoteData | null> {
+  const cacheKey = `finviz_quote_${symbol}`;
 
   try {
     const url = `https://finviz.com/quote.ashx?t=${encodeURIComponent(symbol)}&p=d&ty=ea`;
@@ -932,10 +949,27 @@ export interface InsiderTransaction {
 
 const INSIDER_CACHE_TTL = 21600;
 
+const inflightInsiderScrapes = new Map<string, Promise<InsiderTransaction[]>>();
+
 export async function scrapeFinvizInsiderBuying(symbol: string): Promise<InsiderTransaction[]> {
   const cacheKey = `finviz_insider_buying_${symbol}`;
   const cached = getCached<InsiderTransaction[]>(cacheKey);
   if (cached) return cached;
+
+  const inflight = inflightInsiderScrapes.get(symbol);
+  if (inflight) return inflight;
+
+  const promise = _scrapeFinvizInsiderImpl(symbol);
+  inflightInsiderScrapes.set(symbol, promise);
+  try {
+    return await promise;
+  } finally {
+    inflightInsiderScrapes.delete(symbol);
+  }
+}
+
+async function _scrapeFinvizInsiderImpl(symbol: string): Promise<InsiderTransaction[]> {
+  const cacheKey = `finviz_insider_buying_${symbol}`;
 
   try {
     const url = `https://finviz.com/insidertrading.ashx?tc=1&t=${encodeURIComponent(symbol)}`;

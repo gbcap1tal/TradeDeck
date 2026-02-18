@@ -139,3 +139,23 @@ export function useStockSnapshot(symbol: string) {
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });
 }
+
+export function useStockBundle(symbol: string, view: 'quarterly' | 'annual' = 'quarterly') {
+  return useQuery({
+    queryKey: ['/api/stocks', symbol, 'bundle', view],
+    queryFn: async () => {
+      const res = await fetch(`/api/stocks/${symbol}/bundle?view=${view}`, { credentials: "include" });
+      if (!res.ok) throw new Error(`Bundle fetch failed: ${res.status}`);
+      return res.json() as Promise<{
+        snapshot: Record<string, string>;
+        earnings: any[];
+        insider: { transactions: any[]; hasBuying: boolean };
+        news: any[];
+      }>;
+    },
+    enabled: !!symbol,
+    retry: 2,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
+    staleTime: 5 * 60 * 1000,
+  });
+}

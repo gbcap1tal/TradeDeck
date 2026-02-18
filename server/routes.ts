@@ -2486,6 +2486,144 @@ export async function registerRoutes(
     return res.json([]);
   });
 
+  app.get('/api/stocks/:symbol/bundle', async (req, res) => {
+    const { symbol } = req.params;
+    const sym = symbol.toUpperCase();
+    const view = (req.query.view as string) || 'quarterly';
+
+    const t0 = Date.now();
+
+    const [finvizData, insiderTxns, newsData] = await Promise.all([
+      scrapeFinvizQuote(sym).catch((e: any) => { console.error(`Bundle finviz error ${sym}:`, e.message); return null; }),
+      scrapeFinvizInsiderBuying(sym).catch((e: any) => { console.error(`Bundle insider error ${sym}:`, e.message); return [] as any[]; }),
+      (async () => {
+        try {
+          const fNews = await getFinvizNews(sym);
+          if (fNews && fNews.length > 0) return fNews;
+        } catch (e: any) { console.error(`Bundle finviz news error ${sym}:`, e.message); }
+        try {
+          const fmpNews = await fmp.getStockNews(sym);
+          if (fmpNews && fmpNews.length > 0) return fmpNews;
+        } catch (e: any) { console.error(`Bundle fmp news error ${sym}:`, e.message); }
+        return [];
+      })(),
+    ]);
+
+    const snapshot = finvizData?.snapshot || {};
+    const insider = { transactions: insiderTxns, hasBuying: (insiderTxns as any[]).length > 0 };
+
+    let earnings: any[] = [];
+    if (finvizData && finvizData.earnings.length > 0) {
+      const entries = [...finvizData.earnings].sort((a, b) => a.fiscalEndDate.localeCompare(b.fiscalEndDate));
+
+      if (view === 'annual') {
+        const yearMap = new Map<number, { revenue: number; eps: number; revenueEst: number; epsEst: number; hasActual: boolean; count: number }>();
+        for (const e of entries) {
+          const m = e.fiscalPeriod.match(/(\d{4})/);
+          if (!m) continue;
+          const yr = parseInt(m[1]);
+          const existing = yearMap.get(yr) || { revenue: 0, eps: 0, revenueEst: 0, epsEst: 0, hasActual: false, count: 0 };
+          if (e.salesActual != null) { existing.revenue += e.salesActual; existing.hasActual = true; }
+          else if (e.salesEstimate != null) existing.revenueEst += e.salesEstimate;
+          if (e.epsActual != null) { existing.eps += e.epsActual; existing.hasActual = true; }
+          else if (e.epsEstimate != null) existing.epsEst += e.epsEstimate;
+          existing.count++;
+          yearMap.set(yr, existing);
+        }
+        const allYears = Array.from(yearMap.keys()).sort();
+        const years = allYears.filter(yr => yearMap.get(yr)!.count >= 2).slice(-8);
+        earnings = years.map(yr => {
+          const d = yearMap.get(yr)!;
+          const isEst = !d.hasActual;
+          const rev = d.hasActual ? d.revenue + d.revenueEst : d.revenueEst;
+          const eps = d.hasActual ? d.eps + d.epsEst : d.epsEst;
+          return { quarter: `FY '${String(yr).slice(-2)}`, revenue: Math.round(rev * 100) / 100, eps: Math.round(eps * 100) / 100, revenueYoY: null as number | null, epsYoY: null as number | null, isEstimate: isEst };
+        });
+        for (let i = 1; i < earnings.length; i++) {
+          const prev = earnings[i - 1];
+          if (prev.revenue !== 0) earnings[i].revenueYoY = Math.round(((earnings[i].revenue - prev.revenue) / Math.abs(prev.revenue)) * 1000) / 10;
+          if (prev.eps !== 0) earnings[i].epsYoY = Math.round(((earnings[i].eps - prev.eps) / Math.abs(prev.eps)) * 1000) / 10;
+        }
+      } else {
+        const actuals = entries.filter(e => e.epsActual != null || e.salesActual != null);
+        const estimates = entries.filter(e => e.epsActual == null && e.salesActual == null && new Date(e.fiscalEndDate) > new Date(actuals.length > 0 ? actuals[actuals.length - 1].fiscalEndDate : '2000-01-01'));
+        const display = [...actuals.slice(-8), ...estimates.slice(0, 4)];
+        if (display.length > 0) {
+          earnings = display.map(e => {
+            const m = e.fiscalPeriod.match(/(\d{4})Q(\d)/);
+            const label = m ? `Q${m[2]} '${m[1].slice(-2)}` : e.fiscalPeriod;
+            const isEst = e.epsActual == null && e.salesActual == null;
+            const rev = isEst ? Math.round((e.salesEstimate || 0) * 100) / 100 : Math.round((e.salesActual || 0) * 100) / 100;
+            const eps = isEst ? (e.epsEstimate || 0) : (e.epsActual || 0);
+            const surprise = (!isEst && e.epsEstimate != null && e.epsActual != null && e.epsEstimate !== 0) ? Math.round(((e.epsActual - e.epsEstimate) / Math.abs(e.epsEstimate)) * 1000) / 10 : undefined;
+            return { quarter: label, revenue: rev, eps: Math.round(eps * 100) / 100, revenueYoY: null as number | null, epsYoY: null as number | null, isEstimate: isEst, epsEstimate: e.epsEstimate != null ? Math.round(e.epsEstimate * 100) / 100 : undefined, epsSurprise: surprise, salesEstimate: e.salesEstimate != null ? Math.round(e.salesEstimate * 100) / 100 : undefined, numAnalysts: e.epsAnalysts ?? undefined };
+          });
+          const qKeyMap = new Map<string, number>();
+          for (let i = 0; i < earnings.length; i++) {
+            const m2 = earnings[i].quarter.match(/Q(\d)\s+'(\d{2})/);
+            if (m2) qKeyMap.set(`${m2[1]}Q20${m2[2]}`, i);
+          }
+          for (let i = 0; i < earnings.length; i++) {
+            const m2 = earnings[i].quarter.match(/Q(\d)\s+'(\d{2})/);
+            if (!m2) continue;
+            const qNum = parseInt(m2[1]);
+            const yr = 2000 + parseInt(m2[2]);
+            const prevIdx = qKeyMap.get(`${qNum}Q${yr - 1}`);
+            if (prevIdx != null) {
+              const prevRev = earnings[prevIdx].revenue;
+              const prevEps = earnings[prevIdx].eps;
+              if (prevRev !== 0) earnings[i].revenueYoY = Math.round(((earnings[i].revenue - prevRev) / Math.abs(prevRev)) * 1000) / 10;
+              if (prevEps !== 0) earnings[i].epsYoY = Math.round(((earnings[i].eps - prevEps) / Math.abs(prevEps)) * 1000) / 10;
+            }
+          }
+        }
+      }
+    }
+
+    if (earnings.length === 0) {
+      try {
+        const enhanced = await yahoo.getEnhancedEarningsData(sym);
+        if (enhanced && enhanced.length > 0) earnings = enhanced;
+      } catch (e: any) { console.error(`Bundle yahoo earnings error ${sym}:`, e.message); }
+    }
+    if (earnings.length === 0) {
+      try {
+        const limit = view === 'annual' ? 8 : 20;
+        const period = view === 'annual' ? 'annual' : 'quarter';
+        const incomeData = await fmp.getIncomeStatement(sym, period, limit);
+        if (incomeData && incomeData.length > 0) {
+          const sorted = [...incomeData].reverse();
+          if (view === 'annual') {
+            earnings = sorted.map(s => {
+              const d = new Date(s.date); const yr = d.getFullYear();
+              return { quarter: `FY '${String(yr).slice(-2)}`, revenue: Math.round((s.revenue || 0) / 1e6 * 100) / 100, eps: Math.round((s.epsDiluted || s.eps || 0) * 100) / 100, revenueYoY: null as number | null, epsYoY: null as number | null, isEstimate: false };
+            });
+          } else {
+            earnings = sorted.map(s => {
+              const d = new Date(s.date); const q = Math.ceil((d.getMonth() + 1) / 3); const yr = d.getFullYear();
+              return { quarter: `Q${q} '${String(yr).slice(-2)}`, revenue: Math.round((s.revenue || 0) / 1e6 * 100) / 100, eps: Math.round((s.epsDiluted || s.eps || 0) * 100) / 100, revenueYoY: null as number | null, epsYoY: null as number | null, isEstimate: false };
+            }).slice(-12);
+          }
+          const qKeyMap = new Map<string, number>();
+          for (let i = 0; i < earnings.length; i++) {
+            const m2 = earnings[i].quarter.match(/Q(\d)\s+'(\d{2})|FY\s+'(\d{2})/);
+            if (m2) { const k = m2[1] ? `${m2[1]}Q20${m2[2]}` : `FY20${m2[3]}`; qKeyMap.set(k, i); }
+          }
+          for (let i = 1; i < earnings.length; i++) {
+            const prev = earnings[i - 1];
+            if (prev.revenue !== 0) earnings[i].revenueYoY = Math.round(((earnings[i].revenue - prev.revenue) / Math.abs(prev.revenue)) * 1000) / 10;
+            if (prev.eps !== 0) earnings[i].epsYoY = Math.round(((earnings[i].eps - prev.eps) / Math.abs(prev.eps)) * 1000) / 10;
+          }
+        }
+      } catch (e: any) { console.error(`Bundle FMP earnings error ${sym}:`, e.message); }
+    }
+
+    const elapsed = Date.now() - t0;
+    if (elapsed > 3000) console.log(`[bundle] ${sym} took ${elapsed}ms`);
+
+    return res.json({ snapshot, earnings, insider, news: newsData });
+  });
+
   app.get('/api/stocks/:symbol/ai-summary', async (req, res) => {
     const { symbol } = req.params;
     const sym = symbol.toUpperCase();
