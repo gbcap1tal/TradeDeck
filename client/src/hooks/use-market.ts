@@ -97,7 +97,7 @@ export function useIndustryPerformance() {
     refetchInterval: (query) => {
       const data = query.state.data as any;
       if (data && !data.fullyEnriched) return 15000;
-      return 120000;
+      return 30000;
     },
     retry: (failureCount, error) => {
       if (error?.message === "Data warming up") return failureCount < 30;
