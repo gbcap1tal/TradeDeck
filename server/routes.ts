@@ -7,7 +7,7 @@ import * as yahoo from "./api/yahoo";
 import * as fmp from "./api/fmp";
 import { getCached, setCache, getStale, isRefreshing, markRefreshing, clearRefreshing, CACHE_TTL, loadPersistentCache, deleteCacheKey } from "./api/cache";
 import { SECTORS_DATA, INDUSTRY_ETF_MAP, FINVIZ_SECTOR_MAP } from "./data/sectors";
-import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying, getFinvizDataAge } from "./api/finviz";
+import { getFinvizData, getFinvizDataSync, getIndustriesForSector, getStocksForIndustry, getIndustryAvgChange, searchStocks, getFinvizNews, fetchIndustryRSFromFinviz, getIndustryRSRating, getIndustryRSData, getAllIndustryRS, scrapeFinvizQuote, scrapeFinvizInsiderBuying, getFinvizDataAge, setFinvizScrapeTimestamp } from "./api/finviz";
 import { computeMarketBreadth, loadPersistedBreadthData, getBreadthWithTimeframe, isUSMarketOpen, getFrozenBreadth, getTrendStatus } from "./api/breadth";
 import { getRSScore, getAllRSRatings } from "./api/rs";
 import { computeLeadersQualityBatch, getCachedLeadersQuality, getPersistedScoresForSymbols, isBatchComputeRunning, warmUpQualityCache, PER_SYMBOL_CACHE_PREFIX, PER_SYMBOL_TTL } from "./api/quality";
@@ -624,7 +624,7 @@ function initBackgroundTasks() {
   bgInitialized = true;
 
   setTimeout(async () => {
-    const persistentCount = await loadPersistentCache();
+    const persistentCount = await loadPersistentCache((ts) => setFinvizScrapeTimestamp(ts));
     if (persistentCount > 0) {
       console.log(`[bg] Persistent cache restored: ${persistentCount} dashboard keys loaded from DB — dashboard ready instantly`);
     }

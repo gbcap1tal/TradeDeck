@@ -83,7 +83,7 @@ async function persistToDb(key: string, value: any): Promise<void> {
   }
 }
 
-export async function loadPersistentCache(): Promise<number> {
+export async function loadPersistentCache(onFinvizRestored?: (timestamp: number) => void): Promise<number> {
   let loaded = 0;
   try {
     const rows = await db.select().from(cacheStore);
@@ -100,6 +100,9 @@ export async function loadPersistentCache(): Promise<number> {
         staleCache.set(row.key, parsed, 86400 * 3);
         loaded++;
         console.log(`[cache] Restored from DB: ${row.key} (${(age / 60).toFixed(0)}min old)`);
+        if (row.key === 'finviz_sector_data' && onFinvizRestored) {
+          onFinvizRestored(new Date(row.updatedAt).getTime());
+        }
       } catch (e: any) {
         console.log(`[cache] Failed to parse DB cache for ${row.key}: ${e.message}`);
       }

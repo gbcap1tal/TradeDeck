@@ -399,6 +399,13 @@ export function markFinvizScrapeTime(): void {
   lastFinvizScrapeTimestamp = Date.now();
 }
 
+export function setFinvizScrapeTimestamp(ts: number): void {
+  if (ts > 0 && ts <= Date.now()) {
+    lastFinvizScrapeTimestamp = ts;
+    console.log(`[finviz] Set scrape timestamp from DB: ${((Date.now() - ts) / 60000).toFixed(0)}min ago`);
+  }
+}
+
 export function getIndustriesForSector(sectorName: string): string[] {
   const data = getFinvizDataSync();
   if (!data || !data[sectorName]) return [];
