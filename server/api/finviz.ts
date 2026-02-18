@@ -6,11 +6,11 @@ import { FINVIZ_SECTOR_MAP } from '../data/sectors';
 
 const FINVIZ_CACHE_TTL = 86400;
 const FINVIZ_PERSIST_PATH = path.join(process.cwd(), '.finviz-cache.json');
-const REQUEST_DELAY = 250;
+const REQUEST_DELAY = 200;
 const RETRY_DELAY = 2000;
-const MAX_RETRIES = 4;
+const MAX_RETRIES = 3;
 const MAX_CONSECUTIVE_FAILURES = 5;
-const PARALLEL_PAGES = 3;
+const PARALLEL_PAGES = 5;
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 export interface FinvizStock {
@@ -677,9 +677,14 @@ export async function fetchIndustryRSFromFinviz(forceRefresh = false): Promise<I
   console.log('[finviz] Fetching industry performance groups for RS calculation...');
 
   try {
-    const result = await fetchPage(url);
+    let result = await fetchPage(url);
     if (!result.html) {
-      console.log('[finviz] Industry groups page returned no data');
+      console.log(`[finviz] Industry groups page returned no data (status ${result.status}), retrying...`);
+      await sleep(3000);
+      result = await fetchPage(url);
+    }
+    if (!result.html) {
+      console.log(`[finviz] Industry groups page failed twice (status ${result.status}), using persisted data`);
       const persisted = loadPersistedIndustryRS();
       return persisted || [];
     }
