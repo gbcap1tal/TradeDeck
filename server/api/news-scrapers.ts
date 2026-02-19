@@ -91,14 +91,33 @@ async function scrapeDigestFromJSON(): Promise<{ headline: string; bullets: stri
     const html = await fetchHTML('https://finviz.com/');
     if (!html) return null;
 
-    const jsonMatch = html.match(/\{"whyMoving"\s*:\s*\{[^<]+?"bulletPointsList"\s*:\s*\[[^\]]*\][^<]*?\}/);
-    if (!jsonMatch) {
-      console.log(`[news] No whyMoving JSON found in Finviz HTML`);
+    const idx = html.indexOf('"whyMoving"');
+    if (idx === -1) {
+      console.log(`[news] No whyMoving key found in Finviz HTML`);
+      return null;
+    }
+
+    let start = idx;
+    while (start > 0 && html[start] !== '{') start--;
+
+    let depth = 0;
+    let end = start;
+    for (let i = start; i < Math.min(start + 5000, html.length); i++) {
+      if (html[i] === '{') depth++;
+      else if (html[i] === '}') {
+        depth--;
+        if (depth === 0) { end = i + 1; break; }
+      }
+    }
+
+    const raw = html.substring(start, end);
+    if (!raw || raw.length < 50) {
+      console.log(`[news] whyMoving JSON block too short: ${raw.length} chars`);
       return null;
     }
 
     try {
-      const data = JSON.parse(jsonMatch[0]);
+      const data = JSON.parse(raw);
       return extractFromWhyMoving(data);
     } catch (e: any) {
       console.log(`[news] Failed to parse whyMoving JSON: ${e.message}`);
