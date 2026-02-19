@@ -89,9 +89,9 @@ function isValidDigest(d: any): d is DailyDigest {
 }
 
 export async function scrapeDigestRaw(): Promise<{ headline: string; bullets: string[] } | null> {
-  const result = await scrapeDigestHTTP();
+  const result = await scrapeDigestWithPuppeteer();
   if (result) return result;
-  return await scrapeDigestWithPuppeteer();
+  return await scrapeDigestHTTP();
 }
 
 async function scrapeDigestHTTP(): Promise<{ headline: string; bullets: string[] } | null> {
@@ -152,47 +152,94 @@ async function scrapeDigestWithPuppeteer(): Promise<{ headline: string; bullets:
     await page.goto('https://finviz.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
     await new Promise(r => setTimeout(r, 3000));
 
-    await page.evaluate(() => {
-      const buttons = Array.from(document.querySelectorAll('button'));
-      const moreBtn = buttons.find(b => (b.textContent || '').trim() === 'More');
-      if (moreBtn) moreBtn.click();
+    const mainHeadline = await page.evaluate(() => {
+      const el = document.querySelector('.news-banner_headline__PqJSn');
+      if (el) return (el.textContent || '').trim();
+      const links = Array.from(document.querySelectorAll('a'));
+      for (const a of links) {
+        const next = a.nextElementSibling;
+        if (next && (next.textContent || '').trim().startsWith('More')) {
+          return (a.textContent || '').trim();
+        }
+      }
+      return null;
     });
 
-    await new Promise(r => setTimeout(r, 3000));
+    console.log(`[news] Finviz main headline: "${(mainHeadline || 'not found').substring(0, 80)}"`);
+
+    await page.evaluate(() => {
+      const clickTargets = Array.from(document.querySelectorAll('button, a, span, div'));
+      const moreEl = clickTargets.find(el => {
+        const text = (el.textContent || '').trim();
+        return text === 'More +' || text === 'More' || text === 'More+';
+      });
+      if (moreEl) {
+        (moreEl as HTMLElement).click();
+        console.log('Clicked More button');
+      }
+    });
+
+    await new Promise(r => setTimeout(r, 4000));
 
     const digest = await page.evaluate(() => {
-      const allDivs = Array.from(document.querySelectorAll('div, section'));
-      for (let i = 0; i < allDivs.length; i++) {
-        const div = allDivs[i];
-        const text = (div.textContent || '').trim();
-        if (text.startsWith('Daily Digest') && text.length > 100 && text.length < 5000) {
-          const children = Array.from(div.querySelectorAll('p, li, div, span'));
-          const items: string[] = [];
-          children.forEach(child => {
-            const ct = (child.textContent || '').trim();
-            if (ct.length > 25 && ct.length < 500 && !items.includes(ct)) {
-              const skip = ct.includes('AI-generated content') || ct === 'Daily Digest' || ct.startsWith('×')
-                || /DOWNASDAQ|Stock Price Chart/i.test(ct)
-                || /^(DOW|NASDAQ|S&P\s*500|RUSSELL\s*2000)$/i.test(ct);
-              if (!skip) {
-                items.push(ct);
-              }
-            }
-          });
-          return items;
+      const panels = Array.from(document.querySelectorAll('div, section, aside'));
+      const digestPanels = panels
+        .filter(p => {
+          const t = (p.textContent || '');
+          return t.includes('Daily Digest') && t.length > 100 && t.length < 10000;
+        })
+        .sort((a, b) => (a.textContent || '').length - (b.textContent || '').length);
+
+      if (digestPanels.length === 0) return null;
+      const panel = digestPanels[0];
+
+      const bullets: string[] = [];
+      const listItems = panel.querySelectorAll('li');
+      for (const li of Array.from(listItems)) {
+        const lt = (li.textContent || '').trim();
+        if (lt.length > 15 && lt.length < 500 && !bullets.includes(lt)) {
+          bullets.push(lt);
         }
+      }
+
+      const garbagePatterns = [
+        'Daily Digest', 'AI-generated', 'Stock Price Chart',
+        'DOWNASDAQS', 'DOW', 'NASDAQ', 'S&P 500', 'RUSSELL 2000',
+      ];
+
+      let rawText = (panel.textContent || '').trim();
+      const firstBullet = bullets[0] || '';
+      const headlineEnd = firstBullet ? rawText.indexOf(firstBullet) : -1;
+      let headlineArea = headlineEnd > 0 ? rawText.substring(0, headlineEnd).trim() : rawText.substring(0, 500);
+
+      for (const g of garbagePatterns) {
+        const idx = headlineArea.lastIndexOf(g);
+        if (idx >= 0) {
+          headlineArea = headlineArea.substring(idx + g.length).trim();
+        }
+      }
+      headlineArea = headlineArea.replace(/^[\s\-×:]+/, '').trim();
+
+      const headline = headlineArea.length > 30 ? headlineArea : '';
+
+      if (headline && bullets.length >= 2) {
+        return { headline, bullets };
       }
       return null;
     });
 
     await browser.close();
 
-    if (digest && digest.length > 0) {
-      const headline = digest[0];
-      const bullets = digest.slice(1);
-      console.log(`[news] Puppeteer digest scraped: "${headline.substring(0, 60)}..." with ${bullets.length} bullets`);
-      return { headline, bullets };
+    if (digest && digest.headline) {
+      console.log(`[news] Puppeteer digest scraped: "${digest.headline.substring(0, 60)}..." with ${digest.bullets.length} bullets`);
+      return { headline: digest.headline, bullets: digest.bullets };
     }
+
+    if (mainHeadline && mainHeadline.length > 30) {
+      console.log(`[news] Using main headline as fallback (no digest panel found)`);
+      return { headline: mainHeadline, bullets: [] };
+    }
+
     return null;
   } catch (err: any) {
     console.error(`[news] Puppeteer digest error: ${err.message}`);
