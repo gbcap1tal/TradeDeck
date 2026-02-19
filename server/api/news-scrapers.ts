@@ -1,9 +1,7 @@
 import * as cheerio from 'cheerio';
-import puppeteer from 'puppeteer-core';
 import { getCached, setCache } from './cache';
 import * as fs from 'fs';
 import * as path from 'path';
-import { execSync } from 'child_process';
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
@@ -31,7 +29,7 @@ const DIGEST_CACHE_KEY = 'finviz_daily_digest';
 const PREMARKET_CACHE_KEY = 'briefing_premarket';
 const DIGEST_PERSIST_PATH = path.join(process.cwd(), '.digest-cache.json');
 const PREMARKET_PERSIST_PATH = path.join(process.cwd(), '.premarket-cache.json');
-const DIGEST_TTL = 3600;
+const DIGEST_TTL = 900;
 const PREMARKET_TTL = 600;
 
 function persistToFile(filePath: string, data: any): void {
@@ -71,13 +69,6 @@ async function fetchHTML(url: string): Promise<string | null> {
   }
 }
 
-function getChromiumPath(): string {
-  try {
-    return execSync('which chromium', { encoding: 'utf-8' }).trim();
-  } catch {
-    return '/nix/store/zi4f80l169xlmivz8vja8wlphq74qqk0-chromium-125.0.6422.141/bin/chromium';
-  }
-}
 
 function isValidDigest(d: any): d is DailyDigest {
   if (!d || typeof d.headline !== 'string' || !d.headline) return false;
@@ -89,12 +80,59 @@ function isValidDigest(d: any): d is DailyDigest {
 }
 
 export async function scrapeDigestRaw(): Promise<{ headline: string; bullets: string[] } | null> {
-  const result = await scrapeDigestWithPuppeteer();
+  const result = await scrapeDigestFromJSON();
   if (result) return result;
-  return await scrapeDigestHTTP();
+  console.log(`[news] JSON digest extraction failed, trying nn-tab-link fallback...`);
+  return await scrapeDigestHTTPFallback();
 }
 
-async function scrapeDigestHTTP(): Promise<{ headline: string; bullets: string[] } | null> {
+async function scrapeDigestFromJSON(): Promise<{ headline: string; bullets: string[] } | null> {
+  try {
+    const html = await fetchHTML('https://finviz.com/');
+    if (!html) return null;
+
+    const jsonMatch = html.match(/\{"whyMoving"\s*:\s*\{[^<]+?"bulletPointsList"\s*:\s*\[[^\]]*\][^<]*?\}/);
+    if (!jsonMatch) {
+      console.log(`[news] No whyMoving JSON found in Finviz HTML`);
+      return null;
+    }
+
+    try {
+      const data = JSON.parse(jsonMatch[0]);
+      return extractFromWhyMoving(data);
+    } catch (e: any) {
+      console.log(`[news] Failed to parse whyMoving JSON: ${e.message}`);
+      return null;
+    }
+  } catch (e: any) {
+    console.log(`[news] JSON digest scrape failed: ${e.message}`);
+    return null;
+  }
+}
+
+function extractFromWhyMoving(data: any): { headline: string; bullets: string[] } | null {
+  const wm = data?.whyMoving;
+  if (!wm) return null;
+
+  const headline = (wm.headline || '').trim();
+  if (!headline || headline.length < 25) {
+    console.log(`[news] whyMoving headline too short or empty`);
+    return null;
+  }
+
+  const bullets: string[] = [];
+  if (Array.isArray(wm.bulletPointsList)) {
+    for (const b of wm.bulletPointsList) {
+      const text = (b || '').trim();
+      if (text.length > 10) bullets.push(text);
+    }
+  }
+
+  console.log(`[news] JSON digest extracted: "${headline.substring(0, 60)}..." with ${bullets.length} bullets`);
+  return { headline, bullets };
+}
+
+async function scrapeDigestHTTPFallback(): Promise<{ headline: string; bullets: string[] } | null> {
   try {
     const html = await fetchHTML('https://finviz.com/');
     if (!html) return null;
@@ -112,140 +150,10 @@ async function scrapeDigestHTTP(): Promise<{ headline: string; bullets: string[]
     if (items.length === 0) return null;
 
     const headline = items.shift()!;
-    console.log(`[news] HTTP digest scraped: "${headline.substring(0, 60)}..." with ${items.length} bullets`);
+    console.log(`[news] HTTP fallback digest: "${headline.substring(0, 60)}..." with ${items.length} bullets`);
     return { headline, bullets: items };
   } catch (e: any) {
-    console.log(`[news] HTTP digest scrape failed: ${e.message}`);
-    return null;
-  }
-}
-
-async function scrapeDigestWithPuppeteer(): Promise<{ headline: string; bullets: string[] } | null> {
-  let browser;
-  try {
-    browser = await puppeteer.launch({
-      executablePath: getChromiumPath(),
-      headless: true,
-      args: [
-        '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage',
-        '--disable-gpu', '--disable-extensions', '--disable-background-networking',
-        '--disable-default-apps', '--disable-sync', '--disable-translate',
-        '--no-first-run', '--disable-background-timer-throttling',
-      ],
-      timeout: 30000,
-    });
-
-    const page = await browser.newPage();
-    await page.setUserAgent(USER_AGENT);
-    await page.setViewport({ width: 1280, height: 800 });
-
-    await page.setRequestInterception(true);
-    page.on('request', (request) => {
-      const type = request.resourceType();
-      if (['image', 'media', 'font', 'stylesheet'].includes(type)) {
-        request.abort();
-      } else {
-        request.continue();
-      }
-    });
-
-    await page.goto('https://finviz.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await new Promise(r => setTimeout(r, 3000));
-
-    const mainHeadline = await page.evaluate(() => {
-      const el = document.querySelector('.news-banner_headline__PqJSn');
-      if (el) return (el.textContent || '').trim();
-      const links = Array.from(document.querySelectorAll('a'));
-      for (const a of links) {
-        const next = a.nextElementSibling;
-        if (next && (next.textContent || '').trim().startsWith('More')) {
-          return (a.textContent || '').trim();
-        }
-      }
-      return null;
-    });
-
-    console.log(`[news] Finviz main headline: "${(mainHeadline || 'not found').substring(0, 80)}"`);
-
-    await page.evaluate(() => {
-      const clickTargets = Array.from(document.querySelectorAll('button, a, span, div'));
-      const moreEl = clickTargets.find(el => {
-        const text = (el.textContent || '').trim();
-        return text === 'More +' || text === 'More' || text === 'More+';
-      });
-      if (moreEl) {
-        (moreEl as HTMLElement).click();
-        console.log('Clicked More button');
-      }
-    });
-
-    await new Promise(r => setTimeout(r, 4000));
-
-    const digest = await page.evaluate(() => {
-      const panels = Array.from(document.querySelectorAll('div, section, aside'));
-      const digestPanels = panels
-        .filter(p => {
-          const t = (p.textContent || '');
-          return t.includes('Daily Digest') && t.length > 100 && t.length < 10000;
-        })
-        .sort((a, b) => (a.textContent || '').length - (b.textContent || '').length);
-
-      if (digestPanels.length === 0) return null;
-      const panel = digestPanels[0];
-
-      const bullets: string[] = [];
-      const listItems = panel.querySelectorAll('li');
-      for (const li of Array.from(listItems)) {
-        const lt = (li.textContent || '').trim();
-        if (lt.length > 15 && lt.length < 500 && !bullets.includes(lt)) {
-          bullets.push(lt);
-        }
-      }
-
-      const garbagePatterns = [
-        'Daily Digest', 'AI-generated', 'Stock Price Chart',
-        'DOWNASDAQS', 'DOW', 'NASDAQ', 'S&P 500', 'RUSSELL 2000',
-      ];
-
-      let rawText = (panel.textContent || '').trim();
-      const firstBullet = bullets[0] || '';
-      const headlineEnd = firstBullet ? rawText.indexOf(firstBullet) : -1;
-      let headlineArea = headlineEnd > 0 ? rawText.substring(0, headlineEnd).trim() : rawText.substring(0, 500);
-
-      for (const g of garbagePatterns) {
-        const idx = headlineArea.lastIndexOf(g);
-        if (idx >= 0) {
-          headlineArea = headlineArea.substring(idx + g.length).trim();
-        }
-      }
-      headlineArea = headlineArea.replace(/^[\s\-×:]+/, '').trim();
-
-      const headline = headlineArea.length > 30 ? headlineArea : '';
-
-      if (headline && bullets.length >= 2) {
-        return { headline, bullets };
-      }
-      return null;
-    });
-
-    await browser.close();
-
-    if (digest && digest.headline) {
-      console.log(`[news] Puppeteer digest scraped: "${digest.headline.substring(0, 60)}..." with ${digest.bullets.length} bullets`);
-      return { headline: digest.headline, bullets: digest.bullets };
-    }
-
-    if (mainHeadline && mainHeadline.length > 30) {
-      console.log(`[news] Using main headline as fallback (no digest panel found)`);
-      return { headline: mainHeadline, bullets: [] };
-    }
-
-    return null;
-  } catch (err: any) {
-    console.error(`[news] Puppeteer digest error: ${err.message}`);
-    if (browser) {
-      try { await browser.close(); } catch { /* ignored */ }
-    }
+    console.log(`[news] HTTP fallback digest failed: ${e.message}`);
     return null;
   }
 }
