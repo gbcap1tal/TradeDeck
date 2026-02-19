@@ -726,6 +726,22 @@ function initBackgroundTasks() {
 
     console.log(`[bg] Phase 1 complete in ${((Date.now() - bgStart) / 1000).toFixed(1)}s — dashboard data ready`);
 
+    // News refresh: always force-refresh digest and premarket on startup
+    (async () => {
+      try {
+        const digest = await scrapeFinvizDigest(true);
+        console.log(`[bg] News digest refreshed on startup: ${digest ? `"${digest.headline.substring(0, 60)}..." with ${digest.bullets.length} bullets` : 'empty'}`);
+      } catch (err: any) {
+        console.log(`[bg] News digest startup refresh error: ${err.message}`);
+      }
+      try {
+        const premarket = await scrapeBriefingPreMarket(true);
+        console.log(`[bg] Pre-market briefing refreshed on startup: ${premarket?.entries?.length ?? 0} entries, updated: ${premarket?.updated ?? 'unknown'}`);
+      } catch (err: any) {
+        console.log(`[bg] Pre-market briefing startup refresh error: ${err.message}`);
+      }
+    })();
+
     // Phase 2: Breadth scan — runs independently, does NOT block Phase 3
     console.log('[bg] Phase 2: Starting breadth scan (independent, non-blocking)...');
     (async () => {
