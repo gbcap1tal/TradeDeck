@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import puppeteer from 'puppeteer-core';
-import { getCached, setCache } from './cache';
+import { getCached, setCache, registerCacheValidator } from './cache';
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
@@ -101,6 +101,25 @@ function cleanDigestResult(result: { headline: string; bullets: string[] }): { h
   }
   return { headline, bullets: cleanBullets };
 }
+
+function isValidDigest(d: DailyDigest | null | undefined): d is DailyDigest {
+  if (!d || !d.headline) return false;
+  if (isGarbageItem(d.headline)) {
+    console.log(`[news] Rejecting garbage digest: "${d.headline.substring(0, 50)}..."`);
+    return false;
+  }
+  return true;
+}
+
+registerCacheValidator((key: string, value: any) => {
+  if (key === 'finviz_daily_digest') {
+    if (!value || !value.headline || isGarbageItem(value.headline)) {
+      console.log(`[news] Cache validator rejected garbage digest: "${(value?.headline || '').substring(0, 50)}"`);
+      return false;
+    }
+  }
+  return true;
+});
 
 export async function scrapeDigestRaw(): Promise<{ headline: string; bullets: string[] } | null> {
   let result = await scrapeDigestWithPuppeteer();
@@ -235,10 +254,10 @@ export function saveDigestFromRaw(result: { headline: string; bullets: string[] 
 export async function scrapeFinvizDigest(forceRefresh = false): Promise<DailyDigest | null> {
   if (!forceRefresh) {
     const cached = getCached<DailyDigest>(DIGEST_CACHE_KEY);
-    if (cached) return cached;
+    if (isValidDigest(cached)) return cached;
 
     const persisted = loadPersisted<DailyDigest>(DIGEST_PERSIST_PATH, 24);
-    if (persisted) {
+    if (isValidDigest(persisted)) {
       setCache(DIGEST_CACHE_KEY, persisted, DIGEST_TTL);
       return persisted;
     }

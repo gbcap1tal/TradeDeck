@@ -96,6 +96,13 @@ async function persistToDb(key: string, value: any): Promise<void> {
   }
 }
 
+export type CacheValidator = (key: string, value: any) => boolean;
+let cacheValidators: CacheValidator[] = [];
+
+export function registerCacheValidator(validator: CacheValidator): void {
+  cacheValidators.push(validator);
+}
+
 export async function loadPersistentCache(onFinvizRestored?: (timestamp: number) => void): Promise<number> {
   let loaded = 0;
   try {
@@ -107,6 +114,11 @@ export async function loadPersistentCache(onFinvizRestored?: (timestamp: number)
         const age = (Date.now() - new Date(row.updatedAt).getTime()) / 1000;
         if (age > 86400 * 3) {
           console.log(`[cache] Skipping stale DB entry: ${row.key} (${(age / 3600).toFixed(1)}h old)`);
+          continue;
+        }
+        const rejected = cacheValidators.some(v => !v(row.key, parsed));
+        if (rejected) {
+          console.log(`[cache] Validator rejected DB entry: ${row.key} — skipping`);
           continue;
         }
         cache.set(row.key, parsed, 43200);
