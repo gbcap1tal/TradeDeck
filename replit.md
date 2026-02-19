@@ -44,12 +44,26 @@ Preferred communication style: Simple, everyday language.
 - **cache_store**: Persists critical dashboard cache entries (indices, sectors, rotation, breadth, industry perf, finviz) to PostgreSQL so they survive server restarts. Loaded on startup before background tasks.
 
 ### Production Hardening
-- **Cache System**: `node-cache` with maxKeys (5000), 3-day TTL on stale cache, auto-timeout (120s) for stuck refresh keys, `finally` blocks to ensure cleanup. Critical dashboard keys are additionally persisted to PostgreSQL (`cache_store` table) via async writes on `setCache()`. On startup, `loadPersistentCache()` restores these 6 keys from DB into memory before any background computation, ensuring the dashboard serves data instantly after restarts.
+- **Cache System**: `node-cache` with maxKeys (25000 stale), 3-day TTL on stale cache, auto-timeout (120s) for stuck refresh keys, `finally` blocks to ensure cleanup. Critical dashboard keys are additionally persisted to PostgreSQL (`cache_store` table) via async writes on `setCache()`. On startup, `loadPersistentCache()` restores these keys from DB into memory before any background computation, ensuring the dashboard serves data instantly after restarts. DB-loaded digest entries are validated inline (reject if headline < 25 chars or contains ticker bar garbage).
 - **Background Scheduler**: Three independent refresh tasks with per-task mutex locks: `refreshDashboardData` (indices, sectors, rotation, industry RS — ~5s), `refreshBreadth` (breadth scan — ~15min), `refreshSlowData` (Finviz scrape, quality/CSS scores — ~25min). All dispatched in parallel so fast dashboard data is never blocked by slow tasks. Dynamic cache TTLs: 30min during market hours, 12h off-hours. Hourly scheduler, overnight digest polling.
 - **Self-Healing Watchdog**: Runs every 5 min during market hours; detects broken breadth data (0 universe stocks) or missing sectors/indices; clears Yahoo auth cache and retries with fresh credentials; 10-min cooldown between heal attempts; sends email alerts if healing fails.
 - **Env Var Validation**: Startup checks for required (`DATABASE_URL`, `SESSION_SECRET`) and optional (`FMP_KEY`, `ALPHA_VANTAGE_KEY`, `ADMIN_USER_ID`) environment variables.
 - **API Logging**: Truncated response bodies (200 chars max), only logs errors (4xx/5xx) and slow requests (>5s).
 - **Error Boundary**: React class component wraps entire app, catches render errors with reload fallback.
+
+### Critical: News Digest Scraper (`server/api/news-scrapers.ts`)
+**DO NOT simplify or replace the Puppeteer-based digest scraper.** The Finviz Daily Digest content (headline + detailed bullet points) is only accessible by:
+1. Loading `finviz.com` with Puppeteer (headless Chromium)
+2. Clicking the "More +" button to open the Daily Digest panel
+3. Extracting the headline from raw text (stripping ticker bar garbage like "DOWNASDAQS&P 500RUSSELL 2000") and `<li>` bullet points from the panel
+
+A simple HTTP/cheerio scrape of the Finviz homepage only returns short `a.nn-tab-link` headline links — **not** the full Daily Digest content the user expects. The HTTP scraper exists only as a last-resort fallback if Puppeteer fails completely.
+
+**Key rules:**
+- Puppeteer must remain the **primary** scraper method in `scrapeDigestRaw()`
+- The `isValidDigest()` function validates at every load path (cache, file, DB, fresh scrape)
+- Never cache or persist a digest with a headline shorter than 25 chars or containing ticker bar text
+- If Finviz changes their page layout again, debug by capturing what Puppeteer sees (inspect `panel.textContent`, `<li>` elements, `<b>`/`<strong>` tags) rather than switching to a different approach
 
 ### Shared Code
 - Centralized Zod schemas for database and API validation, and API contract types.
