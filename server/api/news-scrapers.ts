@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import puppeteer from 'puppeteer-core';
-import { getCached, setCache, registerCacheValidator } from './cache';
+import { getCached, setCache } from './cache';
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
@@ -79,56 +79,45 @@ function getChromiumPath(): string {
   }
 }
 
-const GARBAGE_PATTERNS = [
-  /^DOW$/i, /^NASDAQ$/i, /^NASDAQS/i, /^S&P\s*500$/i, /^RUSSELL\s*2000$/i,
-  /DOWNASDAQ/i, /Stock Price Chart/i, /^More\s*\+?$/i,
-];
-
-function isGarbageItem(text: string): boolean {
-  if (text.length < 25) return true;
-  return GARBAGE_PATTERNS.some(p => p.test(text));
-}
-
-function cleanDigestResult(result: { headline: string; bullets: string[] }): { headline: string; bullets: string[] } | null {
-  const cleanBullets = result.bullets.filter(b => !isGarbageItem(b));
-  let headline = result.headline;
-  if (isGarbageItem(headline)) {
-    if (cleanBullets.length > 0) {
-      headline = cleanBullets.shift()!;
-    } else {
-      return null;
-    }
-  }
-  return { headline, bullets: cleanBullets };
-}
-
-function isValidDigest(d: DailyDigest | null | undefined): d is DailyDigest {
-  if (!d || !d.headline) return false;
-  if (isGarbageItem(d.headline)) {
-    console.log(`[news] Rejecting garbage digest: "${d.headline.substring(0, 50)}..."`);
-    return false;
-  }
+function isValidDigest(d: any): d is DailyDigest {
+  if (!d || typeof d.headline !== 'string' || !d.headline) return false;
+  const h = d.headline;
+  if (h.length < 25) return false;
+  if (/DOWNASDAQ|Stock Price Chart/i.test(h)) return false;
+  if (/^(DOW|NASDAQ|S&P\s*500|RUSSELL\s*2000)$/i.test(h)) return false;
   return true;
 }
-
-registerCacheValidator((key: string, value: any) => {
-  if (key === 'finviz_daily_digest') {
-    if (!value || !value.headline || isGarbageItem(value.headline)) {
-      console.log(`[news] Cache validator rejected garbage digest: "${(value?.headline || '').substring(0, 50)}"`);
-      return false;
-    }
-  }
-  return true;
-});
 
 export async function scrapeDigestRaw(): Promise<{ headline: string; bullets: string[] } | null> {
-  let result = await scrapeDigestWithPuppeteer();
-  if (result) result = cleanDigestResult(result);
-  if (!result) {
-    result = await scrapeDigestFallback();
-    if (result) result = cleanDigestResult(result);
+  const result = await scrapeDigestHTTP();
+  if (result) return result;
+  return await scrapeDigestWithPuppeteer();
+}
+
+async function scrapeDigestHTTP(): Promise<{ headline: string; bullets: string[] } | null> {
+  try {
+    const html = await fetchHTML('https://finviz.com/');
+    if (!html) return null;
+
+    const $ = cheerio.load(html);
+    const items: string[] = [];
+
+    $('a.nn-tab-link').each((_, el) => {
+      const text = $(el).text().trim();
+      if (text.length > 20 && text.length < 300 && items.length < 12) {
+        if (!items.includes(text)) items.push(text);
+      }
+    });
+
+    if (items.length === 0) return null;
+
+    const headline = items.shift()!;
+    console.log(`[news] HTTP digest scraped: "${headline.substring(0, 60)}..." with ${items.length} bullets`);
+    return { headline, bullets: items };
+  } catch (e: any) {
+    console.log(`[news] HTTP digest scrape failed: ${e.message}`);
+    return null;
   }
-  return result;
 }
 
 async function scrapeDigestWithPuppeteer(): Promise<{ headline: string; bullets: string[] } | null> {
@@ -181,9 +170,11 @@ async function scrapeDigestWithPuppeteer(): Promise<{ headline: string; bullets:
           const items: string[] = [];
           children.forEach(child => {
             const ct = (child.textContent || '').trim();
-            if (ct.length > 20 && ct.length < 500 && !items.includes(ct)) {
-              const isFiltered = ct.includes('AI-generated content') || ct === 'Daily Digest' || ct.startsWith('×');
-              if (!isFiltered) {
+            if (ct.length > 25 && ct.length < 500 && !items.includes(ct)) {
+              const skip = ct.includes('AI-generated content') || ct === 'Daily Digest' || ct.startsWith('×')
+                || /DOWNASDAQ|Stock Price Chart/i.test(ct)
+                || /^(DOW|NASDAQ|S&P\s*500|RUSSELL\s*2000)$/i.test(ct);
+              if (!skip) {
                 items.push(ct);
               }
             }
@@ -199,6 +190,7 @@ async function scrapeDigestWithPuppeteer(): Promise<{ headline: string; bullets:
     if (digest && digest.length > 0) {
       const headline = digest[0];
       const bullets = digest.slice(1);
+      console.log(`[news] Puppeteer digest scraped: "${headline.substring(0, 60)}..." with ${bullets.length} bullets`);
       return { headline, bullets };
     }
     return null;
@@ -211,35 +203,13 @@ async function scrapeDigestWithPuppeteer(): Promise<{ headline: string; bullets:
   }
 }
 
-async function scrapeDigestFallback(): Promise<{ headline: string; bullets: string[] } | null> {
-  try {
-    const html = await fetchHTML('https://finviz.com/');
-    if (!html) return null;
-
-    const $ = cheerio.load(html);
-    const bullets: string[] = [];
-
-    $('a.nn-tab-link').each((_, el) => {
-      const text = $(el).text().trim();
-      if (text.length > 20 && text.length < 300 && bullets.length < 12) {
-        if (!bullets.includes(text)) bullets.push(text);
-      }
-    });
-
-    if (bullets.length === 0) return null;
-
-    const headline = bullets.shift()!;
-    return { headline, bullets };
-  } catch {
-    return null;
-  }
-}
-
 export function getPersistedDigest(): DailyDigest | null {
-  return loadPersisted<DailyDigest>(DIGEST_PERSIST_PATH, 48);
+  const d = loadPersisted<DailyDigest>(DIGEST_PERSIST_PATH, 48);
+  return isValidDigest(d) ? d : null;
 }
 
-export function saveDigestFromRaw(result: { headline: string; bullets: string[] }): DailyDigest {
+export function saveDigestFromRaw(result: { headline: string; bullets: string[] }): DailyDigest | null {
+  if (!result.headline || result.headline.length < 25) return null;
   const digest: DailyDigest = {
     headline: result.headline,
     bullets: result.bullets,
@@ -279,9 +249,14 @@ export async function scrapeFinvizDigest(forceRefresh = false): Promise<DailyDig
     fetchedAt: Date.now(),
   };
 
+  if (!isValidDigest(digest)) {
+    console.log(`[news] Scraped digest failed validation: "${result.headline.substring(0, 50)}"`);
+    return null;
+  }
+
   setCache(DIGEST_CACHE_KEY, digest, DIGEST_TTL);
   persistToFile(DIGEST_PERSIST_PATH, digest);
-  console.log(`[news] Finviz digest scraped: "${result.headline.substring(0, 60)}..." with ${result.bullets.length} bullets`);
+  console.log(`[news] Digest ready: "${result.headline.substring(0, 60)}..." with ${result.bullets.length} bullets`);
   return digest;
 }
 
@@ -398,8 +373,9 @@ export async function scrapeBriefingPreMarket(forceRefresh = false): Promise<Pre
 
     setCache(PREMARKET_CACHE_KEY, result, PREMARKET_TTL);
     persistToFile(PREMARKET_PERSIST_PATH, result);
-    console.log(`[news] Briefing.com InPlay scraped: ${result.entries.length} entries`);
+    console.log(`[news] Briefing.com scraped: ${result.entries.length} entries`);
     return result;
+
   } catch (err: any) {
     console.error(`[news] Briefing.com scrape error: ${err.message}`);
     return null;

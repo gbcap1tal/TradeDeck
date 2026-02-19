@@ -96,13 +96,6 @@ async function persistToDb(key: string, value: any): Promise<void> {
   }
 }
 
-export type CacheValidator = (key: string, value: any) => boolean;
-let cacheValidators: CacheValidator[] = [];
-
-export function registerCacheValidator(validator: CacheValidator): void {
-  cacheValidators.push(validator);
-}
-
 export async function loadPersistentCache(onFinvizRestored?: (timestamp: number) => void): Promise<number> {
   let loaded = 0;
   try {
@@ -116,10 +109,11 @@ export async function loadPersistentCache(onFinvizRestored?: (timestamp: number)
           console.log(`[cache] Skipping stale DB entry: ${row.key} (${(age / 3600).toFixed(1)}h old)`);
           continue;
         }
-        const rejected = cacheValidators.some(v => !v(row.key, parsed));
-        if (rejected) {
-          console.log(`[cache] Validator rejected DB entry: ${row.key} — skipping`);
-          continue;
+        if (row.key === 'finviz_daily_digest') {
+          if (!parsed?.headline || parsed.headline.length < 25 || /DOWNASDAQ|Stock Price Chart/i.test(parsed.headline)) {
+            console.log(`[cache] Skipping invalid digest from DB: "${(parsed?.headline || '').substring(0, 50)}"`);
+            continue;
+          }
         }
         cache.set(row.key, parsed, 43200);
         staleCache.set(row.key, parsed, 86400 * 3);
