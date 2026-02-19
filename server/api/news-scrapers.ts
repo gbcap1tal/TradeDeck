@@ -79,9 +79,36 @@ function getChromiumPath(): string {
   }
 }
 
+const GARBAGE_PATTERNS = [
+  /^DOW$/i, /^NASDAQ$/i, /^NASDAQS/i, /^S&P\s*500$/i, /^RUSSELL\s*2000$/i,
+  /DOWNASDAQ/i, /Stock Price Chart/i, /^More\s*\+?$/i,
+];
+
+function isGarbageItem(text: string): boolean {
+  if (text.length < 25) return true;
+  return GARBAGE_PATTERNS.some(p => p.test(text));
+}
+
+function cleanDigestResult(result: { headline: string; bullets: string[] }): { headline: string; bullets: string[] } | null {
+  const cleanBullets = result.bullets.filter(b => !isGarbageItem(b));
+  let headline = result.headline;
+  if (isGarbageItem(headline)) {
+    if (cleanBullets.length > 0) {
+      headline = cleanBullets.shift()!;
+    } else {
+      return null;
+    }
+  }
+  return { headline, bullets: cleanBullets };
+}
+
 export async function scrapeDigestRaw(): Promise<{ headline: string; bullets: string[] } | null> {
   let result = await scrapeDigestWithPuppeteer();
-  if (!result) result = await scrapeDigestFallback();
+  if (result) result = cleanDigestResult(result);
+  if (!result) {
+    result = await scrapeDigestFallback();
+    if (result) result = cleanDigestResult(result);
+  }
   return result;
 }
 
@@ -171,26 +198,18 @@ async function scrapeDigestFallback(): Promise<{ headline: string; bullets: stri
     if (!html) return null;
 
     const $ = cheerio.load(html);
-    let headline = '';
     const bullets: string[] = [];
-
-    const bar = $('td.is-digest, td.is-news, [class*="news-bar"]');
-    if (bar.length > 0) {
-      const rawText = bar.text().trim();
-      const cleanText = rawText.replace(/Today,.*?(AM|PM)/i, '').replace('More +', '').replace('More', '').trim();
-      if (cleanText.length > 20) headline = cleanText;
-    }
 
     $('a.nn-tab-link').each((_, el) => {
       const text = $(el).text().trim();
-      if (text.length > 20 && text.length < 250 && bullets.length < 12) {
+      if (text.length > 20 && text.length < 300 && bullets.length < 12) {
         if (!bullets.includes(text)) bullets.push(text);
       }
     });
 
-    if (!headline && bullets.length > 0) headline = bullets.shift()!;
-    if (!headline) return null;
+    if (bullets.length === 0) return null;
 
+    const headline = bullets.shift()!;
     return { headline, bullets };
   } catch {
     return null;
@@ -225,14 +244,9 @@ export async function scrapeFinvizDigest(forceRefresh = false): Promise<DailyDig
     }
   }
 
-  console.log('[news] Scraping Finviz daily digest with Puppeteer...');
+  console.log('[news] Scraping Finviz daily digest...');
 
-  let result = await scrapeDigestWithPuppeteer();
-
-  if (!result) {
-    console.log('[news] Puppeteer failed, falling back to HTTP scraper...');
-    result = await scrapeDigestFallback();
-  }
+  const result = await scrapeDigestRaw();
 
   if (!result) {
     console.log('[news] Could not scrape Finviz digest');
