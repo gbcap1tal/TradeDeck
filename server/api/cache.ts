@@ -115,7 +115,12 @@ export async function loadPersistentCache(onFinvizRestored?: (timestamp: number)
             continue;
           }
         }
-        cache.set(row.key, parsed, 43200);
+        const NEWS_KEYS: Record<string, number> = {
+          'finviz_daily_digest': 120,
+          'briefing_premarket': 120,
+        };
+        const ttl = NEWS_KEYS[row.key] ?? 43200;
+        cache.set(row.key, parsed, ttl);
         staleCache.set(row.key, parsed, 86400 * 3);
         loaded++;
         console.log(`[cache] Restored from DB: ${row.key} (${(age / 60).toFixed(0)}min old)`);
