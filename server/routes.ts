@@ -52,6 +52,7 @@ function loadPersistedIndustryPerf(): any | null {
 }
 
 const MEGATREND_PERF_PERSIST_PATH = path.join(process.cwd(), '.megatrend-perf-cache.json');
+let _mtPerfRecomputeInFlight = false;
 
 function persistMegatrendPerfToFile(data: any): void {
   try {
@@ -64,6 +65,15 @@ function loadPersistedMegatrendPerf(): any | null {
     if (!fs.existsSync(MEGATREND_PERF_PERSIST_PATH)) return null;
     const raw = JSON.parse(fs.readFileSync(MEGATREND_PERF_PERSIST_PATH, 'utf-8'));
     if (raw?.data && Date.now() - raw.savedAt < 24 * 3600000) return raw.data;
+  } catch { /* ignored */ }
+  return null;
+}
+
+function loadPersistedMegatrendPerfIgnoreExpiry(): any | null {
+  try {
+    if (!fs.existsSync(MEGATREND_PERF_PERSIST_PATH)) return null;
+    const raw = JSON.parse(fs.readFileSync(MEGATREND_PERF_PERSIST_PATH, 'utf-8'));
+    if (raw?.data) return raw.data;
   } catch { /* ignored */ }
   return null;
 }
@@ -2852,19 +2862,37 @@ Be direct, opinionated, and useful for trading decisions. Avoid generic statemen
       console.log('[api] GET /api/megatrends - request received');
       const mts = await storage.getMegatrends();
       console.log(`[api] GET /api/megatrends - ${mts.length} baskets from DB`);
-      const perfCached = getMegatrendPerfCached();
+      let perfCached = getMegatrendPerfCached();
       const finvizData = getFinvizDataSync();
 
       if (!perfCached && mts.length > 0) {
-        computeMegatrendPerformance().catch(err =>
-          console.error(`[api] Background megatrend perf computation failed: ${err.message}`)
-        );
+        const staleData = loadPersistedMegatrendPerfIgnoreExpiry();
+        if (staleData) {
+          perfCached = staleData;
+          console.log(`[api] Megatrend perf loaded from stale persisted file (primary cache expired)`);
+        }
+        if (!_mtPerfRecomputeInFlight) {
+          _mtPerfRecomputeInFlight = true;
+          computeMegatrendPerformance()
+            .catch(err => console.error(`[api] Background megatrend perf computation failed: ${err.message}`))
+            .finally(() => { _mtPerfRecomputeInFlight = false; });
+        }
       }
 
       const megatrendsWithPerf = mts.map(mt => {
         const cached = perfCached?.[String(mt.id)];
         if (cached) {
-          return { ...mt, ...cached, tickerCount: mt.tickers.length };
+          return {
+            ...mt,
+            dailyChange: cached.dailyChange ?? 0,
+            weeklyChange: cached.weeklyChange ?? 0,
+            monthlyChange: cached.monthlyChange ?? 0,
+            quarterChange: cached.quarterChange ?? 0,
+            halfChange: cached.halfChange ?? 0,
+            yearlyChange: cached.yearlyChange ?? 0,
+            ytdChange: cached.ytdChange ?? 0,
+            tickerCount: mt.tickers.length,
+          };
         }
 
         let weightedSum = 0, totalCap = 0, eqSum = 0, eqCount = 0;
@@ -2894,13 +2922,27 @@ Be direct, opinionated, and useful for trading decisions. Avoid generic statemen
         }
         let dailyChange = totalCap > 0 ? Math.round((weightedSum / totalCap) * 100) / 100 : 0;
         if (dailyChange === 0 && eqCount > 0) dailyChange = Math.round((eqSum / eqCount) * 100) / 100;
+        console.warn(`[api] Megatrend "${mt.name}" (id=${mt.id}) served with fallback: only dailyChange available, all other timeframes are 0. Cache miss.`);
         return {
           ...mt,
           dailyChange,
-          weeklyChange: 0, monthlyChange: 0, quarterChange: 0, halfChange: 0, yearlyChange: 0,
+          weeklyChange: 0, monthlyChange: 0, quarterChange: 0, halfChange: 0, yearlyChange: 0, ytdChange: 0,
           tickerCount: mt.tickers.length,
         };
       });
+
+      const missingMultiTimeframe = megatrendsWithPerf.filter(mt =>
+        mt.weeklyChange === 0 && mt.monthlyChange === 0 && mt.quarterChange === 0 &&
+        mt.halfChange === 0 && mt.yearlyChange === 0 && mt.ytdChange === 0
+      );
+      if (missingMultiTimeframe.length > 0 && mts.length > 0 && !_mtPerfRecomputeInFlight) {
+        console.warn(`[api] WARNING: ${missingMultiTimeframe.length}/${mts.length} megatrend baskets have 0 for all non-daily timeframes. Triggering throttled background recompute.`);
+        _mtPerfRecomputeInFlight = true;
+        computeMegatrendPerformance()
+          .catch(err => console.error(`[api] Background megatrend perf recompute failed: ${err.message}`))
+          .finally(() => { _mtPerfRecomputeInFlight = false; });
+      }
+
       res.json(megatrendsWithPerf);
     } catch (err: any) {
       console.error(`[api] Megatrends endpoint error: ${err.message}`);
