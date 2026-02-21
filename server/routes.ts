@@ -2857,11 +2857,12 @@ Be direct, opinionated, and useful for trading decisions. Avoid generic statemen
     return adminId ? req.user?.claims?.sub === adminId : false;
   };
 
-  app.get('/api/megatrends', async (req, res) => {
+  app.get('/api/megatrends', async (req: any, res) => {
     try {
       console.log('[api] GET /api/megatrends - request received');
-      const mts = await storage.getMegatrends();
-      console.log(`[api] GET /api/megatrends - ${mts.length} baskets from DB`);
+      const userId = req.user?.claims?.sub;
+      const mts = userId ? await storage.getMegatrendsForUser(userId) : await storage.getMegatrends().then(all => all.filter(m => !m.userId));
+      console.log(`[api] GET /api/megatrends - ${mts.length} baskets for user=${userId || 'anonymous'}`);
       let perfCached = getMegatrendPerfCached();
       const finvizData = getFinvizDataSync();
 
@@ -2952,42 +2953,59 @@ Be direct, opinionated, and useful for trading decisions. Avoid generic statemen
   });
 
   app.post('/api/megatrends', isAuthenticated, async (req: any, res) => {
-    if (!isAdmin(req)) return res.status(403).json({ message: "Admin only" });
     try {
       const { name, tickers } = req.body;
       if (!name || !Array.isArray(tickers)) return res.status(400).json({ message: "name and tickers[] required" });
-      const mt = await storage.createMegatrend({ name, tickers: tickers.map((t: string) => t.toUpperCase()) });
+      const userId = isAdmin(req) ? null : req.user?.claims?.sub;
+      const mt = await storage.createMegatrend({ name, tickers: tickers.map((t: string) => t.toUpperCase()), userId });
+      console.log(`[api] Megatrend created: "${name}" (id=${mt.id}) by ${userId || 'admin'} — triggering perf compute`);
       res.status(201).json(mt);
-      computeMegatrendPerformance().catch(err =>
-        console.error(`[api] Background megatrend perf recompute after create failed: ${err.message}`)
-      );
+      if (!_mtPerfRecomputeInFlight) {
+        _mtPerfRecomputeInFlight = true;
+        computeMegatrendPerformance()
+          .catch(err => console.error(`[api] Background megatrend perf recompute after create failed: ${err.message}`))
+          .finally(() => { _mtPerfRecomputeInFlight = false; });
+      }
     } catch {
       res.status(500).json({ message: "Failed to create megatrend" });
     }
   });
 
   app.put('/api/megatrends/:id', isAuthenticated, async (req: any, res) => {
-    if (!isAdmin(req)) return res.status(403).json({ message: "Admin only" });
     try {
       const id = Number(req.params.id);
+      const existing = await storage.getMegatrendById(id);
+      if (!existing) return res.status(404).json({ message: "Not found" });
+      const userId = req.user?.claims?.sub;
+      const isAdminReq = isAdmin(req);
+      if (!isAdminReq && existing.userId !== userId) return res.status(403).json({ message: "You can only edit your own baskets" });
+      if (isAdminReq && existing.userId && existing.userId !== userId) return res.status(403).json({ message: "Cannot edit user baskets" });
       const { name, tickers } = req.body;
       const updates: any = {};
       if (name) updates.name = name;
       if (Array.isArray(tickers)) updates.tickers = tickers.map((t: string) => t.toUpperCase());
       const mt = await storage.updateMegatrend(id, updates);
       res.json(mt);
-      computeMegatrendPerformance().catch(err =>
-        console.error(`[api] Background megatrend perf recompute after update failed: ${err.message}`)
-      );
+      if (!_mtPerfRecomputeInFlight) {
+        _mtPerfRecomputeInFlight = true;
+        computeMegatrendPerformance()
+          .catch(err => console.error(`[api] Background megatrend perf recompute after update failed: ${err.message}`))
+          .finally(() => { _mtPerfRecomputeInFlight = false; });
+      }
     } catch {
       res.status(500).json({ message: "Failed to update megatrend" });
     }
   });
 
   app.delete('/api/megatrends/:id', isAuthenticated, async (req: any, res) => {
-    if (!isAdmin(req)) return res.status(403).json({ message: "Admin only" });
     try {
       const id = Number(req.params.id);
+      const existing = await storage.getMegatrendById(id);
+      if (!existing) return res.status(404).json({ message: "Not found" });
+      const userId = req.user?.claims?.sub;
+      const isAdminReq = isAdmin(req);
+      if (!isAdminReq && existing.userId !== userId) return res.status(403).json({ message: "You can only delete your own baskets" });
+      if (isAdminReq && existing.userId && existing.userId !== userId) return res.status(403).json({ message: "Cannot delete user baskets" });
       await storage.deleteMegatrend(id);
       res.status(204).send();
       computeMegatrendPerformance().catch(err =>

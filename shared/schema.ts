@@ -131,6 +131,7 @@ export const megatrends = pgTable("megatrends", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   tickers: text("tickers").array().notNull(),
+  userId: varchar("user_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

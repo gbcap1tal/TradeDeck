@@ -19,7 +19,7 @@ Preferred communication style: Simple, everyday language.
 - **Design**: Apple-inspired dark minimal theme (#0a0a0a-#1a1a1a), glass-morphism effects, 8px grid spacing, rounded corners.
 - **Key Features**:
     - **Capital Flow Dashboard**: Major indices, heatmap, market breadth, sector rotation, RS leaders, sector performance.
-    - **Megatrends**: Top/worst industry performance, customizable megatrend baskets with CRUD functionality.
+    - **Megatrends**: Top/worst industry performance, multi-user megatrend baskets. Admin creates global baskets (visible to all), regular users can create personal baskets (visible only to them). CRUD with ownership enforcement.
     - **Earnings Page**: Monthly calendar navigation, earnings table with double-row EPS/Revenue layout, EP (Episodic Pivot) scoring and highlighting, AI-powered earnings summaries via OpenAI.
     - **Detailed Pages**: Sector, industry, and individual stock detail pages with charts, Stock Quality metrics, and earnings visualization.
 
@@ -40,7 +40,7 @@ Preferred communication style: Simple, everyday language.
 - **ORM**: Drizzle ORM.
 - **Schema**: Defined in `shared/schema.ts` and `shared/models/auth.ts`.
 - **Tables**: `sessions`, `users`, `watchlists`, `watchlistItems`, `megatrends`, `cache_store`.
-- **Megatrends**: Stores custom industry baskets; performance is dynamically computed using market-cap weighted averages of constituent stocks.
+- **Megatrends**: Stores custom industry baskets with optional `userId` (null = admin/global, non-null = user-specific); performance is dynamically computed using market-cap weighted averages of constituent stocks.
 - **cache_store**: Persists critical dashboard cache entries (indices, sectors, rotation, breadth, industry perf, finviz) to PostgreSQL so they survive server restarts. Loaded on startup before background tasks.
 
 ### Production Hardening

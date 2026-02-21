@@ -85,7 +85,7 @@ function BarChart({ items, title, isMegatrendMap, onClickItem }: {
   );
 }
 
-function MegatrendAdmin({ megatrends, onClose }: { megatrends: any[]; onClose: () => void }) {
+function MegatrendAdmin({ megatrends, onClose, isAdmin, userId }: { megatrends: any[]; onClose: () => void; isAdmin: boolean; userId?: string }) {
   const createMt = useCreateMegatrend();
   const updateMt = useUpdateMegatrend();
   const deleteMt = useDeleteMegatrend();
@@ -94,6 +94,15 @@ function MegatrendAdmin({ megatrends, onClose }: { megatrends: any[]; onClose: (
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState('');
   const [editTickers, setEditTickers] = useState('');
+
+  const globalBaskets = megatrends.filter(mt => !mt.userId);
+  const myBaskets = megatrends.filter(mt => mt.userId === userId);
+
+  const canEdit = (mt: any) => {
+    if (isAdmin && !mt.userId) return true;
+    if (mt.userId === userId) return true;
+    return false;
+  };
 
   const handleCreate = () => {
     if (!newName.trim()) return;
@@ -116,76 +125,92 @@ function MegatrendAdmin({ megatrends, onClose }: { megatrends: any[]; onClose: (
     setEditTickers(mt.tickers.join(', '));
   };
 
+  const renderBasketItem = (mt: any) => (
+    <div key={mt.id} className="border border-white/[0.06] rounded-lg p-3">
+      {editingId === mt.id ? (
+        <div className="space-y-2">
+          <input
+            value={editName}
+            onChange={e => setEditName(e.target.value)}
+            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-md px-3 py-1.5 text-[13px] text-white outline-none focus:border-white/20"
+            data-testid={`input-edit-name-${mt.id}`}
+          />
+          <input
+            value={editTickers}
+            onChange={e => setEditTickers(e.target.value)}
+            placeholder="AAPL, MSFT, NVDA..."
+            className="w-full bg-white/[0.04] border border-white/[0.08] rounded-md px-3 py-1.5 text-[13px] text-white outline-none focus:border-white/20"
+            data-testid={`input-edit-tickers-${mt.id}`}
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleUpdate(mt.id)}
+              disabled={updateMt.isPending}
+              className="px-3 py-1 text-[11px] font-medium bg-white/[0.08] text-white/80 rounded-md hover:bg-white/[0.12] transition-colors"
+              data-testid={`button-save-${mt.id}`}
+            >
+              Save
+            </button>
+            <button
+              onClick={() => setEditingId(null)}
+              className="px-3 py-1 text-[11px] font-medium text-white/40 hover:text-white/60 transition-colors"
+              data-testid={`button-cancel-edit-${mt.id}`}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <div className="text-[13px] font-medium text-white">{mt.name}</div>
+            <div className="text-[11px] text-white/30 font-mono mt-0.5 truncate max-w-[400px]">
+              {mt.tickers.join(', ')}
+            </div>
+          </div>
+          {canEdit(mt) && (
+            <div className="flex items-center gap-1 shrink-0">
+              <button onClick={() => startEdit(mt)} className="p-1.5 text-white/25 hover:text-white/50 transition-colors" data-testid={`button-edit-${mt.id}`}>
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => { if (confirm(`Delete "${mt.name}"?`)) deleteMt.mutate(mt.id); }}
+                className="p-1.5 text-white/25 hover:text-[#ff453a] transition-colors"
+                data-testid={`button-delete-${mt.id}`}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="glass-card rounded-xl p-5 space-y-4" data-testid="megatrend-admin">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="label-text">Manage Megatrend Baskets</div>
+        <div className="label-text">Manage Baskets</div>
         <button onClick={onClose} className="text-white/30 hover:text-white/60 transition-colors" data-testid="button-close-admin">
           <X className="w-4 h-4" />
         </button>
       </div>
 
-      <div className="space-y-2">
-        {megatrends.map(mt => (
-          <div key={mt.id} className="border border-white/[0.06] rounded-lg p-3">
-            {editingId === mt.id ? (
-              <div className="space-y-2">
-                <input
-                  value={editName}
-                  onChange={e => setEditName(e.target.value)}
-                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-md px-3 py-1.5 text-[13px] text-white outline-none focus:border-white/20"
-                  data-testid={`input-edit-name-${mt.id}`}
-                />
-                <input
-                  value={editTickers}
-                  onChange={e => setEditTickers(e.target.value)}
-                  placeholder="AAPL, MSFT, NVDA..."
-                  className="w-full bg-white/[0.04] border border-white/[0.08] rounded-md px-3 py-1.5 text-[13px] text-white outline-none focus:border-white/20"
-                  data-testid={`input-edit-tickers-${mt.id}`}
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleUpdate(mt.id)}
-                    disabled={updateMt.isPending}
-                    className="px-3 py-1 text-[11px] font-medium bg-white/[0.08] text-white/80 rounded-md hover:bg-white/[0.12] transition-colors"
-                    data-testid={`button-save-${mt.id}`}
-                  >
-                    Save
-                  </button>
-                  <button
-                    onClick={() => setEditingId(null)}
-                    className="px-3 py-1 text-[11px] font-medium text-white/40 hover:text-white/60 transition-colors"
-                    data-testid={`button-cancel-edit-${mt.id}`}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <div className="text-[13px] font-medium text-white">{mt.name}</div>
-                  <div className="text-[11px] text-white/30 font-mono mt-0.5 truncate max-w-[400px]">
-                    {mt.tickers.join(', ')}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => startEdit(mt)} className="p-1.5 text-white/25 hover:text-white/50 transition-colors" data-testid={`button-edit-${mt.id}`}>
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => { if (confirm(`Delete "${mt.name}"?`)) deleteMt.mutate(mt.id); }}
-                    className="p-1.5 text-white/25 hover:text-[#ff453a] transition-colors"
-                    data-testid={`button-delete-${mt.id}`}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            )}
+      {myBaskets.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-[11px] text-white/30 font-medium uppercase tracking-wider">My Baskets</div>
+          {myBaskets.map(renderBasketItem)}
+        </div>
+      )}
+
+      {globalBaskets.length > 0 && (
+        <div className="space-y-2">
+          <div className="text-[11px] text-white/30 font-medium uppercase tracking-wider">
+            {isAdmin ? 'Global Baskets (visible to all)' : 'Global Baskets'}
           </div>
-        ))}
-      </div>
+          {globalBaskets.map(renderBasketItem)}
+        </div>
+      )}
 
       <div className="border-t border-white/[0.06] pt-3 space-y-2">
         <div className="text-[11px] text-white/30 font-medium uppercase tracking-wider">Add New</div>
@@ -280,13 +305,13 @@ export default function Market() {
           <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
             <h1 className="text-2xl font-bold tracking-tight text-white" data-testid="text-page-title">Megatrends</h1>
             <div className="flex items-center gap-3 flex-wrap">
-              {isAdminUser && (
+              {user && (
                 <button
                   onClick={() => setShowAdmin(!showAdmin)}
                   className="px-3 py-1.5 text-[11px] font-medium uppercase tracking-wider text-white/30 border border-white/[0.08] rounded-md hover:text-white/50 hover:border-white/15 transition-colors"
                   data-testid="button-toggle-admin"
                 >
-                  {showAdmin ? 'Hide Admin' : 'Manage Baskets'}
+                  {showAdmin ? 'Hide' : 'Manage Baskets'}
                 </button>
               )}
               <div className="overflow-x-auto scrollbar-none">
@@ -311,9 +336,9 @@ export default function Market() {
             </div>
           </div>
 
-          {showAdmin && isAdminUser && (
+          {showAdmin && user && (
             <div className="mb-6">
-              <MegatrendAdmin megatrends={megatrends} onClose={() => setShowAdmin(false)} />
+              <MegatrendAdmin megatrends={megatrends} onClose={() => setShowAdmin(false)} isAdmin={isAdminUser} userId={user.id} />
             </div>
           )}
 

@@ -4,7 +4,7 @@ import {
   type CreateWatchlistRequest, type CreateMegatrendRequest
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, or, isNull } from "drizzle-orm";
 import { type IAuthStorage } from "./replit_integrations/auth/storage";
 
 export interface IStorage extends IAuthStorage {
@@ -18,7 +18,9 @@ export interface IStorage extends IAuthStorage {
   getWatchlistItems(watchlistId: number): Promise<WatchlistItem[]>;
   // Megatrend methods
   getMegatrends(): Promise<Megatrend[]>;
-  createMegatrend(data: CreateMegatrendRequest): Promise<Megatrend>;
+  getMegatrendsForUser(userId: string): Promise<Megatrend[]>;
+  getMegatrendById(id: number): Promise<Megatrend | undefined>;
+  createMegatrend(data: CreateMegatrendRequest & { userId?: string | null }): Promise<Megatrend>;
   updateMegatrend(id: number, data: Partial<CreateMegatrendRequest>): Promise<Megatrend>;
   deleteMegatrend(id: number): Promise<void>;
 }
@@ -92,7 +94,18 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(megatrends);
   }
 
-  async createMegatrend(data: CreateMegatrendRequest): Promise<Megatrend> {
+  async getMegatrendsForUser(userId: string): Promise<Megatrend[]> {
+    return await db.select().from(megatrends).where(
+      or(isNull(megatrends.userId), eq(megatrends.userId, userId))
+    );
+  }
+
+  async getMegatrendById(id: number): Promise<Megatrend | undefined> {
+    const [mt] = await db.select().from(megatrends).where(eq(megatrends.id, id));
+    return mt;
+  }
+
+  async createMegatrend(data: CreateMegatrendRequest & { userId?: string | null }): Promise<Megatrend> {
     const [mt] = await db.insert(megatrends).values(data).returning();
     return mt;
   }
