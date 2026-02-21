@@ -1,4 +1,4 @@
-import { getCached, setCache, CACHE_TTL } from './cache';
+import { getCached, getStale, setCache, CACHE_TTL } from './cache';
 
 let _yf: any = null;
 async function getYf() {
@@ -74,16 +74,35 @@ function isRateLimitError(e: any): boolean {
   return msg.includes('too many requests') || msg.includes('rate limit') || msg.includes('429');
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+    promise.then(
+      (v) => { clearTimeout(timer); resolve(v); },
+      (e) => { clearTimeout(timer); reject(e); },
+    );
+  });
+}
+
 export async function getQuote(symbol: string) {
   const key = `yf_quote_${symbol}`;
   const cached = getCached<any>(key);
   if (cached) return cached;
 
-  const maxRetries = 3;
+  const maxRetries = 2;
+  const QUOTE_TIMEOUT_MS = 8000;
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const result = await throttledYahooCall(() => yf.quote(symbol));
-      if (!result) return null;
+      const result = await withTimeout(
+        throttledYahooCall(() => yf.quote(symbol)),
+        QUOTE_TIMEOUT_MS,
+        `Yahoo quote(${symbol})`
+      );
+      if (!result) {
+        const stale = getStale<any>(key);
+        return stale || null;
+      }
 
       const data = {
         symbol: result.symbol,
@@ -118,9 +137,25 @@ export async function getQuote(symbol: string) {
           await new Promise(r => setTimeout(r, delay));
           continue;
         }
+        const stale = getStale<any>(key);
+        if (stale) {
+          console.warn(`Yahoo quote rate-limited for ${symbol}, serving stale data`);
+          return stale;
+        }
         throw new RateLimitError(symbol);
       }
+      const isNetworkError = e.message?.includes('fetch failed') || e.message?.includes('timed out') || e.message?.includes('ECONNREFUSED') || e.message?.includes('ENOTFOUND');
+      if (isNetworkError && attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 500 + Math.random() * 300;
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
       console.error(`Yahoo quote error for ${symbol}:`, e.message);
+      const stale = getStale<any>(key);
+      if (stale) {
+        console.log(`[yahoo] Serving stale quote for ${symbol} (Yahoo error: ${e.message})`);
+        return stale;
+      }
       return null;
     }
   }

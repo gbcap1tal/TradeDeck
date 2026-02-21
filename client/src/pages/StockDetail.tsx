@@ -1054,12 +1054,22 @@ function AiSummaryDialog({ symbol, open, onOpenChange }: { symbol: string; open:
 export default function StockDetail() {
   const [, params] = useRoute("/stocks/:symbol");
   const symbol = params?.symbol?.toUpperCase() || "";
-  const { data: bundle, isLoading: isBundleLoading, isFetching: isBundleFetching } = useStockBundle(symbol);
+  const { data: bundle, isLoading: isBundleLoading, isFetching: isBundleFetching, isError, error, refetch } = useStockBundle(symbol);
   const quote = bundle?.quote || null;
   const { mutate: addToWatchlist } = useAddToWatchlist();
   const { data: watchlists } = useWatchlists();
   const { user } = useAuth();
   const [aiSummaryOpen, setAiSummaryOpen] = useState(false);
+  const [loadingTooLong, setLoadingTooLong] = useState(false);
+
+  useEffect(() => {
+    if (isBundleLoading && !bundle) {
+      setLoadingTooLong(false);
+      const timer = setTimeout(() => setLoadingTooLong(true), 10000);
+      return () => clearTimeout(timer);
+    }
+    setLoadingTooLong(false);
+  }, [isBundleLoading, bundle, symbol]);
 
   const handleAddToWatchlist = (watchlistId: number) => {
     addToWatchlist({ id: watchlistId, symbol });
@@ -1067,15 +1077,33 @@ export default function StockDetail() {
 
   if (!symbol) return null;
 
+  const isLoadingState = isBundleLoading || (isBundleFetching && !bundle);
+
   return (
     <div className="min-h-screen lg:h-screen bg-background flex flex-col lg:overflow-hidden">
       <Navbar />
       <main className="flex-1 min-h-0 flex flex-col">
         <div className="max-w-[1440px] w-full mx-auto px-3 sm:px-4 py-2 flex-1 min-h-0 flex flex-col gap-2 overflow-hidden">
-          {(isBundleLoading || (isBundleFetching && !bundle)) ? (
+          {isLoadingState ? (
             <div className="flex-1 flex flex-col gap-2">
               <div className="shimmer h-10 rounded-xl" />
               <div className="flex-1 shimmer rounded-xl" />
+              {loadingTooLong && (
+                <div className="flex items-center justify-center py-4 gap-2">
+                  <Loader2 className="w-4 h-4 text-white/40 animate-spin" />
+                  <span className="text-[13px] text-white/40">Loading data for {symbol}... this is taking longer than usual</span>
+                </div>
+              )}
+            </div>
+          ) : isError && !quote ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
+                <h2 className="text-lg font-semibold text-white/70 mb-1">Failed to Load</h2>
+                <p className="text-[13px] text-white/40 mb-3">Could not load data for "{symbol}". Market data services may be temporarily unavailable.</p>
+                <Button size="sm" variant="ghost" onClick={() => refetch()} className="text-white/50" data-testid="button-retry-load">
+                  Retry
+                </Button>
+              </div>
             </div>
           ) : quote ? (
             <>

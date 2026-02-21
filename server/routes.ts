@@ -2129,10 +2129,13 @@ export async function registerRoutes(
 
   app.get('/api/stocks/:symbol/quote', async (req, res) => {
     const { symbol } = req.params;
+    const sym = symbol.toUpperCase();
     try {
-      const quote = await yahoo.getQuote(symbol.toUpperCase());
+      const [quote, profile] = await Promise.all([
+        yahoo.getQuote(sym),
+        fmp.getCompanyProfile(sym).catch(() => null),
+      ]);
       if (quote) {
-        const profile = await fmp.getCompanyProfile(symbol.toUpperCase());
         return res.json({
           ...quote,
           sector: quote.sector || profile?.sector || '',
@@ -2140,11 +2143,37 @@ export async function registerRoutes(
           rs: 0,
         });
       }
+      if (profile && profile.price) {
+        return res.json({
+          symbol: sym,
+          name: profile.name || sym,
+          price: profile.price || 0,
+          change: 0,
+          changePercent: 0,
+          volume: 0,
+          high: profile.price || 0,
+          low: profile.price || 0,
+          open: profile.price || 0,
+          prevClose: profile.price || 0,
+          marketCap: profile.marketCap || 0,
+          peRatio: 0,
+          dividendYield: 0,
+          sector: profile.sector || '',
+          industry: profile.industry || '',
+          week52High: 0,
+          week52Low: 0,
+          avgVolume: 0,
+          fiftyDayAverage: 0,
+          twoHundredDayAverage: 0,
+          avgVolume10Day: 0,
+          rs: 0,
+        });
+      }
     } catch (e: any) {
       if (e instanceof yahoo.RateLimitError || e.name === 'RateLimitError') {
         return res.status(503).json({ message: "Temporarily unavailable, please retry" });
       }
-      console.error(`Quote error for ${symbol}:`, e.message);
+      console.error(`Quote error for ${sym}:`, e.message);
     }
     return res.status(404).json({ message: "Stock not found" });
   });
