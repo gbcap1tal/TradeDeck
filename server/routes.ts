@@ -2574,6 +2574,56 @@ export async function registerRoutes(
       ]);
 
       const snapshot = finvizData?.snapshot || {};
+
+      let finalQuote = quoteData;
+      if (!finalQuote && Object.keys(snapshot).length > 0) {
+        const parseFinvizNum = (v: string | undefined) => {
+          if (!v || v === '-') return 0;
+          const firstNum = v.split(' ')[0];
+          const clean = firstNum.replace(/[,$%]/g, '');
+          const mult = clean.endsWith('B') ? 1e9 : clean.endsWith('M') ? 1e6 : clean.endsWith('T') ? 1e12 : 1;
+          const num = parseFloat(clean.replace(/[BMT]$/, ''));
+          return isNaN(num) ? 0 : num * mult;
+        };
+        const price = parseFinvizNum(snapshot['Price']);
+        const prevClose = parseFinvizNum(snapshot['Prev Close']);
+        const changeVal = price && prevClose ? Math.round((price - prevClose) * 100) / 100 : 0;
+        const changePctRaw = snapshot['Change'] ? parseFloat(snapshot['Change'].replace('%', '')) : 0;
+        const changePct = changePctRaw || (prevClose > 0 ? Math.round((changeVal / prevClose) * 10000) / 100 : 0);
+        let profile: any = null;
+        try { profile = await fmp.getCompanyProfile(sym); } catch {}
+        const sma50Pct = snapshot['SMA50'] ? parseFloat(snapshot['SMA50'].replace('%', '')) : 0;
+        const sma200Pct = snapshot['SMA200'] ? parseFloat(snapshot['SMA200'].replace('%', '')) : 0;
+        const fiftyDayAvg = price && !isNaN(sma50Pct) ? Math.round(price / (1 + sma50Pct / 100) * 100) / 100 : price;
+        const twoHundredDayAvg = price && !isNaN(sma200Pct) ? Math.round(price / (1 + sma200Pct / 100) * 100) / 100 : price;
+        const divMatch = snapshot['Dividend TTM']?.match(/\(([\d.]+)%\)/);
+        finalQuote = {
+          symbol: sym,
+          name: profile?.name || sym,
+          price: price || 0,
+          change: changeVal,
+          changePercent: changePct,
+          volume: parseFinvizNum(snapshot['Volume']),
+          high: price,
+          low: price,
+          open: prevClose || price,
+          prevClose: prevClose || price,
+          marketCap: parseFinvizNum(snapshot['Market Cap']),
+          peRatio: parseFinvizNum(snapshot['P/E']),
+          dividendYield: divMatch ? parseFloat(divMatch[1]) : 0,
+          sector: profile?.sector || '',
+          industry: profile?.industry || '',
+          week52High: parseFinvizNum(snapshot['52W High']),
+          week52Low: parseFinvizNum(snapshot['52W Low']),
+          avgVolume: parseFinvizNum(snapshot['Avg Volume']),
+          avgVolume10Day: parseFinvizNum(snapshot['Avg Volume']),
+          fiftyDayAverage: fiftyDayAvg,
+          twoHundredDayAverage: twoHundredDayAvg,
+          rs: 0,
+        };
+        console.log(`[bundle] ${sym} using Finviz fallback quote (Yahoo unavailable)`);
+      }
+
       const insider = { transactions: insiderTxns, hasBuying: (insiderTxns as any[]).length > 0 };
 
       let earnings: any[] = [];
@@ -2690,7 +2740,7 @@ export async function registerRoutes(
       const timingStr = Object.entries(timings).map(([k, v]) => `${k}=${v}ms`).join(', ');
       console.log(`[bundle] ${sym} ${elapsed}ms (${timingStr})`);
 
-      return { quote: quoteData, snapshot, earnings, insider, news: newsData };
+      return { quote: finalQuote, snapshot, earnings, insider, news: newsData };
     })();
 
     inflightBundles.set(sym, promise);
