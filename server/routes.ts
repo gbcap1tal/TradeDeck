@@ -2744,15 +2744,61 @@ export async function registerRoutes(
     const openai = new OpenAI({ apiKey, baseURL });
 
     try {
-      let context = '';
-      try {
-        const q = await yahoo.getQuote(sym);
-        if (q) {
-          context = `Ticker: ${sym}, Company: ${q.name || sym}, Sector: ${q.sector || 'N/A'}, Industry: ${q.industry || 'N/A'}, Market Cap: ${q.marketCap || 'N/A'}, Price: $${q.price?.toFixed(2) || 'N/A'}, 52W Range: $${q.fiftyTwoWeekLow?.toFixed(2) || '?'}-$${q.fiftyTwoWeekHigh?.toFixed(2) || '?'}, PE: ${q.pe || 'N/A'}`;
-        }
-      } catch {}
+      const today = new Date();
+      const todayStr = today.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
-      const prompt = `You are an elite equity research analyst writing a briefing for an active trader. Create a detailed company profile for ${sym}.${context ? ` Context: ${context}` : ''}
+      const [quoteResult, incomeResult, cashFlowResult, metricsResult, newsResult] = await Promise.allSettled([
+        yahoo.getQuote(sym),
+        fmp.getIncomeStatement(sym, 'quarter', 4),
+        fmp.getCashFlowStatement(sym),
+        fmp.getKeyMetrics(sym),
+        fmp.getStockNews(sym),
+      ]);
+
+      const q = quoteResult.status === 'fulfilled' ? quoteResult.value : null;
+      const incomeData = incomeResult.status === 'fulfilled' ? incomeResult.value : null;
+      const cashFlowData = cashFlowResult.status === 'fulfilled' ? cashFlowResult.value : null;
+      const metricsData = metricsResult.status === 'fulfilled' ? metricsResult.value : null;
+      const newsData = newsResult.status === 'fulfilled' ? newsResult.value : null;
+
+      let context = `TODAY'S DATE: ${todayStr}.\n`;
+
+      if (q) {
+        context += `Ticker: ${sym}, Company: ${q.name || sym}, Sector: ${q.sector || 'N/A'}, Industry: ${q.industry || 'N/A'}, Market Cap: ${q.marketCap || 'N/A'}, Price: $${q.price?.toFixed(2) || 'N/A'}, 52W Range: $${q.fiftyTwoWeekLow?.toFixed(2) || '?'}-$${q.fiftyTwoWeekHigh?.toFixed(2) || '?'}, PE: ${q.pe || 'N/A'}\n`;
+      }
+
+      if (incomeData && incomeData.length > 0) {
+        context += `\nRECENT QUARTERLY FINANCIALS (most recent first):\n`;
+        for (const s of incomeData.slice(0, 4)) {
+          context += `  ${s.date}: Revenue $${(s.revenue / 1e6).toFixed(1)}M, EPS $${(s.epsDiluted ?? s.eps ?? 0).toFixed(2)}, Net Income $${(s.netIncome / 1e6).toFixed(1)}M, Gross Profit $${(s.grossProfit / 1e6).toFixed(1)}M\n`;
+        }
+      }
+
+      if (cashFlowData && cashFlowData.length > 0) {
+        const latest = cashFlowData[0];
+        context += `\nLATEST CASH FLOW (${latest.date}): Operating CF $${((latest.operatingCashFlow || 0) / 1e6).toFixed(1)}M, CapEx $${((latest.capitalExpenditure || 0) / 1e6).toFixed(1)}M, FCF $${((latest.freeCashFlow || 0) / 1e6).toFixed(1)}M\n`;
+      }
+
+      if (metricsData && metricsData.length > 0) {
+        const m = metricsData[0];
+        context += `\nKEY METRICS (${m.date}): Debt/Equity ${(m.debtToEquity ?? 'N/A')}, Current Ratio ${(m.currentRatio ?? 'N/A')}, ROE ${m.roe != null ? (m.roe * 100).toFixed(1) + '%' : 'N/A'}, Revenue/Share $${(m.revenuePerShare ?? 'N/A')}\n`;
+      }
+
+      if (newsData && newsData.length > 0) {
+        context += `\nRECENT NEWS HEADLINES:\n`;
+        for (const n of newsData.slice(0, 5)) {
+          const nDate = new Date(n.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+          context += `  [${nDate}] ${n.headline}\n`;
+        }
+      }
+
+      const prompt = `You are an elite equity research analyst writing a briefing for an active trader. Create a detailed company profile for ${sym}.
+
+IMPORTANT: Today is ${todayStr}. ALL data below is REAL and CURRENT. Base your analysis ONLY on the provided data. Do NOT invent earnings dates, catalysts, FDA decisions, or events. If you don't have specific upcoming event data, say "No confirmed near-term catalysts in available data" rather than fabricating dates. For the Catalysts row, focus on what can be reasonably inferred from the data provided (e.g., next quarterly earnings is likely ~3 months after the last reported quarter).
+
+--- PROVIDED DATA ---
+${context}
+--- END DATA ---
 
 1. **Explain Like I'm 12** — Three short bullet points about what the company does. Use relatable examples and analogies a kid would understand. Keep it fun and clear.
 
@@ -2765,15 +2811,15 @@ export async function registerRoutes(
 - If biotech/pharma: pipeline stage, key drugs, FDA timeline, cash runway
 - If tech: TAM size, growth rate, customer concentration, Rule of 40 score if SaaS
 
-3. **Key Intel Table** — Provide in a markdown table with columns "Category" and "Details". Be SPECIFIC — use real names, dates, dollar amounts, percentages. Never write vague filler like "analysts are watching closely".
+3. **Key Intel Table** — Provide in a markdown table with columns "Category" and "Details". Be SPECIFIC — use real names, dates, dollar amounts, percentages from the PROVIDED DATA above. Never write vague filler like "analysts are watching closely".
 | Category | Details |
 |----------|---------|
 | Hot Theme/Narrative | The specific trending story or macro theme driving interest (AI, GLP-1, reshoring, defense spending, etc.) — explain WHY this stock is linked to it |
-| Bull Case | The strongest 2-3 arguments for owning this stock right now |
+| Bull Case | The strongest 2-3 arguments for owning this stock right now, referencing the provided financials |
 | Bear Case | The strongest 2-3 risks or concerns — be honest and specific |
-| Key Fundamentals | Revenue/EPS growth rates (YoY), margins trend, debt/cash position, FCF yield |
-| Catalysts (Next 60 days) | Specific upcoming events: earnings date, FDA decisions, product launches, conferences, lock-up expirations |
-| Institutional Activity | Notable fund positions, 13F changes, insider transactions if significant |
+| Key Fundamentals | Use the PROVIDED quarterly financials: revenue/EPS growth rates (YoY), margins trend, debt/cash position, FCF |
+| Catalysts (Next 60 days) | ONLY mention events you can reasonably infer from the data (e.g., approximate next earnings date). Do NOT fabricate specific dates for FDA decisions, conferences, or product launches |
+| Institutional Activity | Notable fund positions, 13F changes, insider transactions if known from news |
 
 Be direct, opinionated, and useful for trading decisions. Avoid generic statements.`;
 
@@ -2781,7 +2827,7 @@ Be direct, opinionated, and useful for trading decisions. Avoid generic statemen
         model: 'gpt-4.1-mini',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 1500,
-        temperature: 0.4,
+        temperature: 0.3,
       });
 
       const summary = completion.choices?.[0]?.message?.content || 'No summary available.';
